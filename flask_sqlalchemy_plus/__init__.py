@@ -1,1 +1,2 @@
-from flask_sqlalchemy_plus import FlaskSQLAlchemyPlus
+from .core import FlaskSQLAlchemyPlus
+from .queryplus import QueryPlus

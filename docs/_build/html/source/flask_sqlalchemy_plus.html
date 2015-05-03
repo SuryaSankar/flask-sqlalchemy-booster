@@ -1,0 +1,549 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>flask_sqlalchemy_plus package &mdash; flask_sqlalchemy_plus 0.1.1 documentation</title>
+    
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.1.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="top" title="flask_sqlalchemy_plus 0.1.1 documentation" href="../index.html" />
+   
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+
+  </head>
+  <body role="document">
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">flask_sqlalchemy_plus 0.1.1 documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="flask-sqlalchemy-plus-package">
+<h1>flask_sqlalchemy_plus package<a class="headerlink" href="#flask-sqlalchemy-plus-package" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="module-flask_sqlalchemy_plus.core">
+<span id="flask-sqlalchemy-plus-core-module"></span><h2>flask_sqlalchemy_plus.core module<a class="headerlink" href="#module-flask_sqlalchemy_plus.core" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="flask_sqlalchemy_plus.core.FlaskSQLAlchemyPlus">
+<em class="property">class </em><code class="descclassname">flask_sqlalchemy_plus.core.</code><code class="descname">FlaskSQLAlchemyPlus</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/core.html#FlaskSQLAlchemyPlus"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.core.FlaskSQLAlchemyPlus" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">flask_sqlalchemy.SQLAlchemy</span></code></p>
+<p>Sets the Model class to ModelPlus, providing all the methods
+defined on ModelPlus</p>
+<p class="rubric">Examples</p>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">db</span> <span class="o">=</span> <span class="n">FlaskSQLAlchemyPlus</span><span class="p">()</span>
+</pre></div>
+</div>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">User</span><span class="p">(</span><span class="n">db</span><span class="o">.</span><span class="n">Model</span><span class="p">):</span>
+<span class="go">        id = db.Column(db.Integer, primary_key=True, unique=True)</span>
+<span class="go">        email = db.Column(db.String(100), unique=True)</span>
+<span class="go">        password = db.Column(db.String(100))</span>
+<span class="go">        name = db.Column(db.String(100))</span>
+<span class="go">        contact_number = db.Column(db.String(20))</span>
+</pre></div>
+</div>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">User</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
+</pre></div>
+</div>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">u</span> <span class="o">=</span> <span class="n">User</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+</pre></div>
+</div>
+<div class="highlight-python"><div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="n">u</span><span class="o">.</span><span class="n">todict</span><span class="p">()</span>
+</pre></div>
+</div>
+<dl class="method">
+<dt id="flask_sqlalchemy_plus.core.FlaskSQLAlchemyPlus.make_declarative_base">
+<code class="descname">make_declarative_base</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/core.html#FlaskSQLAlchemyPlus.make_declarative_base"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.core.FlaskSQLAlchemyPlus.make_declarative_base" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="flask_sqlalchemy_plus.core.QueryPropertyPlus">
+<em class="property">class </em><code class="descclassname">flask_sqlalchemy_plus.core.</code><code class="descname">QueryPropertyPlus</code><span class="sig-paren">(</span><em>sa</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/core.html#QueryPropertyPlus"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.core.QueryPropertyPlus" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">flask_sqlalchemy._QueryProperty</span></code></p>
+<p>Subclassed to add the cls attribute to a query instance.</p>
+<p>This is useful in instances when we need to find the class
+of the model being queried when provided only with a query
+object</p>
+</dd></dl>
+
+</div>
+<div class="section" id="module-flask_sqlalchemy_plus.modelplus">
+<span id="flask-sqlalchemy-plus-modelplus-module"></span><h2>flask_sqlalchemy_plus.modelplus module<a class="headerlink" href="#module-flask_sqlalchemy_plus.modelplus" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus">
+<em class="property">class </em><code class="descclassname">flask_sqlalchemy_plus.modelplus.</code><code class="descname">ModelPlus</code><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">flask_sqlalchemy.Model</span></code></p>
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.add">
+<em class="property">classmethod </em><code class="descname">add</code><span class="sig-paren">(</span><em>model</em>, <em>commit=True</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.add"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.add" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.add_all">
+<em class="property">classmethod </em><code class="descname">add_all</code><span class="sig-paren">(</span><em>models</em>, <em>commit=True</em>, <em>check_type=False</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.add_all"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.add_all" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.all">
+<em class="property">classmethod </em><code class="descname">all</code><span class="sig-paren">(</span><em>*criterion</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.all"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.all" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a list of instances of the service&#8217;s model filtered by the
+specified key word arguments.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**kwargs</strong> &#8211; <p>filter parameters</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.build">
+<em class="property">classmethod </em><code class="descname">build</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.build"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.build" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a new, added but unsaved instance of the service&#8217;s model class.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**kwargs</strong> &#8211; <p>instance parameters</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.build_all">
+<em class="property">classmethod </em><code class="descname">build_all</code><span class="sig-paren">(</span><em>list_of_kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.build_all"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.build_all" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.commit">
+<code class="descname">commit</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.commit"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.commit" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.count">
+<em class="property">classmethod </em><code class="descname">count</code><span class="sig-paren">(</span><em>*criterion</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.count"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.count" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.create">
+<em class="property">classmethod </em><code class="descname">create</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.create"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.create" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a new, saved instance of the service&#8217;s model class.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**kwargs</strong> &#8211; <p>instance parameters</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.create_all">
+<em class="property">classmethod </em><code class="descname">create_all</code><span class="sig-paren">(</span><em>list_of_kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.create_all"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.create_all" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.delete">
+<code class="descname">delete</code><span class="sig-paren">(</span><em>commit=True</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.delete"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.delete" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.filter">
+<em class="property">classmethod </em><code class="descname">filter</code><span class="sig-paren">(</span><em>*criterion</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.filter"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.filter" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.filter_by">
+<em class="property">classmethod </em><code class="descname">filter_by</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.filter_by"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.filter_by" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a list of instances of the service&#8217;s model filtered by the
+specified key word arguments.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**kwargs</strong> &#8211; <p>filter parameters</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.find_or_build">
+<em class="property">classmethod </em><code class="descname">find_or_build</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.find_or_build"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.find_or_build" title="Permalink to this definition">¶</a></dt>
+<dd><p>Checks if an instance already exists in db with these kwargs else
+returns a new, saved instance of the service&#8217;s model class.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**kwargs</strong> &#8211; <p>instance parameters</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.find_or_build_all">
+<em class="property">classmethod </em><code class="descname">find_or_build_all</code><span class="sig-paren">(</span><em>list_of_kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.find_or_build_all"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.find_or_build_all" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.find_or_create">
+<em class="property">classmethod </em><code class="descname">find_or_create</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.find_or_create"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.find_or_create" title="Permalink to this definition">¶</a></dt>
+<dd><p>Checks if an instance already exists in db with these kwargs else
+returns a new, saved instance of the service&#8217;s model class.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**kwargs</strong> &#8211; <p>instance parameters</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.find_or_create_all">
+<em class="property">classmethod </em><code class="descname">find_or_create_all</code><span class="sig-paren">(</span><em>list_of_kwargs</em>, <em>keys=[]</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.find_or_create_all"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.find_or_create_all" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.first">
+<em class="property">classmethod </em><code class="descname">first</code><span class="sig-paren">(</span><em>*criterion</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.first"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.first" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the first instance found of the service&#8217;s model filtered by
+the specified key word arguments.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**kwargs</strong> &#8211; <p>filter parameters</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.get">
+<em class="property">classmethod </em><code class="descname">get</code><span class="sig-paren">(</span><em>keyval</em>, <em>key='id'</em>, <em>user_id=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.get"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.get" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns an instance of the service&#8217;s model with the specified id.
+Returns <cite>None</cite> if an instance with the specified id does not exist.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>id</strong> &#8211; the instance id</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.get_all">
+<em class="property">classmethod </em><code class="descname">get_all</code><span class="sig-paren">(</span><em>keyvals</em>, <em>key='id'</em>, <em>user_id=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.get_all"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.get_all" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.get_and_setattr">
+<em class="property">classmethod </em><code class="descname">get_and_setattr</code><span class="sig-paren">(</span><em>id</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.get_and_setattr"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.get_and_setattr" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns an updated instance of the service&#8217;s model class.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>model</strong> &#8211; the model to update</li>
+<li><strong>**kwargs</strong> &#8211; <p>update parameters</p>
+</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.get_and_update">
+<em class="property">classmethod </em><code class="descname">get_and_update</code><span class="sig-paren">(</span><em>id</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.get_and_update"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.get_and_update" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns an updated instance of the service&#8217;s model class.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>model</strong> &#8211; the model to update</li>
+<li><strong>**kwargs</strong> &#8211; <p>update parameters</p>
+</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.get_or_404">
+<em class="property">classmethod </em><code class="descname">get_or_404</code><span class="sig-paren">(</span><em>id</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.get_or_404"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.get_or_404" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns an instance of the service&#8217;s model with the specified id or
+raises an 404 error if an instance with the specified id does not exist</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>id</strong> &#8211; the instance id</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.is_list_attribute">
+<em class="property">classmethod </em><code class="descname">is_list_attribute</code><span class="sig-paren">(</span><em>rel</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.is_list_attribute"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.is_list_attribute" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.last">
+<em class="property">classmethod </em><code class="descname">last</code><span class="sig-paren">(</span><em>*criterion</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.last"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.last" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.new">
+<em class="property">classmethod </em><code class="descname">new</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.new"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.new" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a new, unsaved instance of the service&#8217;s model class.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>**kwargs</strong> &#8211; <p>instance parameters</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.new_all">
+<em class="property">classmethod </em><code class="descname">new_all</code><span class="sig-paren">(</span><em>list_of_kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.new_all"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.new_all" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.one">
+<em class="property">classmethod </em><code class="descname">one</code><span class="sig-paren">(</span><em>*criterion</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.one"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.one" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.query_class">
+<code class="descname">query_class</code><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.query_class" title="Permalink to this definition">¶</a></dt>
+<dd><p>alias of <code class="xref py py-class docutils literal"><span class="pre">QueryPlus</span></code></p>
+</dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.rollback_session">
+<em class="property">classmethod </em><code class="descname">rollback_session</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.rollback_session"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.rollback_session" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.save">
+<code class="descname">save</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.save"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.save" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.serialize_attrs">
+<code class="descname">serialize_attrs</code><span class="sig-paren">(</span><em>*args</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.serialize_attrs"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.serialize_attrs" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.session">
+<code class="descname">session</code><em class="property"> = None</em><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.session" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.to_serializable_dict">
+<code class="descname">to_serializable_dict</code><span class="sig-paren">(</span><em>attrs_to_serialize=None</em>, <em>rels_to_expand=None</em>, <em>rels_to_serialize=None</em>, <em>key_modifications=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.to_serializable_dict"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.to_serializable_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Just an alias for some functions which might still use old name</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.todict">
+<code class="descname">todict</code><span class="sig-paren">(</span><em>attrs_to_serialize=None</em>, <em>rels_to_expand=None</em>, <em>rels_to_serialize=None</em>, <em>group_listrels_by=None</em>, <em>key_modifications=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.todict"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.todict" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.tojson">
+<code class="descname">tojson</code><span class="sig-paren">(</span><em>attrs_to_serialize=None</em>, <em>rels_to_expand=None</em>, <em>rels_to_serialize=None</em>, <em>key_modifications=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.tojson"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.tojson" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.update">
+<code class="descname">update</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.update"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.update" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.update_all">
+<em class="property">classmethod </em><code class="descname">update_all</code><span class="sig-paren">(</span><em>*criterion</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.update_all"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.update_all" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.update_or_create">
+<em class="property">classmethod </em><code class="descname">update_or_create</code><span class="sig-paren">(</span><em>**kwargs</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.update_or_create"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.update_or_create" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="classmethod">
+<dt id="flask_sqlalchemy_plus.modelplus.ModelPlus.update_or_create_all">
+<em class="property">classmethod </em><code class="descname">update_or_create_all</code><span class="sig-paren">(</span><em>list_of_kwargs</em>, <em>keys=[]</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#ModelPlus.update_or_create_all"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.ModelPlus.update_or_create_all" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="flask_sqlalchemy_plus.modelplus.dthandler">
+<code class="descclassname">flask_sqlalchemy_plus.modelplus.</code><code class="descname">dthandler</code><span class="sig-paren">(</span><em>obj</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#dthandler"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.dthandler" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="flask_sqlalchemy_plus.modelplus.is_dict_like">
+<code class="descclassname">flask_sqlalchemy_plus.modelplus.</code><code class="descname">is_dict_like</code><span class="sig-paren">(</span><em>rel_instance</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#is_dict_like"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.is_dict_like" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="flask_sqlalchemy_plus.modelplus.is_list_like">
+<code class="descclassname">flask_sqlalchemy_plus.modelplus.</code><code class="descname">is_list_like</code><span class="sig-paren">(</span><em>rel_instance</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#is_list_like"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.is_list_like" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="flask_sqlalchemy_plus.modelplus.serialized_list">
+<code class="descclassname">flask_sqlalchemy_plus.modelplus.</code><code class="descname">serialized_list</code><span class="sig-paren">(</span><em>olist</em>, <em>rels_to_expand=[]</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/modelplus.html#serialized_list"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.modelplus.serialized_list" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</div>
+<div class="section" id="module-flask_sqlalchemy_plus.queryplus">
+<span id="flask-sqlalchemy-plus-queryplus-module"></span><h2>flask_sqlalchemy_plus.queryplus module<a class="headerlink" href="#module-flask_sqlalchemy_plus.queryplus" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="flask_sqlalchemy_plus.queryplus.QueryPlus">
+<em class="property">class </em><code class="descclassname">flask_sqlalchemy_plus.queryplus.</code><code class="descname">QueryPlus</code><span class="sig-paren">(</span><em>entities</em>, <em>session=None</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/queryplus.html#QueryPlus"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.queryplus.QueryPlus" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal"><span class="pre">flask_sqlalchemy.BaseQuery</span></code></p>
+<dl class="method">
+<dt id="flask_sqlalchemy_plus.queryplus.QueryPlus.asc">
+<code class="descname">asc</code><span class="sig-paren">(</span><em>attr='id'</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/queryplus.html#QueryPlus.asc"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.queryplus.QueryPlus.asc" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="attribute">
+<dt id="flask_sqlalchemy_plus.queryplus.QueryPlus.cls">
+<code class="descname">cls</code><em class="property"> = None</em><a class="headerlink" href="#flask_sqlalchemy_plus.queryplus.QueryPlus.cls" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="flask_sqlalchemy_plus.queryplus.QueryPlus.desc">
+<code class="descname">desc</code><span class="sig-paren">(</span><em>attr='id'</em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/flask_sqlalchemy_plus/queryplus.html#QueryPlus.desc"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#flask_sqlalchemy_plus.queryplus.QueryPlus.desc" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="module-flask_sqlalchemy_plus">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-flask_sqlalchemy_plus" title="Permalink to this headline">¶</a></h2>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">flask_sqlalchemy_plus package</a><ul>
+<li><a class="reference internal" href="#submodules">Submodules</a></li>
+<li><a class="reference internal" href="#module-flask_sqlalchemy_plus.core">flask_sqlalchemy_plus.core module</a></li>
+<li><a class="reference internal" href="#module-flask_sqlalchemy_plus.modelplus">flask_sqlalchemy_plus.modelplus module</a></li>
+<li><a class="reference internal" href="#module-flask_sqlalchemy_plus.queryplus">flask_sqlalchemy_plus.queryplus module</a></li>
+<li><a class="reference internal" href="#module-flask_sqlalchemy_plus">Module contents</a></li>
+</ul>
+</li>
+</ul>
+
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/source/flask_sqlalchemy_plus.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2015, SuryaSankar.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.3</a>
+      
+      |
+      <a href="../_sources/source/flask_sqlalchemy_plus.txt"
+          rel="nofollow">Page source</a></li>
+    </div>
+
+    
+
+    
+  </body>
+</html>
