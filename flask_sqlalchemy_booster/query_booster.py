@@ -1,7 +1,7 @@
 from flask_sqlalchemy import BaseQuery
 
 
-class QueryPlus(BaseQuery):
+class QueryBooster(BaseQuery):
 
     cls = None
 

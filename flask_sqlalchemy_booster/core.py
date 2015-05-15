@@ -1,12 +1,12 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_sqlalchemy import (
     _QueryProperty, _BoundDeclarativeMeta)
-from .queryplus import QueryPlus
+from .query_booster import QueryBooster
 from sqlalchemy.ext.declarative import declarative_base
-from .modelplus import ModelPlus
+from .model_booster import ModelBooster
 
 
-class QueryPropertyPlus(_QueryProperty):
+class QueryPropertyWithModelClass(_QueryProperty):
     """Subclassed to add the cls attribute to a query instance.
 
     This is useful in instances when we need to find the class
@@ -15,20 +15,20 @@ class QueryPropertyPlus(_QueryProperty):
     """
 
     def __get__(self, obj, type_):
-        query = super(QueryPropertyPlus, self).__get__(obj, type_)
+        query = super(QueryPropertyWithModelClass, self).__get__(obj, type_)
         if query:
-            query.cls = type_
+            query.model_class = type_
         return query
 
 
-class FlaskSQLAlchemyPlus(SQLAlchemy):
+class FlaskSQLAlchemyBooster(SQLAlchemy):
     """Sets the Model class to ModelPlus, providing all the methods
     defined on ModelPlus
 
     Examples
     --------
 
-    >>> db = FlaskSQLAlchemyPlus()
+    >>> db = FlaskSQLAlchemyBooster()
 
     >>> class User(db.Model):
             id = db.Column(db.Integer, primary_key=True, unique=True)
@@ -46,13 +46,13 @@ class FlaskSQLAlchemyPlus(SQLAlchemy):
     """
 
     def __init__(self, **kwargs):
-        super(FlaskSQLAlchemyPlus, self).__init__(**kwargs)
-        self.Query = QueryPlus
+        super(FlaskSQLAlchemyBooster, self).__init__(**kwargs)
+        self.Query = QueryBooster
 
     def make_declarative_base(self):
 
-        base = declarative_base(cls=ModelPlus, name='Model',
+        base = declarative_base(cls=ModelBooster, name='Model',
                                 metaclass=_BoundDeclarativeMeta)
-        base.query = QueryPropertyPlus(self)
+        base.query = QueryPropertyWithModelClass(self)
         base.session = self.session
         return base
