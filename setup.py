@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='flask-sqlalchemy-booster',
-    version='0.1.3',
+    version='0.1.0',
     long_description='A wrapper around Flask-SQLalchemy',
     packages=['flask_sqlalchemy_booster'],
     include_package_data=True,
@@ -13,5 +13,6 @@ setup(
         "Flask-SQLAlchemy>=2.0"
         ],
     license='MIT',
+    url='https://github.com/inkmonk/flask-sqlalchemy-booster',
     author='SuryaSankar',
     author_email='suryashankar.m@gmail.com')
