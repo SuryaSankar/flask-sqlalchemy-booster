@@ -1,3 +1,8 @@
+"""DictizableMixin
+A mixin class to add `todict` method to objects.
+
+"""
+
 from sqlalchemy.ext.associationproxy import AssociationProxy
 from .utils import is_list_like, is_dict_like
 from toolspy import deep_group
@@ -14,15 +19,41 @@ def serialized_list(olist, rels_to_expand=[]):
 
 class DictizableMixin(object):
 
-    # The scalar attributes to serialize.
+    """
+    Attributes
+    ----------
+
+    _attrs_to_serialize_ : list of str
+        The columns which should be serialized as a part of the output
+        dictionary
+
+    _key_modifications_ : dict of str,str
+        A dictionary used to map the display names of columns whose
+        original name you want to be modified in the json
+
+    _rels_to_serialize_ : list of (str, str)
+        A list of tuples. The first element of the tuple is the relationship
+        that is to be serialized. The second element it the name of the
+        attribute in the related model, the value of which is to be used
+        as the representation
+
+    _rels_to_expand_ : list of str
+        A list of relationships to expand. You can specify nested relationships
+        by placing dots.
+
+    _group_listrels_by_ : dict of str, list of str
+        A dictionary representing how to hierarchially group a list
+        like relationship. The relationship fields are the keys and
+        the list of the attributes based on which they are to be grouped
+        are the values.
+
+
+    """
+
     _attrs_to_serialize_ = []
-
-    # Change the name of any attribute to anything else
     _key_modifications_ = {}
-
     _rels_to_serialize_ = []
     _rels_to_expand_ = []
-
     _group_listrels_by_ = {}
 
     @classmethod
@@ -53,8 +84,38 @@ class DictizableMixin(object):
                rels_to_serialize=None,
                group_listrels_by=None,
                key_modifications=None):
-        # The most important method in the code base. Gets called
-        # for every request.
+
+        """Converts an instance to a dictionary form
+
+        Parameters
+        ----------
+
+        attrs_to_serialize : list of str
+            The columns which should be serialized as a part of the output
+            dictionary
+
+        key_modifications : dict of str,str
+            A dictionary used to map the display names of columns whose
+            original name you want to be modified in the json
+
+        rels_to_serialize : list of (str, str)
+            A list of tuples. The first element of the tuple is the relationship
+            that is to be serialized. The second element it the name of the
+            attribute in the related model, the value of which is to be used
+            as the representation
+
+        rels_to_expand : list of str
+            A list of relationships to expand. You can specify nested relationships
+            by placing dots.
+
+        group_listrels_by : dict of str, list of str
+            A dictionary representing how to hierarchially group a list
+            like relationship. The relationship fields are the keys and
+            the list of the attributes based on which they are to be grouped
+            are the values.
+
+
+        """
 
         # Never replace the following code by the (attrs = attrs or
         # self._attrs_) idiom. Python considers empty list as false. So
@@ -70,9 +131,6 @@ class DictizableMixin(object):
         rels_to_expand = (
             self._rels_to_expand_ if rels_to_expand is None
             else rels_to_expand)
-        # assoc_proxies_to_expand = (
-        #     self._assoc_proxies_to_expand_ if assoc_proxies_to_expand is None
-        #     else assoc_proxies_to_expand)
         key_modifications = (
             self._key_modifications_ if key_modifications is None
             else key_modifications)
@@ -165,6 +223,23 @@ class DictizableMixin(object):
         return result
 
     def serialize_attrs(self, *args):
+        """Converts and instance to a dictionary with only the specified
+        attributes as keys
+
+        Parameters
+        ----------
+        *args : args list of str
+            The arguments to serialize
+
+        Examples
+        --------
+
+        >>> customer = Customer.create(name="James Bond", email="007@mi.com",
+                                       phone="007", city="London")
+        >>> customer.serialize_attrs('name', 'email')
+        {'name': u'James Bond', 'email': u'007@mi.com'}
+
+        """
         return dict([(a, getattr(self, a)) for a in args])
 
     def tojson(self, attrs_to_serialize=None,

@@ -10,12 +10,29 @@ from toolspy import place_nulls, subdict, remove_and_mark_duplicate_dicts
 
 class QueryableMixin(object):
 
-    __no_overwrite__ = []
+    """
+    Attributes
+    ----------
+    _no_overwrite_: list
+                    The list of attributes that should not be overwritten
+
+    """
+
+    _no_overwrite_ = []
 
     def update(self, **kwargs):
+        """updates an instance
+
+        Parameters
+        ----------
+        **kwargs: Arbitrary keyword arguments
+                  Column names are keywords and their new values are the values
+
+        >>> customer.update(email="newemail@x.com", name="new")
+        """
         kwargs = self._preprocess_params(kwargs)
         for key, value in kwargs.iteritems():
-            if key not in self.__no_overwrite__:
+            if key not in self._no_overwrite_:
                 setattr(self, key, value)
         try:
             self.session.commit()
@@ -28,6 +45,13 @@ class QueryableMixin(object):
         self.session.commit()
 
     def save(self):
+        """
+        Saves a model instance to db
+
+        >>> customer = Customer.new(name="hari")
+        >>> customer.save()
+
+        """
         self.session.add(self)
         self.session.commit()
 
@@ -37,12 +61,15 @@ class QueryableMixin(object):
             self.session.commit
 
     def _isinstance(self, model, raise_error=True):
-        """Checks if the specified model instance matches the service's model.
+        """Checks if the specified model instance matches the class model.
         By default this method will raise a `ValueError` if the model is not of
         expected type.
 
-        :param model: the model instance to check
-        :param raise_error: flag to raise an error on a mismatch
+        Parameters
+        ----------
+
+        model: Class
+        raise_error: boolean
         """
         rv = isinstance(model, self.__model__)
         if not rv and raise_error:
@@ -58,7 +85,10 @@ class QueryableMixin(object):
         """Returns a preprocessed dictionary of parameters. Used by default
         before creating a new instance or updating an existing instance.
 
-        :param kwargs: a dictionary of parameters
+        Parameters
+        -----------
+
+        **kwargs: a dictionary of parameters
         """
         kwargs.pop('csrf_token', None)
         return kwargs
@@ -68,7 +98,11 @@ class QueryableMixin(object):
         """Returns a list of instances of the model filtered by the
         specified key word arguments.
 
-        :param **kwargs: filter parameters
+        Parameters
+        ----------
+
+        **kwargs: filter parameters
+
         """
         limit = kwargs.pop('limit', None)
         reverse = kwargs.pop('reverse', False)
@@ -244,7 +278,7 @@ class QueryableMixin(object):
         if obj is not None:
             for key, value in kwargs.iteritems():
                 if (key not in keys and
-                        key not in cls.__no_overwrite__):
+                        key not in cls._no_overwrite_):
                     setattr(obj, key, value)
             try:
                 cls.session.commit()
@@ -289,7 +323,7 @@ class QueryableMixin(object):
             if obj is not None:
                 for key, value in kwargs.iteritems():
                     if (key not in keys and
-                            key not in cls.__no_overwrite__):
+                            key not in cls._no_overwrite_):
                         setattr(obj, key, value)
             else:
                 obj = cls.new(**kwargs)
