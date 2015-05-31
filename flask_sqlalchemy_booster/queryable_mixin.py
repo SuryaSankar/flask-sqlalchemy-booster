@@ -21,7 +21,7 @@ class QueryableMixin(object):
     _no_overwrite_ = []
 
     def update(self, **kwargs):
-        """updates an instance
+        """Updates an instance
 
         Parameters
         ----------
@@ -82,8 +82,9 @@ class QueryableMixin(object):
 
     @classmethod
     def _preprocess_params(cls, kwargs):
-        """Returns a preprocessed dictionary of parameters. Used by default
-        before creating a new instance or updating an existing instance.
+        """Returns a preprocessed dictionary of parameters.
+        Use this to filter the kwargs passed to `new`, `create`,
+        `build` methods.
 
         Parameters
         -----------
@@ -95,13 +96,20 @@ class QueryableMixin(object):
 
     @classmethod
     def filter_by(cls, **kwargs):
-        """Returns a list of instances of the model filtered by the
-        specified key word arguments.
+        """Same as SQLAlchemy's filter_by. Additionally this accepts
+        two special keyword arguments `limit` and `reverse` for limiting
+        the results and reversing the order respectively
 
         Parameters
         ----------
 
         **kwargs: filter parameters
+
+        Examples
+        --------
+        >>> user = User.filter_by(email="new@x.com")
+
+        >>> shipments = Shipment.filter_by(country="India", limit=3, reverse=True)
 
         """
         limit = kwargs.pop('limit', None)
@@ -115,6 +123,22 @@ class QueryableMixin(object):
 
     @classmethod
     def filter(cls, *criterion, **kwargs):
+        """Same as SQLAlchemy's filter_by. Additionally this accepts
+        two special keyword arguments `limit` and `reverse` for limiting
+        the results and reversing the order respectively
+
+        Parameters
+        ----------
+
+        **kwargs: filter parameters
+
+        Examples
+        --------
+        >>> user = User.filter(User.email=="new@x.com")
+
+        >>> shipments = Order.filter(Order.price < 500, limit=3, reverse=True)
+
+        """
         limit = kwargs.pop('limit', None)
         reverse = kwargs.pop('reverse', False)
         q = cls.query.filter_by(**kwargs).filter(*criterion)
@@ -126,6 +150,22 @@ class QueryableMixin(object):
 
     @classmethod
     def count(cls, *criterion, **kwargs):
+        """Returns a count of the instances meeting the specified
+        filter criterion and kwargs
+
+        Examples
+        --------
+
+        >>> User.count()
+        500
+
+        >>> User.count(country="India")
+        300
+
+        >>> User.count(User.age > 50, country="India")
+        39
+
+        """
         if criterion or kwargs:
             return cls.filter(
                 *criterion,
@@ -135,10 +175,20 @@ class QueryableMixin(object):
 
     @classmethod
     def all(cls, *criterion, **kwargs):
-        """Returns a list of instances of the service's model filtered by the
-        specified key word arguments.
+        """Returns all the instances which fulfill the filtering
+        criterion and kwargs if any given.
 
-        :param **kwargs: filter parameters
+        Examples
+        ---------
+
+        >>> Tshirt.all()
+        [tee1, tee2, tee4, tee5]
+
+        >> Tshirt.all(reverse=True, limit=3)
+        [tee5, tee4, tee2]
+
+        >> Tshirt.all(color="Red")
+        [tee4, tee2]
         """
         return cls.filter(*criterion, **kwargs).all()
 

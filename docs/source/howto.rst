@@ -25,3 +25,5 @@ You can then subclass the `db.Model` class to create your model classes::
 	    id = db.Column(db.Integer, primary_key=True, unique=True)
     	user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
 
+
+
