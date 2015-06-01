@@ -23,7 +23,7 @@ class QueryPropertyWithModelClass(_QueryProperty):
 
 class FlaskSQLAlchemyBooster(SQLAlchemy):
     """Sets the Model class to ModelBooster, providing all the methods
-    defined on ModelBooster
+    defined on ModelBooster.
 
     Examples
     --------

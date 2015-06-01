@@ -254,8 +254,6 @@ def as_processed_list(func):
                     if value.lower() == 'none':
                         value = None
                     result = filter_query_with_key(result, kw, value, '=')
-                    # result = result.filter(
-                    #     getattr(result.cls, kw) == value)
         if sort:
             if sort == 'asc':
                 result = result.asc(orderby)

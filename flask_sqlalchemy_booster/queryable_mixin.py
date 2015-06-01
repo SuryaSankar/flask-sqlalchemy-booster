@@ -1,34 +1,33 @@
-"""
-Borrows heavily from
-https://github.com/mattupstate/overholt/blob/master/overholt/core.py
-
-"""
-
 from sqlalchemy import func
 from toolspy import place_nulls, subdict, remove_and_mark_duplicate_dicts
 
 
 class QueryableMixin(object):
 
-    """
+    """Contains all querying methods. Used for common ORM operations
+
     Attributes
     ----------
     _no_overwrite_: list
-                    The list of attributes that should not be overwritten
+                    The list of attributes that should not be overwritten.
 
     """
 
     _no_overwrite_ = []
 
     def update(self, **kwargs):
-        """Updates an instance
+        """Updates an instance.
 
         Parameters
-        ----------
-        **kwargs: Arbitrary keyword arguments
-                  Column names are keywords and their new values are the values
+        -----------
+        kwargs  :   kwargs
+                    Arbitrary keyword arguments. Column names are keywords and their new values are the values.
+
+        Examples
+        ---------
 
         >>> customer.update(email="newemail@x.com", name="new")
+
         """
         kwargs = self._preprocess_params(kwargs)
         for key, value in kwargs.iteritems():
@@ -42,11 +41,15 @@ class QueryableMixin(object):
             raise e
 
     def commit(self):
+        """Commits a transaction.
+        """
         self.session.commit()
 
     def save(self):
-        """
-        Saves a model instance to db
+        """Saves a model instance to db.
+
+        Examples
+        ---------
 
         >>> customer = Customer.new(name="hari")
         >>> customer.save()
@@ -56,6 +59,14 @@ class QueryableMixin(object):
         self.session.commit()
 
     def delete(self, commit=True):
+        """Deletes a model instance.
+
+        Examples
+        ---------
+
+        >>> customer.delete()
+
+        """
         self.session.delete(self)
         if commit:
             self.session.commit
@@ -98,7 +109,7 @@ class QueryableMixin(object):
     def filter_by(cls, **kwargs):
         """Same as SQLAlchemy's filter_by. Additionally this accepts
         two special keyword arguments `limit` and `reverse` for limiting
-        the results and reversing the order respectively
+        the results and reversing the order respectively.
 
         Parameters
         ----------
@@ -123,9 +134,9 @@ class QueryableMixin(object):
 
     @classmethod
     def filter(cls, *criterion, **kwargs):
-        """Same as SQLAlchemy's filter_by. Additionally this accepts
+        """Same as SQLAlchemy's filter. Additionally this accepts
         two special keyword arguments `limit` and `reverse` for limiting
-        the results and reversing the order respectively
+        the results and reversing the order respectively.
 
         Parameters
         ----------
@@ -151,7 +162,7 @@ class QueryableMixin(object):
     @classmethod
     def count(cls, *criterion, **kwargs):
         """Returns a count of the instances meeting the specified
-        filter criterion and kwargs
+        filter criterion and kwargs.
 
         Examples
         --------
@@ -175,7 +186,7 @@ class QueryableMixin(object):
 
     @classmethod
     def all(cls, *criterion, **kwargs):
-        """Returns all the instances which fulfill the filtering
+        """Returns all the instances which fulfil the filtering
         criterion and kwargs if any given.
 
         Examples
@@ -194,32 +205,63 @@ class QueryableMixin(object):
 
     @classmethod
     def first(cls, *criterion, **kwargs):
-        """Returns the first instance found of the service's model filtered by
-        the specified key word arguments.
+        """Returns the first instance found of the model class
+        filtered by the specified criterion and/or key word arguments.
+        Return None if no result found.
 
-        :param **kwargs: filter parameters
+        Examples
+        ---------
+
+        >>> will = User.first(name="Will")
+
         """
         return cls.filter(*criterion, **kwargs).first()
 
     @classmethod
     def one(cls, *criterion, **kwargs):
+        """Similar to `first`. But throws an exception if 
+        no result is found.
+
+        >>> user = User.one(name="here")
+        NoResultFound: No row was found for one()
+        """
         return cls.filter(*criterion, **kwargs).one()
 
     @classmethod
     def last(cls, *criterion, **kwargs):
+        """Returns the last instance matching the criterion and/or
+        keyword arguments.
+
+        Examples
+        ---------
+
+        last_male_user = User.last(gender="male")
+        """
         kwargs['reverse'] = True
         return cls.first(*criterion, **kwargs)
 
     @classmethod
     def new(cls, **kwargs):
-        """Returns a new, unsaved instance of the service's model class.
+        """Returns a new, unsaved instance of the model class.
 
-        :param **kwargs: instance parameters
         """
         return cls(**cls._preprocess_params(kwargs))
 
     @classmethod
     def add(cls, model, commit=True):
+        """Adds a model instance to session and commits the
+        transaction.
+
+        Parameters
+        -----------
+        model - The instance to add.
+
+        Examples
+        ---------
+        >>> customer = Customer.new(name="hari", email="hari@gmail.com")
+        >>> Customer.add(customer)
+        hari@gmail.com
+        """
         if not isinstance(model, cls):
             raise ValueError('%s is not of type %s' (model, cls))
         cls.session.add(model)
@@ -233,6 +275,28 @@ class QueryableMixin(object):
 
     @classmethod
     def add_all(cls, models, commit=True, check_type=False):
+        """Batch method for adding a list of model instances
+        to the db in one get_or_404.
+
+        Parameters
+        -----------
+        models      : list of `Model`
+                      A list of the instances to add.
+        commit      : boolean, optional
+                      Defaults to True. If False, the transaction won't
+                      get committed.
+
+        check_type  : boolean, optional
+                      If True, each instance is type checked and exception
+                      is thrown if it is not an instance of the model.
+                      By default, False.
+
+        Returns
+        --------
+        list
+            A list of `Model` instances
+
+        """
         if check_type:
             for model in models:
                 if not isinstance(model, cls):
@@ -256,25 +320,76 @@ class QueryableMixin(object):
 
     @classmethod
     def get(cls, keyval, key='id', user_id=None):
-        """Returns an instance of the service's model with the specified id.
-        Returns `None` if an instance with the specified id does not exist.
+        """Fetches a single instance which has value `keyval`
+        for the attribute `key`.
 
-        :param id: the instance id
+        Parameters
+        -----------
+
+        keyval      : Any type
+                      The value of the attribute.
+
+        key         : str, optional
+                      The attribute to search by. By default, it is
+                      'id'.
+
+        Returns
+        --------
+        Model
+            A model instance if found. Else None.
+
+        Examples
+        ---------
+
+        >>> User.get(35)
+        user35@i.com
+
+        >>> User.get('user35@i.com', key='email')
+        user35@i.com
+
         """
         if (key in cls.__table__.columns
                 and cls.__table__.columns[key].primary_key):
             if user_id and hasattr(cls, 'user_id'):
-                return cls.query.filter_by(id=keyval, user_id=user_id).one()
+                return cls.query.filter_by(id=keyval, user_id=user_id).first()
             return cls.query.get(keyval)
         else:
             result = cls.query.filter(
                 getattr(cls, key) == keyval)
             if user_id and hasattr(cls, 'user_id'):
                 result = result.filter(cls.user_id == user_id)
-            return result.one()
+            return result.first()
 
     @classmethod
     def get_all(cls, keyvals, key='id', user_id=None):
+        """Works like a map function from keyvals to instances.
+
+        Parameters
+        ----------
+
+        keyvals      : list
+                      The list of values of the attribute.
+
+        key         : str, optional
+                      The attribute to search by. By default, it is
+                      'id'.
+
+        Returns
+        -------
+        list
+            A list of model instances, in the same order as the list of
+            keyvals.
+
+        Examples
+        ---------
+
+        >>> User.get_all([2,5,7, 8000, 11])
+        user2@i.com, user5@i.com, user7@i.com, None, user11@i.com
+
+        >>> User.get_all(['user35@i.com', 'user5@i.com'], key='email')
+        user35@i.com, user5@i.com
+
+        """
         if len(keyvals) == 0:
             return []
         resultset = cls.query.filter(getattr(cls, key).in_(keyvals))
@@ -286,24 +401,26 @@ class QueryableMixin(object):
             func.field(getattr(cls, key), *keyvals))
         return place_nulls(key, keyvals, resultset.all())
 
-    # @classmethod
-    # def get_all(cls, ids, user_id=None):
-    #     return cls._get_all('id', ids, user_id=user_id)
-
     @classmethod
     def get_or_404(cls, id):
-        """Returns an instance of the service's model with the specified id or
-        raises an 404 error if an instance with the specified id does not exist
-
-        :param id: the instance id
+        """Same as Flask-SQLAlchemy's `get_or_404`.
         """
         return cls.query.get_or_404(id)
 
     @classmethod
     def create(cls, **kwargs):
-        """Returns a new, saved instance of the service's model class.
+        """Initializes a new instance, adds it to the db and commits
+        the transaction.
 
-        :param **kwargs: instance parameters
+        Parameters
+        -----------
+        kwargs : The keyword arguments for the init constructor.
+
+        Example
+        --------
+        >>> user = User.create(name="Vicky", email="vicky@h.com")
+        >>> user.id
+        35
         """
         try:
             return cls.add(cls.new(**kwargs))
@@ -313,16 +430,83 @@ class QueryableMixin(object):
 
     @classmethod
     def find_or_create(cls, **kwargs):
-        """Checks if an instance already exists in db with these kwargs else
-        returns a new, saved instance of the service's model class.
+        """Checks if an instance already exists by filtering with the
+        kwargs. If yes, returns that instance. If not, creates a new
+        instance with kwargs and returns it
 
-        :param **kwargs: instance parameters
+        Parameters
+        -----------
+        kwargs      : kwargs
+                      The keyword arguments which are used for filtering
+                      and initialization.
+
+        keys        : list of str
+                      A special keyword argument. If passed, only the set of
+                      keys mentioned here will be used for filtering. Useful
+                      when we want to 'find' based on a subset of the keys and
+                      create with all the keys.
+
+        Examples
+        ---------
+        >>> customer = Customer.find_or_create(
+        ...     name="vicky", email="vicky@h.com", country="India")
+        >>> customer.id
+        45
+        >>> customer1 = Customer.find_or_create(
+        ...     name="vicky", email="vicky@h.com", country="India")
+        >>> customer1==customer
+        True
+        >>> customer2 = Customer.find_or_create(
+        ...     name="vicky", email="vicky@h.com", country="Russia")
+        >>> customer2==customer
+        False
+        >>> customer3 = Customer.find_or_create(
+        ...      name="vicky", email="vicky@h.com", country="Russia",
+        ...      keys=['name', 'email'])
+        >>> customer3==customer
+        True
         """
         keys = kwargs.pop('keys') if 'keys' in kwargs else []
         return cls.first(**subdict(kwargs, keys)) or cls.create(**kwargs)
 
     @classmethod
     def update_or_create(cls, **kwargs):
+        """Checks if an instance already exists by filtering with the
+        kwargs. If yes, updates the instance with new kwargs and
+        returns that instance. If not, creates a new
+        instance with kwargs and returns it.
+
+        Parameters
+        -----------
+        kwargs      : The keyword arguments which are used for filtering
+                      and initialization.
+
+        keys        : list of str
+                      A special keyword argument. If passed, only the set of
+                      keys mentioned here will be used for filtering. Useful
+                      when we want to 'filter' based on a subset of the keys and
+                      create with all the keys.
+
+        Examples
+        ---------
+        >>> customer = Customer.update_or_create(
+        ...     name="vicky", email="vicky@h.com", country="India")
+        >>> customer.id
+        45
+        >>> customer1 = Customer.update_or_create(
+        ...     name="vicky", email="vicky@h.com", country="India")
+        >>> customer1==customer
+        True
+        >>> customer2 = Customer.update_or_create(
+        ...     name="vicky", email="vicky@h.com", country="Russia")
+        >>> customer2==customer
+        False
+        >>> customer3 = Customer.update_or_create(
+        ...      name="vicky", email="vicky@h.com", country="Russia",
+        ...      keys=['name', 'email'])
+        >>> customer3==customer
+        True
+        """
         keys = kwargs.pop('keys') if 'keys' in kwargs else []
         obj = cls.first(**subdict(kwargs, keys))
         if obj is not None:
@@ -386,9 +570,16 @@ class QueryableMixin(object):
 
     @classmethod
     def build(cls, **kwargs):
-        """Returns a new, added but unsaved instance of the service's model class.
+        """Similar to create. But the transaction is not committed
 
-        :param **kwargs: instance parameters
+        Parameters
+        -----------
+        kwargs  : The keyword arguments for the constructor
+
+        Returns
+        -------
+        A model instance which has been added to db session. But session
+        transaction has not been committed yet.
         """
         return cls.add(cls.new(**kwargs), commit=False)
 
