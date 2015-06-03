@@ -1,10 +1,11 @@
 from flask.json import _json
 from flask import abort, Response, request
 from functools import wraps
-from toolspy import deep_group, merge, add_kv_to_dict
+from toolspy import deep_group, merge, add_kv_to_dict, boolify
 import inspect
 from .json_encoder import json_encoder
 from .query_booster import QueryBooster
+from sqlalchemy.sql import sqltypes
 
 
 RESTRICTED = ['limit', 'sort', 'orderby', 'groupby', 'attrs',
@@ -210,6 +211,16 @@ def filter_query_with_key(query, keyword, value, op):
         key = getattr(model_class, attr_name)
         if op == '~':
             value = "%{0}%".format(value)
+        column_type = type(
+            getattr(
+                getattr(model_class, '__mapper__'),
+                'columns'
+                )[attr_name].type
+            )
+        if column_type is sqltypes.Integer:
+            value = int(value)
+        elif column_type is sqltypes.Boolean:
+            value = boolify(value)
         return _query.filter(getattr(
             key, OPERATOR_FUNC[op])(value))
     else:
