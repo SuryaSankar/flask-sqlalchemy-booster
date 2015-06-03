@@ -196,13 +196,27 @@ def as_list(func):
 
 def filter_query_with_key(query, keyword, value, op):
     if '.' in keyword:
-        class_name = keyword.partition('.')[0]
-        attr_name = keyword.partition('.')[2]
-        if class_name not in query.model_class._decl_class_registry:
-            return query
-        model_class = query.model_class._decl_class_registry[class_name]
-        # model_class = getattr(models, class_name)
-        _query = query.join(model_class)
+
+        # class_name = keyword.partition('.')[0]
+        # attr_name = keyword.partition('.')[2]
+        # if class_name not in query.model_class._decl_class_registry:
+        #     return query
+        # model_class = query.model_class._decl_class_registry[class_name]
+        # # model_class = getattr(models, class_name)
+        # _query = query.join(model_class)
+
+        kw_split_arr = keyword.split('.')
+        class_names = kw_split_arr[:-1]
+        print class_names
+        attr_name = kw_split_arr[-1]
+        print attr_name
+        _query = query
+        for class_name in class_names:
+            if class_name not in query.model_class._decl_class_registry:
+                return query
+            model_class = query.model_class._decl_class_registry[class_name]
+            # model_class = getattr(models, class_name)
+            _query = _query.join(model_class)
     else:
         model_class = query.model_class
         attr_name = keyword
@@ -211,17 +225,17 @@ def filter_query_with_key(query, keyword, value, op):
         key = getattr(model_class, attr_name)
         if op == '~':
             value = "%{0}%".format(value)
-        column_type = type(
-            getattr(
-                getattr(model_class, '__mapper__'),
-                'columns'
-                )[attr_name].type
-            )
         if op in ['=', '>', '<', '>=', '<=', '!']:
-            if column_type is sqltypes.Integer:
-                value = int(value)
-            elif column_type is sqltypes.Boolean:
-                value = boolify(value)
+            columns = getattr(
+                getattr(model_class, '__mapper__'),
+                'columns')
+            if attr_name in columns:
+                column_type = type(
+                    columns[attr_name].type)
+                if column_type is sqltypes.Integer:
+                    value = int(value)
+                elif column_type is sqltypes.Boolean:
+                    value = boolify(value)
         return _query.filter(getattr(
             key, OPERATOR_FUNC[op])(value))
     else:
