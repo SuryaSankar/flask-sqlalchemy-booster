@@ -217,10 +217,11 @@ def filter_query_with_key(query, keyword, value, op):
                 'columns'
                 )[attr_name].type
             )
-        if column_type is sqltypes.Integer:
-            value = int(value)
-        elif column_type is sqltypes.Boolean:
-            value = boolify(value)
+        if op in ['=', '>', '<', '>=', '<=', '!']:
+            if column_type is sqltypes.Integer:
+                value = int(value)
+            elif column_type is sqltypes.Boolean:
+                value = boolify(value)
         return _query.filter(getattr(
             key, OPERATOR_FUNC[op])(value))
     else:
