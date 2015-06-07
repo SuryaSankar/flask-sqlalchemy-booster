@@ -19,33 +19,30 @@ def serialized_list(olist, rels_to_expand=[]):
 
 class DictizableMixin(object):
 
-    """
-    Attributes
-    ----------
+    """Methods for converting Model instance to dict and json.
 
-    _attrs_to_serialize_ : list of str
-        The columns which should be serialized as a part of the output
-        dictionary
+    Attributes:
 
-    _key_modifications_ : dict of str,str
-        A dictionary used to map the display names of columns whose
-        original name you want to be modified in the json
+        _attrs_to_serialize_ (list of str):  The columns which should
+            be serialized as a part of the output dictionary
 
-    _rels_to_serialize_ : list of (str, str)
-        A list of tuples. The first element of the tuple is the relationship
-        that is to be serialized. The second element it the name of the
-        attribute in the related model, the value of which is to be used
-        as the representation
+        _key_modifications_ (dict of str,str): A dictionary used to map
+            the display names of columns whose original name we want
+            to be modified in the json
 
-    _rels_to_expand_ : list of str
-        A list of relationships to expand. You can specify nested relationships
-        by placing dots.
+        _rels_to_serialize_ (list of tuple of str):  A list of tuples. The
+            first element of the tuple is the relationship
+            that is to be serialized. The second element it the name of the
+            attribute in the related model, the value of which is to be used
+            as the representation
 
-    _group_listrels_by_ : dict of str, list of str
-        A dictionary representing how to hierarchially group a list
-        like relationship. The relationship fields are the keys and
-        the list of the attributes based on which they are to be grouped
-        are the values.
+        _rels_to_expand_ (list of str): A list of relationships to expand.
+            You can specify nested relationships by placing dots.
+
+        _group_listrels_by_ (dict of str, list of str): A dictionary
+            representing how to hierarchially group a list like relationship.
+            The relationship fields are the keys and the list of the attributes
+            based on which they are to be grouped are the values.
 
 
     """
@@ -71,7 +68,7 @@ class DictizableMixin(object):
                              rels_to_serialize=None,
                              key_modifications=None):
         """
-        Just an alias for some functions which might still use old name
+        An alias for `todict`
         """
         return self.todict(
             attrs_to_serialize=attrs_to_serialize,
@@ -87,32 +84,29 @@ class DictizableMixin(object):
 
         """Converts an instance to a dictionary form
 
-        Parameters
-        ----------
+        Args:
 
-        attrs_to_serialize : list of str
-            The columns which should be serialized as a part of the output
-            dictionary
 
-        key_modifications : dict of str,str
-            A dictionary used to map the display names of columns whose
-            original name you want to be modified in the json
+            attrs_to_serialize (list of str):  The columns which should
+                be serialized as a part of the output dictionary
 
-        rels_to_serialize : list of (str, str)
-            A list of tuples. The first element of the tuple is the relationship
-            that is to be serialized. The second element it the name of the
-            attribute in the related model, the value of which is to be used
-            as the representation
+            key_modifications (dict of str,str): A dictionary used to map
+                the display names of columns whose original name we want
+                to be modified in the json
 
-        rels_to_expand : list of str
-            A list of relationships to expand. You can specify nested relationships
-            by placing dots.
+            rels_to_serialize (list of tuple of str):  A list of tuples. The
+                first element of the tuple is the relationship
+                that is to be serialized. The second element it the name of the
+                attribute in the related model, the value of which is to be used
+                as the representation
 
-        group_listrels_by : dict of str, list of str
-            A dictionary representing how to hierarchially group a list
-            like relationship. The relationship fields are the keys and
-            the list of the attributes based on which they are to be grouped
-            are the values.
+            rels_to_expand (list of str): A list of relationships to expand.
+                You can specify nested relationships by placing dots.
+
+            group_listrels_by (dict of str, list of str): A dictionary
+                representing how to hierarchially group a list like relationship.
+                The relationship fields are the keys and the list of the attributes
+                based on which they are to be grouped are the values.
 
 
         """
@@ -226,18 +220,15 @@ class DictizableMixin(object):
         """Converts and instance to a dictionary with only the specified
         attributes as keys
 
-        Parameters
-        ----------
-        *args : args list of str
-            The arguments to serialize
+        Args:
+            *args (list): The attributes to serialize
 
-        Examples
-        --------
+        Examples:
 
-        >>> customer = Customer.create(name="James Bond", email="007@mi.com",
-                                       phone="007", city="London")
-        >>> customer.serialize_attrs('name', 'email')
-        {'name': u'James Bond', 'email': u'007@mi.com'}
+            >>> customer = Customer.create(name="James Bond", email="007@mi.com",
+                                           phone="007", city="London")
+            >>> customer.serialize_attrs('name', 'email')
+            {'name': u'James Bond', 'email': u'007@mi.com'}
 
         """
         return dict([(a, getattr(self, a)) for a in args])

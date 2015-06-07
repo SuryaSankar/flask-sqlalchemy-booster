@@ -6,10 +6,8 @@ class QueryableMixin(object):
 
     """Contains all querying methods. Used for common ORM operations
 
-    Attributes
-    ----------
-    _no_overwrite_: list
-                    The list of attributes that should not be overwritten.
+    Attributes:
+        _no_overwrite_(list): The list of attributes that should not be overwritten.
 
     """
 
@@ -18,15 +16,13 @@ class QueryableMixin(object):
     def update(self, **kwargs):
         """Updates an instance.
 
-        Parameters
-        -----------
-        kwargs  :   kwargs
-                    Arbitrary keyword arguments. Column names are keywords and their new values are the values.
+        Args:
+            **kwargs  :  Arbitrary keyword arguments. Column names are
+                keywords and their new values are the values.
 
-        Examples
-        ---------
+        Examples:
 
-        >>> customer.update(email="newemail@x.com", name="new")
+            >>> customer.update(email="newemail@x.com", name="new")
 
         """
         kwargs = self._preprocess_params(kwargs)
@@ -48,11 +44,9 @@ class QueryableMixin(object):
     def save(self):
         """Saves a model instance to db.
 
-        Examples
-        ---------
-
-        >>> customer = Customer.new(name="hari")
-        >>> customer.save()
+        Examples:
+            >>> customer = Customer.new(name="hari")
+            >>> customer.save()
 
         """
         self.session.add(self)
@@ -61,10 +55,9 @@ class QueryableMixin(object):
     def delete(self, commit=True):
         """Deletes a model instance.
 
-        Examples
-        ---------
+        Examples:
 
-        >>> customer.delete()
+            >>> customer.delete()
 
         """
         self.session.delete(self)
@@ -76,11 +69,17 @@ class QueryableMixin(object):
         By default this method will raise a `ValueError` if the model is not of
         expected type.
 
-        Parameters
-        ----------
+        Args:
 
-        model: Class
-        raise_error: boolean
+            model (Model) : The instance to be type checked
+
+            raise_error (bool) : Flag to specify whether to raise error on
+                type check failure
+
+        Raises:
+
+            ValueError: If `model` is not an instance of the respective Model
+                class
         """
         rv = isinstance(model, self.__model__)
         if not rv and raise_error:
@@ -97,10 +96,9 @@ class QueryableMixin(object):
         Use this to filter the kwargs passed to `new`, `create`,
         `build` methods.
 
-        Parameters
-        -----------
+        Args:
 
-        **kwargs: a dictionary of parameters
+            **kwargs: a dictionary of parameters
         """
         kwargs.pop('csrf_token', None)
         return kwargs
@@ -111,16 +109,15 @@ class QueryableMixin(object):
         two special keyword arguments `limit` and `reverse` for limiting
         the results and reversing the order respectively.
 
-        Parameters
-        ----------
+        Args:
 
-        **kwargs: filter parameters
+            **kwargs: filter parameters
 
-        Examples
-        --------
-        >>> user = User.filter_by(email="new@x.com")
+        Examples:
 
-        >>> shipments = Shipment.filter_by(country="India", limit=3, reverse=True)
+            >>> user = User.filter_by(email="new@x.com")
+
+            >>> shipments = Shipment.filter_by(country="India", limit=3, reverse=True)
 
         """
         limit = kwargs.pop('limit', None)
@@ -138,16 +135,15 @@ class QueryableMixin(object):
         two special keyword arguments `limit` and `reverse` for limiting
         the results and reversing the order respectively.
 
-        Parameters
-        ----------
+        Args:
 
-        **kwargs: filter parameters
+            **kwargs: filter parameters
 
-        Examples
-        --------
-        >>> user = User.filter(User.email=="new@x.com")
+        Examples:
 
-        >>> shipments = Order.filter(Order.price < 500, limit=3, reverse=True)
+            >>> user = User.filter(User.email=="new@x.com")
+
+            >>> shipments = Order.filter(Order.price < 500, limit=3, reverse=True)
 
         """
         limit = kwargs.pop('limit', None)
@@ -164,17 +160,16 @@ class QueryableMixin(object):
         """Returns a count of the instances meeting the specified
         filter criterion and kwargs.
 
-        Examples
-        --------
+        Examples:
 
-        >>> User.count()
-        500
+            >>> User.count()
+            500
 
-        >>> User.count(country="India")
-        300
+            >>> User.count(country="India")
+            300
 
-        >>> User.count(User.age > 50, country="India")
-        39
+            >>> User.count(User.age > 50, country="India")
+            39
 
         """
         if criterion or kwargs:
@@ -189,17 +184,16 @@ class QueryableMixin(object):
         """Returns all the instances which fulfil the filtering
         criterion and kwargs if any given.
 
-        Examples
-        ---------
+        Examples:
 
-        >>> Tshirt.all()
-        [tee1, tee2, tee4, tee5]
+            >>> Tshirt.all()
+            [tee1, tee2, tee4, tee5]
 
-        >> Tshirt.all(reverse=True, limit=3)
-        [tee5, tee4, tee2]
+            >> Tshirt.all(reverse=True, limit=3)
+            [tee5, tee4, tee2]
 
-        >> Tshirt.all(color="Red")
-        [tee4, tee2]
+            >> Tshirt.all(color="Red")
+            [tee4, tee2]
         """
         return cls.filter(*criterion, **kwargs).all()
 
@@ -209,10 +203,9 @@ class QueryableMixin(object):
         filtered by the specified criterion and/or key word arguments.
         Return None if no result found.
 
-        Examples
-        ---------
+        Examples:
 
-        >>> will = User.first(name="Will")
+            >>> will = User.first(name="Will")
 
         """
         return cls.filter(*criterion, **kwargs).first()
@@ -222,8 +215,12 @@ class QueryableMixin(object):
         """Similar to `first`. But throws an exception if 
         no result is found.
 
-        >>> user = User.one(name="here")
-        NoResultFound: No row was found for one()
+        Examples:
+
+            >>> user = User.one(name="here")
+
+        Raises:
+            NoResultFound: No row was found for one()
         """
         return cls.filter(*criterion, **kwargs).one()
 
@@ -232,10 +229,9 @@ class QueryableMixin(object):
         """Returns the last instance matching the criterion and/or
         keyword arguments.
 
-        Examples
-        ---------
+        Examples:
 
-        last_male_user = User.last(gender="male")
+            last_male_user = User.last(gender="male")
         """
         kwargs['reverse'] = True
         return cls.first(*criterion, **kwargs)
@@ -252,15 +248,16 @@ class QueryableMixin(object):
         """Adds a model instance to session and commits the
         transaction.
 
-        Parameters
-        -----------
-        model - The instance to add.
+        Args:
 
-        Examples
-        ---------
-        >>> customer = Customer.new(name="hari", email="hari@gmail.com")
-        >>> Customer.add(customer)
-        hari@gmail.com
+            model: The instance to add.
+
+        Examples:
+
+            >>> customer = Customer.new(name="hari", email="hari@gmail.com")
+
+            >>> Customer.add(customer)
+            hari@gmail.com
         """
         if not isinstance(model, cls):
             raise ValueError('%s is not of type %s' (model, cls))
@@ -278,23 +275,17 @@ class QueryableMixin(object):
         """Batch method for adding a list of model instances
         to the db in one get_or_404.
 
-        Parameters
-        -----------
-        models      : list of `Model`
-                      A list of the instances to add.
-        commit      : boolean, optional
-                      Defaults to True. If False, the transaction won't
-                      get committed.
+        Args:
 
-        check_type  : boolean, optional
-                      If True, each instance is type checked and exception
-                      is thrown if it is not an instance of the model.
-                      By default, False.
+            models (list): A list of the instances to add.
+            commit (bool, optional): Defaults to True. If False, the
+                transaction won't get committed.
+            check_type (bool, optional) :  If True, each instance
+                is type checked and exception is thrown if it is
+                not an instance of the model. By default, False.
 
-        Returns
-        --------
-        list
-            A list of `Model` instances
+        Returns:
+            list: A list of `Model` instances
 
         """
         if check_type:
@@ -323,29 +314,24 @@ class QueryableMixin(object):
         """Fetches a single instance which has value `keyval`
         for the attribute `key`.
 
-        Parameters
-        -----------
+        Args:
 
-        keyval      : Any type
-                      The value of the attribute.
+            keyval: The value of the attribute.
 
-        key         : str, optional
-                      The attribute to search by. By default, it is
-                      'id'.
+            key (str, optional):  The attribute to search by. By default,
+                it is 'id'.
 
-        Returns
-        --------
-        Model
+        Returns:
+
             A model instance if found. Else None.
 
-        Examples
-        ---------
+        Examples:
 
-        >>> User.get(35)
-        user35@i.com
+            >>> User.get(35)
+            user35@i.com
 
-        >>> User.get('user35@i.com', key='email')
-        user35@i.com
+            >>> User.get('user35@i.com', key='email')
+            user35@i.com
 
         """
         if (key in cls.__table__.columns
@@ -364,30 +350,29 @@ class QueryableMixin(object):
     def get_all(cls, keyvals, key='id', user_id=None):
         """Works like a map function from keyvals to instances.
 
-        Parameters
-        ----------
 
-        keyvals      : list
-                      The list of values of the attribute.
+        Args:
 
-        key         : str, optional
-                      The attribute to search by. By default, it is
-                      'id'.
+            keyvals(list):  The list of values of the attribute.
 
-        Returns
-        -------
-        list
-            A list of model instances, in the same order as the list of
-            keyvals.
+            key (str, optional): The attribute to search by. By default, it is
+                'id'.
 
-        Examples
-        ---------
 
-        >>> User.get_all([2,5,7, 8000, 11])
-        user2@i.com, user5@i.com, user7@i.com, None, user11@i.com
+        Returns:
 
-        >>> User.get_all(['user35@i.com', 'user5@i.com'], key='email')
-        user35@i.com, user5@i.com
+            list: A list of model instances, in the same order as the list of
+                keyvals.
+
+
+        Examples:
+
+
+            >>> User.get_all([2,5,7, 8000, 11])
+            user2@i.com, user5@i.com, user7@i.com, None, user11@i.com
+
+            >>> User.get_all(['user35@i.com', 'user5@i.com'], key='email')
+            user35@i.com, user5@i.com
 
         """
         if len(keyvals) == 0:
@@ -412,15 +397,15 @@ class QueryableMixin(object):
         """Initializes a new instance, adds it to the db and commits
         the transaction.
 
-        Parameters
-        -----------
-        kwargs : The keyword arguments for the init constructor.
+        Args:
 
-        Example
-        --------
-        >>> user = User.create(name="Vicky", email="vicky@h.com")
-        >>> user.id
-        35
+            **kwargs: The keyword arguments for the init constructor.
+
+        Examples:
+
+            >>> user = User.create(name="Vicky", email="vicky@h.com")
+            >>> user.id
+            35
         """
         try:
             return cls.add(cls.new(**kwargs))
@@ -434,37 +419,34 @@ class QueryableMixin(object):
         kwargs. If yes, returns that instance. If not, creates a new
         instance with kwargs and returns it
 
-        Parameters
-        -----------
-        kwargs      : kwargs
-                      The keyword arguments which are used for filtering
-                      and initialization.
+        Args:
 
-        keys        : list of str
-                      A special keyword argument. If passed, only the set of
-                      keys mentioned here will be used for filtering. Useful
-                      when we want to 'find' based on a subset of the keys and
-                      create with all the keys.
+            **kwargs: The keyword arguments which are used for filtering
+                and initialization.
+            keys(list, optional): A special keyword argument.
+                If passed, only the set of keys mentioned here will be used
+                for filtering. Useful when we want to 'find' based on a subset
+                of the keys and create with all the keys
 
-        Examples
-        ---------
-        >>> customer = Customer.find_or_create(
-        ...     name="vicky", email="vicky@h.com", country="India")
-        >>> customer.id
-        45
-        >>> customer1 = Customer.find_or_create(
-        ...     name="vicky", email="vicky@h.com", country="India")
-        >>> customer1==customer
-        True
-        >>> customer2 = Customer.find_or_create(
-        ...     name="vicky", email="vicky@h.com", country="Russia")
-        >>> customer2==customer
-        False
-        >>> customer3 = Customer.find_or_create(
-        ...      name="vicky", email="vicky@h.com", country="Russia",
-        ...      keys=['name', 'email'])
-        >>> customer3==customer
-        True
+        Examples:
+
+            >>> customer = Customer.find_or_create(
+            ...     name="vicky", email="vicky@h.com", country="India")
+            >>> customer.id
+            45
+            >>> customer1 = Customer.find_or_create(
+            ...     name="vicky", email="vicky@h.com", country="India")
+            >>> customer1==customer
+            True
+            >>> customer2 = Customer.find_or_create(
+            ...     name="vicky", email="vicky@h.com", country="Russia")
+            >>> customer2==customer
+            False
+            >>> customer3 = Customer.find_or_create(
+            ...      name="vicky", email="vicky@h.com", country="Russia",
+            ...      keys=['name', 'email'])
+            >>> customer3==customer
+            True
         """
         keys = kwargs.pop('keys') if 'keys' in kwargs else []
         return cls.first(**subdict(kwargs, keys)) or cls.create(**kwargs)
@@ -476,36 +458,35 @@ class QueryableMixin(object):
         returns that instance. If not, creates a new
         instance with kwargs and returns it.
 
-        Parameters
-        -----------
-        kwargs      : The keyword arguments which are used for filtering
-                      and initialization.
+        Args:
 
-        keys        : list of str
-                      A special keyword argument. If passed, only the set of
-                      keys mentioned here will be used for filtering. Useful
-                      when we want to 'filter' based on a subset of the keys and
-                      create with all the keys.
+            **kwargs: The keyword arguments which are used for filtering
+                and initialization.
 
-        Examples
-        ---------
-        >>> customer = Customer.update_or_create(
-        ...     name="vicky", email="vicky@h.com", country="India")
-        >>> customer.id
-        45
-        >>> customer1 = Customer.update_or_create(
-        ...     name="vicky", email="vicky@h.com", country="India")
-        >>> customer1==customer
-        True
-        >>> customer2 = Customer.update_or_create(
-        ...     name="vicky", email="vicky@h.com", country="Russia")
-        >>> customer2==customer
-        False
-        >>> customer3 = Customer.update_or_create(
-        ...      name="vicky", email="vicky@h.com", country="Russia",
-        ...      keys=['name', 'email'])
-        >>> customer3==customer
-        True
+            keys (list, optional): A special keyword argument. If passed,
+                only the set of keys mentioned here will be used for filtering.
+                Useful when we want to 'filter' based on a subset of the keys
+                and create with all the keys.
+
+        Examples:
+
+            >>> customer = Customer.update_or_create(
+            ...     name="vicky", email="vicky@h.com", country="India")
+            >>> customer.id
+            45
+            >>> customer1 = Customer.update_or_create(
+            ...     name="vicky", email="vicky@h.com", country="India")
+            >>> customer1==customer
+            True
+            >>> customer2 = Customer.update_or_create(
+            ...     name="vicky", email="vicky@h.com", country="Russia")
+            >>> customer2==customer
+            False
+            >>> customer3 = Customer.update_or_create(
+            ...      name="vicky", email="vicky@h.com", country="Russia",
+            ...      keys=['name', 'email'])
+            >>> customer3==customer
+            True
         """
         keys = kwargs.pop('keys') if 'keys' in kwargs else []
         obj = cls.first(**subdict(kwargs, keys))
@@ -525,6 +506,19 @@ class QueryableMixin(object):
 
     @classmethod
     def create_all(cls, list_of_kwargs):
+        """Batch method for creating a list of instances
+
+        Args:
+            list_of_kwargs(list of dicts): hereA list of dicts where
+                each dict denotes the keyword args that you would pass
+                to the create method separately
+
+        Examples:
+
+            >>> Customer.create_all([
+            ... {'name': 'Vicky', 'age': 34, 'user_id': 1},
+            ... {'name': 'Ron', 'age': 40, 'user_id': 1, 'gender': 'Male'}])
+        """
         try:
             return cls.add_all([
                 cls.new(**kwargs) for kwargs in list_of_kwargs])
@@ -534,6 +528,25 @@ class QueryableMixin(object):
 
     @classmethod
     def find_or_create_all(cls, list_of_kwargs, keys=[]):
+        """Batch method for querying for a list of instances and
+        creating them if required
+
+        Args:
+            list_of_kwargs(list of dicts): A list of dicts where
+                each dict denotes the keyword args that you would pass
+                to the create method separately
+
+            keys (list, optional): A list of keys to use for the 
+                initial finding step. Matching is done only on these
+                attributes.
+
+        Examples:
+
+            >>> Customer.find_or_create_all([
+            ... {'name': 'Vicky', 'email': 'vicky@x.com', 'age': 34},
+            ... {'name': 'Ron', 'age': 40, 'email': 'ron@x.com',
+            ... 'gender': 'Male'}], keys=['name', 'email'])
+        """
         list_of_kwargs_wo_dupes, markers = remove_and_mark_duplicate_dicts(
             list_of_kwargs, keys)
         added_objs = cls.add_all([
@@ -551,6 +564,25 @@ class QueryableMixin(object):
 
     @classmethod
     def update_or_create_all(cls, list_of_kwargs, keys=[]):
+        """Batch method for updating a list of instances and
+        creating them if required
+
+        Args:
+            list_of_kwargs(list of dicts): A list of dicts where
+                each dict denotes the keyword args that you would pass
+                to the create method separately
+
+            keys (list, optional): A list of keys to use for the 
+                initial finding step. Matching is done only on these
+                attributes.
+
+        Examples:
+
+            >>> Customer.update_or_create_all([
+            ... {'name': 'Vicky', 'email': 'vicky@x.com', 'age': 34},
+            ... {'name': 'Ron', 'age': 40, 'email': 'ron@x.com',
+            ... 'gender': 'Male'}], keys=['name', 'email'])
+        """
         objs = []
         for kwargs in list_of_kwargs:
             obj = cls.first(**subdict(kwargs, keys))
@@ -572,14 +604,14 @@ class QueryableMixin(object):
     def build(cls, **kwargs):
         """Similar to create. But the transaction is not committed
 
-        Parameters
-        -----------
-        kwargs  : The keyword arguments for the constructor
+        Args:
 
-        Returns
-        -------
-        A model instance which has been added to db session. But session
-        transaction has not been committed yet.
+            **kwargs : The keyword arguments for the constructor
+
+        Returns:
+
+            A model instance which has been added to db session. But session
+            transaction has not been committed yet.
         """
         return cls.add(cls.new(**kwargs), commit=False)
 
@@ -588,7 +620,8 @@ class QueryableMixin(object):
         """Checks if an instance already exists in db with these kwargs else
         returns a new, saved instance of the service's model class.
 
-        :param **kwargs: instance parameters
+        Args:
+            **kwargs: instance parameters
         """
         return cls.first(**kwargs) or cls.build(**kwargs)
 
@@ -598,16 +631,36 @@ class QueryableMixin(object):
 
     @classmethod
     def build_all(cls, list_of_kwargs):
+        """Similar to `create_all`. But transaction is not committed.
+        """
         return cls.add_all([
             cls.new(**kwargs) for kwargs in list_of_kwargs], commit=False)
 
     @classmethod
     def find_or_build_all(cls, list_of_kwargs):
+        """Similar to `find_or_create_all`. But transaction is not committed.
+        """
         return cls.add_all([cls.first(**kwargs) or cls.new(**kwargs)
                             for kwargs in list_of_kwargs], commit=False)
 
     @classmethod
     def update_all(cls, *criterion, **kwargs):
+        """Batch method for updating all instances obeying the criterion
+
+        Args:
+            *criterion: SQLAlchemy query criterion for filtering what
+                instances to update
+            **kwargs: The parameters to be updated
+
+        Examples:
+
+            >>> User.update_all(active=True)
+
+            >>> Customer.update_all(Customer.country=='India', active=True)
+
+        The second example sets active=True for all customers with
+        country India.
+        """
         try:
             r = cls.query.filter(*criterion).update(kwargs, 'fetch')
             cls.session.commit()
@@ -620,8 +673,9 @@ class QueryableMixin(object):
     def get_and_update(cls, id, **kwargs):
         """Returns an updated instance of the service's model class.
 
-        :param model: the model to update
-        :param **kwargs: update parameters
+        Args:
+            model: the model to update
+            **kwargs: update parameters
         """
         model = cls.get(id)
         for k, v in cls._preprocess_params(kwargs).items():
@@ -633,8 +687,9 @@ class QueryableMixin(object):
     def get_and_setattr(cls, id, **kwargs):
         """Returns an updated instance of the service's model class.
 
-        :param model: the model to update
-        :param **kwargs: update parameters
+        Args:
+            model: the model to update
+            **kwargs: update parameters
         """
         model = cls.get(id)
         for k, v in cls._preprocess_params(kwargs).items():

@@ -207,9 +207,7 @@ def filter_query_with_key(query, keyword, value, op):
 
         kw_split_arr = keyword.split('.')
         class_names = kw_split_arr[:-1]
-        print class_names
         attr_name = kw_split_arr[-1]
-        print attr_name
         _query = query
         for class_name in class_names:
             if class_name not in query.model_class._decl_class_registry:
