@@ -39,9 +39,6 @@ def serialized_obj(obj, attrs_to_serialize=None,
                    group_listrels_by=None,
                    rels_to_serialize=None,
                    key_modifications=None):
-    """
-    Misnamed. Should be deprecated eventually.
-    """
     return serializable_obj(
         obj, attrs_to_serialize, rels_to_expand, group_listrels_by,
         rels_to_serialize, key_modifications)
@@ -51,6 +48,30 @@ def serializable_list(
         olist, attrs_to_serialize=None, rels_to_expand=None,
         group_listrels_by=None, rels_to_serialize=None,
         key_modifications=None, groupby=None, keyvals_to_merge=None):
+    """
+    Converts a list of model instances to a list of dictionaries
+    using their `todict` method.
+
+    Args:
+        olist (list): The list of instances to convert
+        attrs_to_serialize (list, optional): To be passed as an argument
+            to the `todict` method
+        rels_to_expand (list, optional): To be passed as an argument
+            to the `todict` method
+        group_listrels_by (dict, optional): To be passed as an argument
+            to the `todict` method
+        rels_to_serialize (list, optional): To be passed as an argument
+            to the `todict` method
+        key_modifications (dict, optional): To be passed as an argument
+            to the `todict` method
+
+        groupby (list, optional): An optional list of keys based on which
+            the result list will be hierarchially grouped ( and converted 
+                into a dict)
+
+        keyvals_to_merge (list of dicts, optional): A list of parameters
+            to be merged with each dict of the output list
+    """
     if groupby:
         return deep_group(
             olist, keys=groupby, serializer='todict',
@@ -86,9 +107,29 @@ def serialized_list(olist, **kwargs):
         olist)
 
 
-def jsoned(struct, wrap=True, meta=None, wrap_key='result'):
+def jsoned(struct, wrap=True, meta=None, struct_key='result'):
+    """ Provides a json dump of the struct
+
+    Args:
+        struct: The data to dump
+        wrap (bool, optional): Specify whether to wrap the
+            struct in an enclosing dict
+        struct_key (str, optional): The string key which will
+            contain the struct in the result dict
+        meta (dict, optional): An optional dictonary to merge
+            with the output dictionary.
+
+    Examples:
+
+        >>> jsoned([3,4,5])
+        ... '{"status": "success", "result": [3, 4, 5]}'
+
+        >>> jsoned([3,4,5], wrap=False)
+        ... '[3, 4, 5]'
+
+    """
     if wrap:
-        output = {'status': 'success', wrap_key: struct}
+        output = {'status': 'success', struct_key: struct}
         if meta:
             output = merge(output, meta)
         return _json.dumps(output,
@@ -99,17 +140,12 @@ def jsoned(struct, wrap=True, meta=None, wrap_key='result'):
 
 
 def jsoned_obj(obj, **kwargs):
-    return jsoned(serialized_obj(obj, **kwargs))
+    return jsoned(serializable_obj(obj, **kwargs))
 
 
 def jsoned_list(olist, **kwargs):
     return jsoned(
-        serialized_list(olist, **kwargs))
-
-
-# def success_json():
-#     return Response(jsoned({'status': 'success'}, wrap=False),
-#                     200, mimetype='application/json')
+        serializable_list(olist, **kwargs))
 
 
 def as_json(struct, status=200, wrap=True, meta=None):
@@ -186,6 +222,18 @@ def _serializable_params(args, check_groupby=False):
 
 
 def as_list(func):
+    """ A decorator used to return a JSON response of a list of model
+        objects. It expects the decorated function to return a list
+        of model instances. It then converts the instances to dicts
+        and serializes them into a json response
+
+        Examples:
+
+            @app.route('/api/customers')
+            @as_list
+            def list_customers():
+                return Customer.all()
+    """
     @wraps(func)
     def wrapper(*args, **kwargs):
         return as_json_list(
@@ -241,6 +289,26 @@ def filter_query_with_key(query, keyword, value, op):
 
 
 def as_processed_list(func):
+    """ A decorator used to return a JSON response of a list of model
+        objects. It differs from `as_list` in that it accepts a variety
+        of querying parameters and can use them to filter and modify the
+        results. It expects the decorated function to return either Model Class
+        to query or a SQLAlchemy filter which exposes a subset of the instances
+        of the Model class. It then converts the instances to dicts
+        and serializes them into a json response
+
+        Examples:
+
+            @app.route('/api/customers')
+            @as_processed_list
+            def list_all_customers():
+                return Customer
+
+            @app.route('/api/editors')
+            @as_processed_list
+            def list_editors():
+                return User.filter(role='editor')
+    """
     @wraps(func)
     def wrapper(*args, **kwargs):
         limit = request.args.get('limit', None)
