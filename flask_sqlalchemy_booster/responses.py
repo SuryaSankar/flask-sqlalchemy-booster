@@ -229,10 +229,11 @@ def as_list(func):
 
         Examples:
 
-            @app.route('/api/customers')
-            @as_list
-            def list_customers():
-                return Customer.all()
+            >>> @app.route('/api')
+            ... @as_list
+            ... def list_customers():
+            ...     return Customer.all()
+
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -299,15 +300,15 @@ def as_processed_list(func):
 
         Examples:
 
-            @app.route('/api/customers')
-            @as_processed_list
-            def list_all_customers():
-                return Customer
+            >>> @app.route('/api/customers')
+            ... @as_processed_list
+            ... def list_all_customers():
+            ...     return Customer
 
-            @app.route('/api/editors')
-            @as_processed_list
-            def list_editors():
-                return User.filter(role='editor')
+            >>> @app.route('/api/editors')
+            ... @as_processed_list
+            ... def list_editors():
+            ...     return User.filter(role='editor')
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -380,6 +381,18 @@ def as_processed_list(func):
 
 
 def as_obj(func):
+    """ A decorator used to return a JSON response with a dict
+        representation of the model instance.  It expects the decorated function
+        to return a Model instance. It then converts the instance to dicts
+        and serializes it into a json response
+
+        Examples:
+
+            >>> @app.route('/api/shipments/<id>')
+            ... @as_obj
+            ... def get_shipment(id):
+            ...     return Shipment.get(id)
+    """
     @wraps(func)
     def wrapper(*args, **kwargs):
         return as_json_obj(
