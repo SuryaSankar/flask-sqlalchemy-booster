@@ -26,4 +26,24 @@ You can then subclass the `db.Model` class to create your model classes::
     	user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
 
 
+Using the Querying API
+=======================
+
+This module provides a set of commonly used methods - for CRUD operations
+on models. Usage is very simple
+
+To get the first instance obeying some conditions::
+
+	customer = Customer.first(state="Rajasthan")
+
+	first_cust = Customer.first()
+
+To get the last instance obeying some conditions::
+
+	customer = Customer.last(city="Delhi")
+
+	last_cust = Customer.last()
+
+
+
 

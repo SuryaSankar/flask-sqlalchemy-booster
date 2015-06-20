@@ -277,12 +277,15 @@ def filter_query_with_key(query, keyword, value, op):
                 getattr(model_class, '__mapper__'),
                 'columns')
             if attr_name in columns:
-                column_type = type(
-                    columns[attr_name].type)
-                if column_type is sqltypes.Integer:
-                    value = int(value)
-                elif column_type is sqltypes.Boolean:
-                    value = boolify(value)
+                if value == 'none':
+                    value = None
+                if value is not None:
+                    column_type = type(
+                        columns[attr_name].type)
+                    if column_type is sqltypes.Integer:
+                        value = int(value)
+                    elif column_type is sqltypes.Boolean:
+                        value = boolify(value)
         return _query.filter(getattr(
             key, OPERATOR_FUNC[op])(value))
     else:
