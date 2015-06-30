@@ -6,6 +6,8 @@ import inspect
 from .json_encoder import json_encoder
 from .query_booster import QueryBooster
 from sqlalchemy.sql import sqltypes
+from decimal import Decimal
+import dateutil.parser
 
 
 RESTRICTED = ['limit', 'sort', 'orderby', 'groupby', 'attrs',
@@ -284,8 +286,12 @@ def filter_query_with_key(query, keyword, value, op):
                         columns[attr_name].type)
                     if column_type is sqltypes.Integer:
                         value = int(value)
+                    elif column_type is sqltypes.Numeric:
+                        value = Decimal(value)
                     elif column_type is sqltypes.Boolean:
                         value = boolify(value)
+                    elif column_type is sqltypes.DateTime:
+                        value = dateutil.parser.parse(value)
         return _query.filter(getattr(
             key, OPERATOR_FUNC[op])(value))
     else:

@@ -16,7 +16,7 @@ from setuptools import setup
 
 setup(
     name='Flask-SQLAlchemy-Booster',
-    version='0.1.4',
+    version='0.1.5',
     long_description='A wrapper around Flask-SQLAlchemy',
     packages=['flask_sqlalchemy_booster'],
     include_package_data=True,
