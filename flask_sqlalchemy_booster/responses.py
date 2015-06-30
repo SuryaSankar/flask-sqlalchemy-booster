@@ -6,6 +6,8 @@ import inspect
 from .json_encoder import json_encoder
 from .query_booster import QueryBooster
 from sqlalchemy.sql import sqltypes
+from decimal import Decimal
+import dateutil.parser
 
 
 RESTRICTED = ['limit', 'sort', 'orderby', 'groupby', 'attrs',
@@ -245,25 +247,39 @@ def as_list(func):
 
 def filter_query_with_key(query, keyword, value, op):
     if '.' in keyword:
-
-        # class_name = keyword.partition('.')[0]
-        # attr_name = keyword.partition('.')[2]
-        # if class_name not in query.model_class._decl_class_registry:
-        #     return query
-        # model_class = query.model_class._decl_class_registry[class_name]
-        # # model_class = getattr(models, class_name)
-        # _query = query.join(model_class)
-
         kw_split_arr = keyword.split('.')
-        class_names = kw_split_arr[:-1]
+        prefix_names = kw_split_arr[:-1]
         attr_name = kw_split_arr[-1]
         _query = query
-        for class_name in class_names:
-            if class_name not in query.model_class._decl_class_registry:
-                return query
-            model_class = query.model_class._decl_class_registry[class_name]
-            # model_class = getattr(models, class_name)
-            _query = _query.join(model_class)
+        if prefix_names[0] in query.model_class._decl_class_registry:
+            for class_name in prefix_names:
+                if class_name not in query.model_class._decl_class_registry:
+                    return query
+                model_class = query.model_class._decl_class_registry[
+                    class_name]
+                _query = _query.join(model_class)
+
+        elif prefix_names[0] in query.model_class.all_keys():
+            model_class = query.model_class
+            for rel_or_proxy_name in prefix_names:
+                if rel_or_proxy_name in model_class.relationship_keys():
+                    mapped_rel = next(
+                        r for r in model_class.__mapper__.relationships
+                        if r.key == rel_or_proxy_name)
+                    model_class = mapped_rel.mapper.class_
+                    _query = _query.join(model_class)
+                elif rel_or_proxy_name in model_class.association_proxy_keys():
+                    assoc_proxy = getattr(model_class, rel_or_proxy_name)
+                    assoc_rel = next(
+                        r for r in model_class.__mapper__.relationships
+                        if r.key == assoc_proxy.target_collection)
+                    assoc_rel_class = assoc_rel.mapper.class_
+                    _query = _query.join(assoc_rel_class)
+                    actual_rel_in_assoc_class = next(
+                        r for r in assoc_rel_class.__mapper__.relationships
+                        if r.key == assoc_proxy.value_attr)
+                    model_class = actual_rel_in_assoc_class.mapper.class_
+                    _query = _query.join(model_class)
     else:
         model_class = query.model_class
         attr_name = keyword
@@ -284,8 +300,12 @@ def filter_query_with_key(query, keyword, value, op):
                         columns[attr_name].type)
                     if column_type is sqltypes.Integer:
                         value = int(value)
+                    elif column_type is sqltypes.Numeric:
+                        value = Decimal(value)
                     elif column_type is sqltypes.Boolean:
                         value = boolify(value)
+                    elif column_type is sqltypes.DateTime:
+                        value = dateutil.parser.parse(value)
         return _query.filter(getattr(
             key, OPERATOR_FUNC[op])(value))
     else:
