@@ -251,6 +251,7 @@ def filter_query_with_key(query, keyword, value, op):
         prefix_names = kw_split_arr[:-1]
         attr_name = kw_split_arr[-1]
         _query = query
+        model_class = query.model_class
         if prefix_names[0] in query.model_class._decl_class_registry:
             for class_name in prefix_names:
                 if class_name not in query.model_class._decl_class_registry:
