@@ -3,11 +3,17 @@ from decimal import Decimal
 from flask.json import _json
 from toolspy import dict_map
 from .utils import is_list_like, is_dict_like
+from collections import OrderedDict
+from types import FunctionType
 
 
 def json_encoder(obj):
     if isinstance(obj, datetime):
         return obj.isoformat()
+    elif isinstance(obj, OrderedDict):
+        return [[k, json_encoder(v)]
+                for k, v in obj.items()
+                if not (k == 'key' and isinstance(v, FunctionType))]
     elif isinstance(obj, Decimal):
         return str(obj)
     elif isinstance(obj, unicode):
