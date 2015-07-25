@@ -49,7 +49,8 @@ def serialized_obj(obj, attrs_to_serialize=None,
 def serializable_list(
         olist, attrs_to_serialize=None, rels_to_expand=None,
         group_listrels_by=None, rels_to_serialize=None,
-        key_modifications=None, groupby=None, keyvals_to_merge=None):
+        key_modifications=None, groupby=None, keyvals_to_merge=None,
+        preserve_order=False):
     """
     Converts a list of model instances to a list of dictionaries
     using their `todict` method.
@@ -75,8 +76,20 @@ def serializable_list(
             to be merged with each dict of the output list
     """
     if groupby:
+        if preserve_order:
+            return json_encoder(deep_group(
+                olist, keys=groupby, serializer='todict',
+                preserve_order=preserve_order,
+                serializer_kwargs={
+                    'rels_to_serialize': rels_to_serialize,
+                    'rels_to_expand': rels_to_expand,
+                    'attrs_to_serialize': attrs_to_serialize,
+                    'group_listrels_by': group_listrels_by,
+                    'key_modifications': key_modifications
+                }))
         return deep_group(
             olist, keys=groupby, serializer='todict',
+            preserve_order=preserve_order,
             serializer_kwargs={
                 'rels_to_serialize': rels_to_serialize,
                 'rels_to_expand': rels_to_expand,
@@ -177,6 +190,7 @@ def as_json_list(olist, attrs_to_serialize=None,
                  group_listrels_by=None,
                  key_modifications=None,
                  groupby=None,
+                 preserve_order=False,
                  keyvals_to_merge=None,
                  meta=None):
     return as_json(serializable_list(
@@ -184,8 +198,8 @@ def as_json_list(olist, attrs_to_serialize=None,
         rels_to_expand=rels_to_expand, rels_to_serialize=rels_to_serialize,
         group_listrels_by=group_listrels_by,
         key_modifications=key_modifications,
-        groupby=groupby, keyvals_to_merge=keyvals_to_merge
-        ), meta=meta)
+        groupby=groupby, keyvals_to_merge=keyvals_to_merge,
+        preserve_order=preserve_order), meta=meta)
 
 
 def appropriate_json(olist, **kwargs):
@@ -220,6 +234,8 @@ def _serializable_params(args, check_groupby=False):
             for arg in request.args.getlist('grouprelby')}
     if check_groupby and 'groupby' in request.args:
         params['groupby'] = request.args.get('groupby').split(',')
+        if 'preserve_order' in request.args:
+            params['preserve_order'] = boolify(request.args.get('preserve_order'))
     return params
 
 
@@ -239,8 +255,11 @@ def as_list(func):
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
+        response = func(*args, **kwargs)
+        if isinstance(response, Response):
+            return response
         return as_json_list(
-            func(*args, **kwargs),
+            response,
             **_serializable_params(request.args, check_groupby=True))
     return wrapper
 
@@ -351,6 +370,8 @@ def as_processed_list(func):
                     and not any(kw.endswith(op) for op in OPERATORS)):
                 kwargs[kw] = request.args.get(kw)
         result = func(*args, **kwargs)
+        if isinstance(result, Response):
+            return result
         if not isinstance(result, QueryBooster):
             result = result.query
         for kw in request.args:
@@ -419,8 +440,11 @@ def as_obj(func):
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
+        response = func(*args, **kwargs)
+        if isinstance(response, Response):
+            return response
         return as_json_obj(
-            func(*args, **kwargs),
+            response,
             **_serializable_params(request.args))
     return wrapper
 
@@ -432,4 +456,3 @@ def as_list_or_obj(func):
             func(*args, **kwargs),
             **_serializable_params(request.args))
     return wrapper
-
