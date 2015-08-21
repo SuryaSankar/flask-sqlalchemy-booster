@@ -277,7 +277,8 @@ def filter_query_with_key(query, keyword, value, op):
                     return query
                 model_class = query.model_class._decl_class_registry[
                     class_name]
-                _query = _query.join(model_class)
+                if model_class not in [entity.class_ for entity in _query._join_entities]:
+                    _query = _query.join(model_class)
 
         elif prefix_names[0] in query.model_class.all_keys():
             model_class = query.model_class
@@ -287,7 +288,8 @@ def filter_query_with_key(query, keyword, value, op):
                         r for r in model_class.__mapper__.relationships
                         if r.key == rel_or_proxy_name)
                     model_class = mapped_rel.mapper.class_
-                    _query = _query.join(model_class)
+                    if model_class not in [entity.class_ for entity in _query._join_entities]:
+                        _query = _query.join(model_class)
                 elif rel_or_proxy_name in model_class.association_proxy_keys():
                     assoc_proxy = getattr(model_class, rel_or_proxy_name)
                     assoc_rel = next(
@@ -299,7 +301,8 @@ def filter_query_with_key(query, keyword, value, op):
                         r for r in assoc_rel_class.__mapper__.relationships
                         if r.key == assoc_proxy.value_attr)
                     model_class = actual_rel_in_assoc_class.mapper.class_
-                    _query = _query.join(model_class)
+                    if model_class not in [entity.class_ for entity in _query._join_entities]:
+                        _query = _query.join(model_class)
     else:
         model_class = query.model_class
         attr_name = keyword

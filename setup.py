@@ -16,9 +16,9 @@ from setuptools import setup
 
 setup(
     name='Flask-SQLAlchemy-Booster',
-    version='0.1.9',
-    description='Enhance Flask-SQLAlchemy with some additional features',
-    long_description='A wrapper around Flask-SQLAlchemy',
+    version='0.2.0',
+    description='Querying and JSON Response generation wrappers for Flask-SQLAlchemy',
+    long_description='Allows querying on Model classes, supports several common query operations, allows JSONification of models and relations and provides a simple query language for dynamically fetching data',
     packages=['flask_sqlalchemy_booster'],
     include_package_data=True,
     install_requires=[
