@@ -69,7 +69,7 @@ def serializable_list(
             to the `todict` method
 
         groupby (list, optional): An optional list of keys based on which
-            the result list will be hierarchially grouped ( and converted 
+            the result list will be hierarchially grouped ( and converted
                 into a dict)
 
         keyvals_to_merge (list of dicts, optional): A list of parameters
@@ -361,6 +361,7 @@ def as_processed_list(func):
         offset = request.args.get('offset', None)
         page = request.args.get('page', None)
         per_page = request.args.get('per_page', 20)
+        count_only = boolify(request.args.get('count_only', 'false'))
         func_argspec = inspect.getargspec(func)
         func_args = func_argspec.args
         for kw in request.args:
@@ -392,6 +393,8 @@ def as_processed_list(func):
                     if value.lower() == 'none':
                         value = None
                     result = filter_query_with_key(result, kw, value, '=')
+        if count_only:
+            return as_json(result.count())
         if sort:
             if sort == 'asc':
                 result = result.asc(orderby)
@@ -416,12 +419,12 @@ def as_processed_list(func):
             if limit:
                 result = result.limit(limit)
             if offset:
-                result = result.offset(int(offset)-1)
+                result = result.offset(int(offset) - 1)
             result = result.all()
         return as_json_list(
             result,
             **_serializable_params(request.args, check_groupby=True)
-            )
+        )
     return wrapper
 
 
