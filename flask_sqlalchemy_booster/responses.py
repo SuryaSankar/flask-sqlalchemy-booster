@@ -1,5 +1,5 @@
 from flask.json import _json
-from flask import abort, Response, request
+from flask import Response, request
 from functools import wraps
 from toolspy import deep_group, merge, add_kv_to_dict, boolify
 import inspect
@@ -8,6 +8,8 @@ from .query_booster import QueryBooster
 from sqlalchemy.sql import sqltypes
 from decimal import Decimal
 import dateutil.parser
+import traceback
+import math
 
 
 RESTRICTED = ['limit', 'sort', 'orderby', 'groupby', 'attrs',
@@ -404,13 +406,25 @@ def as_processed_list(func):
             elif sort == 'desc':
                 result = result.desc(orderby)
         if page:
-            pagination = result.paginate(int(page), int(per_page))
+            try:
+                pagination = result.paginate(int(page), int(per_page))
+            except:
+                traceback.print_exc()
+                return as_json({
+                    "status": "failure",
+                    "error": "PAGE_NOT_FOUND",
+                    "total_pages": int(math.ceil(float(result.count()) / int(per_page)))
+                }, status=404, wrap=False)
             if pagination.total == 0:
                 return as_json_list(
                     result,
                     **_serializable_params(request.args, check_groupby=True))
             if int(page) > pagination.pages:
-                abort(404)
+                return as_json({
+                    "status": "failure",
+                    "error": "PAGE_NOT_FOUND",
+                    "total_pages": pagination.pages
+                }, status=404, wrap=False)
             return as_json_list(
                 pagination.items,
                 **add_kv_to_dict(
