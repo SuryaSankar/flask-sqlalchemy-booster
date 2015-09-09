@@ -1,5 +1,5 @@
 from flask.json import _json
-from flask import abort, Response, request
+from flask import Response, request
 from functools import wraps
 from toolspy import deep_group, merge, add_kv_to_dict, boolify
 import inspect
@@ -8,6 +8,8 @@ from .query_booster import QueryBooster
 from sqlalchemy.sql import sqltypes
 from decimal import Decimal
 import dateutil.parser
+import traceback
+import math
 
 
 RESTRICTED = ['limit', 'sort', 'orderby', 'groupby', 'attrs',
@@ -49,7 +51,8 @@ def serialized_obj(obj, attrs_to_serialize=None,
 def serializable_list(
         olist, attrs_to_serialize=None, rels_to_expand=None,
         group_listrels_by=None, rels_to_serialize=None,
-        key_modifications=None, groupby=None, keyvals_to_merge=None):
+        key_modifications=None, groupby=None, keyvals_to_merge=None,
+        preserve_order=False):
     """
     Converts a list of model instances to a list of dictionaries
     using their `todict` method.
@@ -68,15 +71,27 @@ def serializable_list(
             to the `todict` method
 
         groupby (list, optional): An optional list of keys based on which
-            the result list will be hierarchially grouped ( and converted 
+            the result list will be hierarchially grouped ( and converted
                 into a dict)
 
         keyvals_to_merge (list of dicts, optional): A list of parameters
             to be merged with each dict of the output list
     """
     if groupby:
+        if preserve_order:
+            return json_encoder(deep_group(
+                olist, keys=groupby, serializer='todict',
+                preserve_order=preserve_order,
+                serializer_kwargs={
+                    'rels_to_serialize': rels_to_serialize,
+                    'rels_to_expand': rels_to_expand,
+                    'attrs_to_serialize': attrs_to_serialize,
+                    'group_listrels_by': group_listrels_by,
+                    'key_modifications': key_modifications
+                }))
         return deep_group(
             olist, keys=groupby, serializer='todict',
+            preserve_order=preserve_order,
             serializer_kwargs={
                 'rels_to_serialize': rels_to_serialize,
                 'rels_to_expand': rels_to_expand,
@@ -177,6 +192,7 @@ def as_json_list(olist, attrs_to_serialize=None,
                  group_listrels_by=None,
                  key_modifications=None,
                  groupby=None,
+                 preserve_order=False,
                  keyvals_to_merge=None,
                  meta=None):
     return as_json(serializable_list(
@@ -184,8 +200,8 @@ def as_json_list(olist, attrs_to_serialize=None,
         rels_to_expand=rels_to_expand, rels_to_serialize=rels_to_serialize,
         group_listrels_by=group_listrels_by,
         key_modifications=key_modifications,
-        groupby=groupby, keyvals_to_merge=keyvals_to_merge
-        ), meta=meta)
+        groupby=groupby, keyvals_to_merge=keyvals_to_merge,
+        preserve_order=preserve_order), meta=meta)
 
 
 def appropriate_json(olist, **kwargs):
@@ -220,6 +236,8 @@ def _serializable_params(args, check_groupby=False):
             for arg in request.args.getlist('grouprelby')}
     if check_groupby and 'groupby' in request.args:
         params['groupby'] = request.args.get('groupby').split(',')
+        if 'preserve_order' in request.args:
+            params['preserve_order'] = boolify(request.args.get('preserve_order'))
     return params
 
 
@@ -239,8 +257,11 @@ def as_list(func):
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
+        response = func(*args, **kwargs)
+        if isinstance(response, Response):
+            return response
         return as_json_list(
-            func(*args, **kwargs),
+            response,
             **_serializable_params(request.args, check_groupby=True))
     return wrapper
 
@@ -258,7 +279,8 @@ def filter_query_with_key(query, keyword, value, op):
                     return query
                 model_class = query.model_class._decl_class_registry[
                     class_name]
-                _query = _query.join(model_class)
+                if model_class not in [entity.class_ for entity in _query._join_entities]:
+                    _query = _query.join(model_class)
 
         elif prefix_names[0] in query.model_class.all_keys():
             model_class = query.model_class
@@ -268,7 +290,8 @@ def filter_query_with_key(query, keyword, value, op):
                         r for r in model_class.__mapper__.relationships
                         if r.key == rel_or_proxy_name)
                     model_class = mapped_rel.mapper.class_
-                    _query = _query.join(model_class)
+                    if model_class not in [entity.class_ for entity in _query._join_entities]:
+                        _query = _query.join(model_class)
                 elif rel_or_proxy_name in model_class.association_proxy_keys():
                     assoc_proxy = getattr(model_class, rel_or_proxy_name)
                     assoc_rel = next(
@@ -280,7 +303,8 @@ def filter_query_with_key(query, keyword, value, op):
                         r for r in assoc_rel_class.__mapper__.relationships
                         if r.key == assoc_proxy.value_attr)
                     model_class = actual_rel_in_assoc_class.mapper.class_
-                    _query = _query.join(model_class)
+                    if model_class not in [entity.class_ for entity in _query._join_entities]:
+                        _query = _query.join(model_class)
     else:
         model_class = query.model_class
         attr_name = keyword
@@ -342,6 +366,7 @@ def as_processed_list(func):
         offset = request.args.get('offset', None)
         page = request.args.get('page', None)
         per_page = request.args.get('per_page', 20)
+        count_only = boolify(request.args.get('count_only', 'false'))
         func_argspec = inspect.getargspec(func)
         func_args = func_argspec.args
         for kw in request.args:
@@ -351,6 +376,8 @@ def as_processed_list(func):
                     and not any(kw.endswith(op) for op in OPERATORS)):
                 kwargs[kw] = request.args.get(kw)
         result = func(*args, **kwargs)
+        if isinstance(result, Response):
+            return result
         if not isinstance(result, QueryBooster):
             result = result.query
         for kw in request.args:
@@ -371,19 +398,33 @@ def as_processed_list(func):
                     if value.lower() == 'none':
                         value = None
                     result = filter_query_with_key(result, kw, value, '=')
+        if count_only:
+            return as_json(result.count())
         if sort:
             if sort == 'asc':
                 result = result.asc(orderby)
             elif sort == 'desc':
                 result = result.desc(orderby)
         if page:
-            pagination = result.paginate(int(page), int(per_page))
+            try:
+                pagination = result.paginate(int(page), int(per_page))
+            except:
+                traceback.print_exc()
+                return as_json({
+                    "status": "failure",
+                    "error": "PAGE_NOT_FOUND",
+                    "total_pages": int(math.ceil(float(result.count()) / int(per_page)))
+                }, status=404, wrap=False)
             if pagination.total == 0:
                 return as_json_list(
                     result,
                     **_serializable_params(request.args, check_groupby=True))
             if int(page) > pagination.pages:
-                abort(404)
+                return as_json({
+                    "status": "failure",
+                    "error": "PAGE_NOT_FOUND",
+                    "total_pages": pagination.pages
+                }, status=404, wrap=False)
             return as_json_list(
                 pagination.items,
                 **add_kv_to_dict(
@@ -395,12 +436,12 @@ def as_processed_list(func):
             if limit:
                 result = result.limit(limit)
             if offset:
-                result = result.offset(int(offset)-1)
+                result = result.offset(int(offset) - 1)
             result = result.all()
         return as_json_list(
             result,
             **_serializable_params(request.args, check_groupby=True)
-            )
+        )
     return wrapper
 
 
@@ -419,8 +460,11 @@ def as_obj(func):
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
+        response = func(*args, **kwargs)
+        if isinstance(response, Response):
+            return response
         return as_json_obj(
-            func(*args, **kwargs),
+            response,
             **_serializable_params(request.args))
     return wrapper
 
@@ -432,4 +476,3 @@ def as_list_or_obj(func):
             func(*args, **kwargs),
             **_serializable_params(request.args))
     return wrapper
-

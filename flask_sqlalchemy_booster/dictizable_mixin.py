@@ -164,7 +164,7 @@ class DictizableMixin(object):
         # Serialize rels
         if len(rels_to_serialize) > 0:
             for rel, id_attr in rels_to_serialize:
-                rel_obj = getattr(self, rel, None)
+                rel_obj = getattr(self, rel) if hasattr(self, rel) else None
                 if rel_obj is not None:
                     if is_list_like(rel_obj):
                         if (group_listrels_by is not None and
@@ -176,16 +176,18 @@ class DictizableMixin(object):
                             )
                         else:
                             result[rel] = [getattr(item, id_attr)
-                                           for item in rel_obj]
+                                           for item in rel_obj if hasattr(item, id_attr)]
                     elif is_dict_like(rel_obj):
                         result[rel] = {k: getattr(v, id_attr)
-                                       for k, v in rel_obj.iteritems()}
+                                       for k, v in rel_obj.iteritems()
+                                       if hasattr(v, id_attr)}
                     else:
-                        result[rel] = getattr(rel_obj, id_attr)
+                        result[rel] = getattr(rel_obj, id_attr) if hasattr(
+                            rel_obj, id_attr) else None
 
         # Expand some rels
         for rel, child_rels in rels_to_expand_dict.iteritems():
-            rel_obj = getattr(self, rel, None)
+            rel_obj = getattr(self, rel) if hasattr(self, rel) else None
             if rel_obj is not None:
                 if is_list_like(rel_obj):
                     if (group_listrels_by is not None and
@@ -231,7 +233,7 @@ class DictizableMixin(object):
             {'name': u'James Bond', 'email': u'007@mi.com'}
 
         """
-        return dict([(a, getattr(self, a)) for a in args])
+        return dict([(a, getattr(self, a)) for a in args if hasattr(self, a)])
 
     def tojson(self, attrs_to_serialize=None,
                rels_to_expand=None,
