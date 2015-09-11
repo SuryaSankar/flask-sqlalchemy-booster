@@ -223,7 +223,9 @@ def _serializable_params(args, check_groupby=False):
         if rels.lower() == 'none':
             params['rels_to_serialize'] = []
         else:
-            params['rels_to_serialize'] = rels.split(',')
+            params['rels_to_serialize'] = [
+                (rel.partition(':')[0], rel.partition(':')[2]) for rel in rels.split(',')
+                if ':' in rel]
     if 'expand' in args:
         expand = args.get('expand')
         if expand.lower() == 'none':
