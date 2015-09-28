@@ -184,6 +184,8 @@ class DictizableMixin(object):
                     else:
                         result[rel] = getattr(rel_obj, id_attr) if hasattr(
                             rel_obj, id_attr) else None
+                else:
+                    result[rel] = None
 
         # Expand some rels
         for rel, child_rels in rels_to_expand_dict.iteritems():
