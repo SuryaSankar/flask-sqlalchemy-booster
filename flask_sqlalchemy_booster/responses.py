@@ -342,6 +342,8 @@ def filter_query_with_key(query, keyword, value, op):
                         value = boolify(value)
                     elif column_type is sqltypes.DateTime:
                         value = dateutil.parser.parse(value)
+                    elif column_type is sqltypes.Date:
+                        value = dateutil.parser.parse(value).date()
         return _query.filter(getattr(
             key, OPERATOR_FUNC[op])(value))
     else:
