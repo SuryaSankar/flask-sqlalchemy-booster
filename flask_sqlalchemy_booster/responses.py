@@ -311,7 +311,9 @@ def filter_query_with_key(query, keyword, value, op):
         model_class = query.model_class
         attr_name = keyword
         _query = query
-        if attr_name in model_class.association_proxy_keys():
+        counter = 0  # to prevent infinite loop by some mistake
+        while attr_name in model_class.association_proxy_keys() and counter < 5:
+            counter += 1
             assoc_proxy = getattr(model_class, attr_name)
             assoc_rel = next(
                 r for r in model_class.__mapper__.relationships
