@@ -20,8 +20,6 @@ def json_encoder(obj):
         return obj
     elif hasattr(obj, 'todict'):
         return obj.todict()
-    elif isinstance(obj, set):
-        return [json_encoder(i) for i in list(obj)]
     elif is_list_like(obj):
         return [json_encoder(i) for i in obj]
     elif is_dict_like(obj):
