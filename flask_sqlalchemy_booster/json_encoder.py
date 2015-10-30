@@ -29,3 +29,25 @@ def json_encoder(obj):
             return _json.JSONEncoder().default(obj)
         except:
             return unicode(obj)
+
+
+class BoosterJSONEncoder(_json.JSONEncoder):
+    def default(self, obj):
+        return json_encoder(obj)
+
+
+def booster_json_decoder(obj):
+    if '__type__' in obj:
+        if obj['__type__'] == '__datetime__':
+            return datetime.fromtimestamp(obj['epoch'])
+    return obj
+
+
+# Encoder function
+def booster_json_dumps(obj):
+    return _json.dumps(obj, cls=BoosterJSONEncoder)
+
+
+# Decoder function
+def booster_json_loads(obj):
+    return _json.loads(obj, object_hook=booster_json_decoder)
