@@ -378,6 +378,8 @@ class QueryableMixin(object):
         if len(keyvals) == 0:
             return []
         resultset = cls.query.filter(getattr(cls, key).in_(keyvals))
+        # This is ridiculous. user_id check cannot be here. A hangover
+        # from the time this lib was inside our app codebase
         if user_id and hasattr(cls, 'user_id'):
             resultset = resultset.filter(cls.user_id == user_id)
         # We need the results in the same order as the input keyvals
@@ -596,6 +598,45 @@ class QueryableMixin(object):
             objs.append(obj)
         try:
             return cls.add_all(objs)
+        except:
+            cls.session.rollback()
+            raise
+
+
+    @classmethod
+    def update_or_build_all(cls, list_of_kwargs, keys=[]):
+        """Batch method for updating a list of instances and
+        creating them if required
+
+        Args:
+            list_of_kwargs(list of dicts): A list of dicts where
+                each dict denotes the keyword args that you would pass
+                to the create method separately
+
+            keys (list, optional): A list of keys to use for the 
+                initial finding step. Matching is done only on these
+                attributes.
+
+        Examples:
+
+            >>> Customer.update_or_create_all([
+            ... {'name': 'Vicky', 'email': 'vicky@x.com', 'age': 34},
+            ... {'name': 'Ron', 'age': 40, 'email': 'ron@x.com',
+            ... 'gender': 'Male'}], keys=['name', 'email'])
+        """
+        objs = []
+        for kwargs in list_of_kwargs:
+            obj = cls.first(**subdict(kwargs, keys))
+            if obj is not None:
+                for key, value in kwargs.iteritems():
+                    if (key not in keys and
+                            key not in cls._no_overwrite_):
+                        setattr(obj, key, value)
+            else:
+                obj = cls.new(**kwargs)
+            objs.append(obj)
+        try:
+            return cls.add_all(objs, commit=False)
         except:
             cls.session.rollback()
             raise

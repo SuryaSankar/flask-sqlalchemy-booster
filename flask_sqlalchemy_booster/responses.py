@@ -8,7 +8,6 @@ from .query_booster import QueryBooster
 from sqlalchemy.sql import sqltypes
 from decimal import Decimal
 import dateutil.parser
-import traceback
 import math
 
 
@@ -17,7 +16,7 @@ RESTRICTED = ['limit', 'sort', 'orderby', 'groupby', 'attrs',
 
 OPERATORS = ['~', '=', '>', '<', '>=', '!', '<=']
 OPERATOR_FUNC = {
-    '~': 'ilike', '=': '__eq__', '>': '__gt__', '<': '__lt__',
+    '~': 'ilike', '=': '__eq__', '>': '__ge__', '<': '__le__',
     '>': '__gt__', '>=': '__ge__', '<=': '__le__', '!': '__ne__'
 }
 
@@ -424,7 +423,6 @@ def as_processed_list(func):
             try:
                 pagination = result.paginate(int(page), int(per_page))
             except:
-                traceback.print_exc()
                 return as_json({
                     "status": "failure",
                     "error": "PAGE_NOT_FOUND",
