@@ -9,6 +9,7 @@ from sqlalchemy.sql import sqltypes
 from decimal import Decimal
 import dateutil.parser
 import math
+from flask_sqlalchemy import Pagination
 
 
 RESTRICTED = ['limit', 'sort', 'orderby', 'groupby', 'attrs',
@@ -351,6 +352,88 @@ def filter_query_with_key(query, keyword, value, op):
         return query
 
 
+def filter_query_using_args(result):
+    if not isinstance(result, QueryBooster):
+        result = result.query
+    for kw in request.args:
+        for op in OPERATORS:
+            if kw.endswith(op):
+                result = filter_query_with_key(
+                    result, kw.rstrip(op), request.args.get(kw), op)
+                break
+            elif request.args.get(kw).startswith(op):
+                result = filter_query_with_key(
+                    result, kw, request.args.get(kw).lstrip(op), op)
+                break
+        else:
+            # Well who would've thought that a for else will be appropriate
+            # anywhere? Turns out it is here.
+            if kw not in RESTRICTED:
+                value = request.args.get(kw)
+                if value.lower() == 'none':
+                    value = None
+                result = filter_query_with_key(result, kw, value, '=')
+    return result
+
+
+def fetch_results_in_requested_format(result):
+    limit = request.args.get('limit', None)
+    sort = request.args.get('sort', None)
+    orderby = request.args.get('orderby', 'id')
+    offset = request.args.get('offset', None)
+    page = request.args.get('page', None)
+    per_page = request.args.get('per_page', 20)
+    if sort:
+        if sort == 'asc':
+            result = result.asc(orderby)
+        elif sort == 'desc':
+            result = result.desc(orderby)
+    if page:
+        try:
+            pagination = result.paginate(int(page), int(per_page))
+        except:
+            raise Exception("PAGE_NOT_FOUND")
+        return pagination
+    else:
+        if limit:
+            result = result.limit(limit)
+        if offset:
+            result = result.offset(int(offset) - 1)
+        result = result.all()
+    return result
+
+
+def convert_result_to_response(result, meta={}):
+    page = request.args.get('page', None)
+    if isinstance(result, Pagination):
+        if result.total == 0:
+            return as_json_list(
+                result,
+                **_serializable_params(request.args, check_groupby=True))
+        if int(page) > result.pages:
+            return as_json({
+                "status": "failure",
+                "error": "PAGE_NOT_FOUND",
+                "total_pages": result.pages
+            }, status=404, wrap=False)
+        result_meta = merge({
+            'total_pages': result.pages,
+            'total_items': result.total
+        }, meta)
+        return as_json_list(
+            result.items,
+            **add_kv_to_dict(
+                _serializable_params(request.args, check_groupby=True),
+                'meta', result_meta))
+    if len(meta.keys) > 0:
+        kwargs = merge(
+            _serializable_params(request.args, check_groupby=True),
+            {'meta': meta})
+    else:
+        kwargs = _serializable_params(request.args, check_groupby=True)
+    return as_json_list(result, **kwargs)
+
+
 def as_processed_list(func):
     """ A decorator used to return a JSON response of a list of model
         objects. It differs from `as_list` in that it accepts a variety
@@ -374,13 +457,6 @@ def as_processed_list(func):
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
-        limit = request.args.get('limit', None)
-        sort = request.args.get('sort', None)
-        orderby = request.args.get('orderby', 'id')
-        offset = request.args.get('offset', None)
-        page = request.args.get('page', None)
-        per_page = request.args.get('per_page', 20)
-        count_only = boolify(request.args.get('count_only', 'false'))
         func_argspec = inspect.getargspec(func)
         func_args = func_argspec.args
         for kw in request.args:
@@ -389,72 +465,29 @@ def as_processed_list(func):
                             for op in OPERATORS)
                     and not any(kw.endswith(op) for op in OPERATORS)):
                 kwargs[kw] = request.args.get(kw)
-        result = func(*args, **kwargs)
-        if isinstance(result, Response):
-            return result
-        if not isinstance(result, QueryBooster):
-            result = result.query
-        for kw in request.args:
-            for op in OPERATORS:
-                if kw.endswith(op):
-                    result = filter_query_with_key(
-                        result, kw.rstrip(op), request.args.get(kw), op)
-                    break
-                elif request.args.get(kw).startswith(op):
-                    result = filter_query_with_key(
-                        result, kw, request.args.get(kw).lstrip(op), op)
-                    break
-            else:
-                # Well who would've thought that a for else will be appropriate
-                # anywhere? Turns out it is here.
-                if kw not in RESTRICTED:
-                    value = request.args.get(kw)
-                    if value.lower() == 'none':
-                        value = None
-                    result = filter_query_with_key(result, kw, value, '=')
+        func_output = func(*args, **kwargs)
+        if isinstance(func_output, Response):
+            return func_output
+
+        filtered_query = filter_query_using_args(func_output)
+
+        count_only = boolify(request.args.get('count_only', 'false'))
         if count_only:
-            return as_json(result.count())
-        if sort:
-            if sort == 'asc':
-                result = result.asc(orderby)
-            elif sort == 'desc':
-                result = result.desc(orderby)
-        if page:
-            try:
-                pagination = result.paginate(int(page), int(per_page))
-            except:
-                return as_json({
-                    "status": "failure",
-                    "error": "PAGE_NOT_FOUND",
-                    "total_pages": int(math.ceil(float(result.count()) / int(per_page)))
-                }, status=404, wrap=False)
-            if pagination.total == 0:
-                return as_json_list(
-                    result,
-                    **_serializable_params(request.args, check_groupby=True))
-            if int(page) > pagination.pages:
-                return as_json({
-                    "status": "failure",
-                    "error": "PAGE_NOT_FOUND",
-                    "total_pages": pagination.pages
-                }, status=404, wrap=False)
-            return as_json_list(
-                pagination.items,
-                **add_kv_to_dict(
-                    _serializable_params(request.args, check_groupby=True),
-                    'meta', {'total_pages': pagination.pages,
-                             'total_items': pagination.total
-                             }))
-        else:
-            if limit:
-                result = result.limit(limit)
-            if offset:
-                result = result.offset(int(offset) - 1)
-            result = result.all()
-        return as_json_list(
-            result,
-            **_serializable_params(request.args, check_groupby=True)
-        )
+            return as_json(filtered_query.count())
+
+        per_page = request.args.get('per_page', 20)
+
+        try:
+            result = fetch_results_in_requested_format(filtered_query)
+        except:
+            return as_json({
+                "status": "failure",
+                "error": "PAGE_NOT_FOUND",
+                "total_pages": int(math.ceil(float(filtered_query.count()) / int(per_page)))
+            }, status=404, wrap=False)
+
+        return convert_result_to_response(result)
+
     return wrapper
 
 
