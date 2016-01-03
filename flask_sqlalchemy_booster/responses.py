@@ -406,11 +406,11 @@ def fetch_results_in_requested_format(result):
 def convert_result_to_response(result, meta={}):
     page = request.args.get('page', None)
     if isinstance(result, Pagination):
-        if result.total == 0:
-            return as_json_list(
-                result,
-                **_serializable_params(request.args, check_groupby=True))
-        if int(page) > result.pages:
+        # if result.total == 0:
+        #     return as_json_list(
+        #         result.items,
+        #         **_serializable_params(request.args, check_groupby=True))
+        if result.total != 0 and int(page) > result.pages:
             return as_json({
                 "status": "failure",
                 "error": "PAGE_NOT_FOUND",
