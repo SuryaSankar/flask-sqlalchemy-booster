@@ -416,16 +416,17 @@ def convert_result_to_response(result, meta={}):
                 "error": "PAGE_NOT_FOUND",
                 "total_pages": result.pages
             }, status=404, wrap=False)
+        pages_meta = {
+            'total_pages': result.pages,
+            'total_items': result.total
+        }
         if isinstance(meta, dict) and len(meta.keys()) > 0:
-            meta = merge({
-                'total_pages': result.pages,
-                'total_items': result.total
-            }, meta)
+            pages_meta = merge(pages_meta, meta)
         return as_json_list(
             result.items,
             **add_kv_to_dict(
                 _serializable_params(request.args, check_groupby=True),
-                'meta', meta))
+                'meta', pages_meta))
     if isinstance(meta, dict) and len(meta.keys()) > 0:
         kwargs = merge(
             _serializable_params(request.args, check_groupby=True),
