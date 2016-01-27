@@ -1,5 +1,5 @@
-from sqlalchemy import func
-from toolspy import place_nulls, subdict, remove_and_mark_duplicate_dicts
+# from sqlalchemy import func
+from toolspy import subdict, remove_and_mark_duplicate_dicts
 
 
 class QueryableMixin(object):
@@ -377,16 +377,30 @@ class QueryableMixin(object):
         """
         if len(keyvals) == 0:
             return []
-        resultset = cls.query.filter(getattr(cls, key).in_(keyvals))
+        original_keyvals = keyvals
+        keyvals_set = list(set(keyvals))
+        resultset = cls.query.filter(getattr(cls, key).in_(keyvals_set))
         # This is ridiculous. user_id check cannot be here. A hangover
         # from the time this lib was inside our app codebase
         if user_id and hasattr(cls, 'user_id'):
             resultset = resultset.filter(cls.user_id == user_id)
         # We need the results in the same order as the input keyvals
         # So order by field in SQL
-        resultset = resultset.order_by(
-            func.field(getattr(cls, key), *keyvals))
-        return place_nulls(key, keyvals, resultset.all())
+        key_result_mapping = {getattr(result, key): result for result in resultset.all()}
+        return [key_result_mapping.get(kv) for kv in original_keyvals]
+
+        # if len(keyvals) == 0:
+        #     return []
+        # resultset = cls.query.filter(getattr(cls, key).in_(keyvals))
+        # # This is ridiculous. user_id check cannot be here. A hangover
+        # # from the time this lib was inside our app codebase
+        # if user_id and hasattr(cls, 'user_id'):
+        #     resultset = resultset.filter(cls.user_id == user_id)
+        # # We need the results in the same order as the input keyvals
+        # # So order by field in SQL
+        # resultset = resultset.order_by(
+        #     func.field(getattr(cls, key), *keyvals))
+        # return place_nulls(key, keyvals, resultset.all())
 
     @classmethod
     def get_or_404(cls, id):
