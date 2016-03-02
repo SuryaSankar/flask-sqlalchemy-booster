@@ -312,16 +312,22 @@ def filter_query_with_key(query, keyword, value, op):
         attr_name = keyword
         _query = query
         counter = 0  # to prevent infinite loop by some mistake
-        while attr_name in model_class.association_proxy_keys() and counter < 5:
+        while attr_name in model_class.association_proxy_keys() and counter < 10:
             counter += 1
             assoc_proxy = getattr(model_class, attr_name)
             assoc_rel = next(
                 r for r in model_class.__mapper__.relationships
                 if r.key == assoc_proxy.target_collection)
+            prev_model_class = model_class
             model_class = assoc_rel.mapper.class_
             attr_name = assoc_proxy.value_attr
             if model_class not in [entity.class_ for entity in _query._join_entities]:
-                _query = _query.join(model_class)
+                # _query = _query.join(model_class)
+                # Commenting this out because it is not possibel to directly
+                # join a class when there are multiple foreign keys to it.
+                # Instead it is preferable to join by mentioning the relationshp
+                # itself.
+                _query = _query.join(getattr(prev_model_class, assoc_rel.key))
     if hasattr(model_class, attr_name):
         key = getattr(model_class, attr_name)
         if op == '~':
