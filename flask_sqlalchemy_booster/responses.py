@@ -21,6 +21,14 @@ OPERATOR_FUNC = {
     '>': '__gt__', '>=': '__ge__', '<=': '__le__', '!': '__ne__'
 }
 
+def json_dump(obj):
+    return _json.dumps(
+        obj,
+        default=json_encoder)
+
+def json_response(json_string, status=200):
+    return Response(json_string, status, mimetype='application/json')
+
 
 def serializable_obj(
         obj, attrs_to_serialize=None, rels_to_expand=None,
@@ -123,6 +131,14 @@ def serialized_list(olist, **kwargs):
         lambda o: serialized_obj(o, **kwargs),
         olist)
 
+def structured(struct, wrap=True, meta=None, struct_key='result'):
+    output = struct
+    if wrap:
+        output = {'status': 'success', struct_key: struct}
+        if meta:
+            output = merge(output, meta)
+    return output
+
 
 def jsoned(struct, wrap=True, meta=None, struct_key='result'):
     """ Provides a json dump of the struct
@@ -145,15 +161,18 @@ def jsoned(struct, wrap=True, meta=None, struct_key='result'):
         ... '[3, 4, 5]'
 
     """
-    if wrap:
-        output = {'status': 'success', struct_key: struct}
-        if meta:
-            output = merge(output, meta)
-        return _json.dumps(output,
-                           default=json_encoder)
-    else:
-        return _json.dumps(struct,
-                           default=json_encoder)
+    return _json.dumps(
+        structured(struct, wrap=wrap, meta=meta, struct_key=struct_key),
+        default=json_encoder)
+    # if wrap:
+        # output = {'status': 'success', struct_key: struct}
+        # if meta:
+        #     output = merge(output, meta)
+        # return _json.dumps(output,
+        #                    default=json_encoder)
+    # else:
+    #     return _json.dumps(struct,
+    #                        default=json_encoder)
 
 
 def jsoned_obj(obj, **kwargs):
@@ -170,6 +189,7 @@ def as_json(struct, status=200, wrap=True, meta=None):
                     status, mimetype='application/json')
 
 
+
 def as_json_obj(o, attrs_to_serialize=None,
                 rels_to_expand=None,
                 rels_to_serialize=None,
@@ -184,6 +204,23 @@ def as_json_obj(o, attrs_to_serialize=None,
         group_listrels_by=group_listrels_by,
         key_modifications=key_modifications),
         meta=meta)
+
+def as_dict_list(olist, attrs_to_serialize=None,
+                 rels_to_expand=None,
+                 rels_to_serialize=None,
+                 group_listrels_by=None,
+                 key_modifications=None,
+                 groupby=None,
+                 preserve_order=False,
+                 keyvals_to_merge=None,
+                 meta=None):
+    return structured(serializable_list(
+        olist, attrs_to_serialize=attrs_to_serialize,
+        rels_to_expand=rels_to_expand, rels_to_serialize=rels_to_serialize,
+        group_listrels_by=group_listrels_by,
+        key_modifications=key_modifications,
+        groupby=groupby, keyvals_to_merge=keyvals_to_merge,
+        preserve_order=preserve_order), meta=meta)
 
 
 def as_json_list(olist, attrs_to_serialize=None,
@@ -408,38 +445,76 @@ def fetch_results_in_requested_format(result):
         result = result.all()
     return result
 
-
-def convert_result_to_response(result, meta={}):
+def convert_result_to_response_structure(result, meta={}):
     page = request.args.get('page', None)
     if isinstance(result, Pagination):
-        # if result.total == 0:
-        #     return as_json_list(
-        #         result.items,
-        #         **_serializable_params(request.args, check_groupby=True))
         if result.total != 0 and int(page) > result.pages:
-            return as_json({
+            return {
                 "status": "failure",
                 "error": "PAGE_NOT_FOUND",
                 "total_pages": result.pages
-            }, status=404, wrap=False)
+            }
         pages_meta = {
             'total_pages': result.pages,
             'total_items': result.total
         }
         if isinstance(meta, dict) and len(meta.keys()) > 0:
             pages_meta = merge(pages_meta, meta)
-        return as_json_list(
-            result.items,
-            **add_kv_to_dict(
-                _serializable_params(request.args, check_groupby=True),
-                'meta', pages_meta))
+        return structured(
+            serializable_list(
+                result.items,
+                **_serializable_params(request.args, check_groupby=True)),
+            meta=pages_meta)
     if isinstance(meta, dict) and len(meta.keys()) > 0:
         kwargs = merge(
             _serializable_params(request.args, check_groupby=True),
             {'meta': meta})
     else:
         kwargs = _serializable_params(request.args, check_groupby=True)
-    return as_json_list(result, **kwargs)
+    return as_dict_list(result, **kwargs)
+
+def decide_status_code_for_response(obj):
+    status = 200
+    if obj['status'] == 'failure':
+        if obj['error'] == 'PAGE_NOT_FOUND':
+            status = 404
+        else:
+            status = 400
+    return status
+
+def convert_result_to_response(result, meta={}):
+    obj = convert_result_to_response_structure(result, meta)
+    return json_response(json_dump(obj), status=decide_status_code_for_response(obj))
+    # page = request.args.get('page', None)
+    # if isinstance(result, Pagination):
+    #     # if result.total == 0:
+    #     #     return as_json_list(
+    #     #         result.items,
+    #     #         **_serializable_params(request.args, check_groupby=True))
+    #     if result.total != 0 and int(page) > result.pages:
+    #         return as_json({
+    #             "status": "failure",
+    #             "error": "PAGE_NOT_FOUND",
+    #             "total_pages": result.pages
+    #         }, status=404, wrap=False)
+    #     pages_meta = {
+    #         'total_pages': result.pages,
+    #         'total_items': result.total
+    #     }
+    #     if isinstance(meta, dict) and len(meta.keys()) > 0:
+    #         pages_meta = merge(pages_meta, meta)
+    #     return as_json_list(
+    #         result.items,
+    #         **add_kv_to_dict(
+    #             _serializable_params(request.args, check_groupby=True),
+    #             'meta', pages_meta))
+    # if isinstance(meta, dict) and len(meta.keys()) > 0:
+    #     kwargs = merge(
+    #         _serializable_params(request.args, check_groupby=True),
+    #         {'meta': meta})
+    # else:
+    #     kwargs = _serializable_params(request.args, check_groupby=True)
+    # return as_json_list(result, **kwargs)
 
 
 def as_processed_list(func):
