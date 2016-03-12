@@ -395,27 +395,28 @@ def filter_query_with_key(query, keyword, value, op):
         return query
 
 
-def filter_query_using_args(result):
+def filter_query_using_args(result, args_to_skip=[]):
     if not isinstance(result, QueryBooster):
         result = result.query
     for kw in request.args:
-        for op in OPERATORS:
-            if kw.endswith(op):
-                result = filter_query_with_key(
-                    result, kw.rstrip(op), request.args.get(kw), op)
-                break
-            elif request.args.get(kw).startswith(op):
-                result = filter_query_with_key(
-                    result, kw, request.args.get(kw).lstrip(op), op)
-                break
-        else:
-            # Well who would've thought that a for else will be appropriate
-            # anywhere? Turns out it is here.
-            if kw not in RESTRICTED:
-                value = request.args.get(kw)
-                if value.lower() == 'none':
-                    value = None
-                result = filter_query_with_key(result, kw, value, '=')
+        if kw not in args_to_skip:
+            for op in OPERATORS:
+                if kw.endswith(op):
+                    result = filter_query_with_key(
+                        result, kw.rstrip(op), request.args.get(kw), op)
+                    break
+                elif request.args.get(kw).startswith(op):
+                    result = filter_query_with_key(
+                        result, kw, request.args.get(kw).lstrip(op), op)
+                    break
+            else:
+                # Well who would've thought that a for else will be appropriate
+                # anywhere? Turns out it is here.
+                if kw not in RESTRICTED:
+                    value = request.args.get(kw)
+                    if value.lower() == 'none':
+                        value = None
+                    result = filter_query_with_key(result, kw, value, '=')
     return result
 
 
