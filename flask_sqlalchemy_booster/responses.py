@@ -447,8 +447,9 @@ def fetch_results_in_requested_format(result):
     return result
 
 def convert_result_to_response_structure(result, meta={}):
-    page = request.args.get('page', None)
     if isinstance(result, Pagination):
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 10))
         if result.total != 0 and int(page) > result.pages:
             return {
                 "status": "failure",
@@ -457,7 +458,11 @@ def convert_result_to_response_structure(result, meta={}):
             }
         pages_meta = {
             'total_pages': result.pages,
-            'total_items': result.total
+            'total_items': result.total,
+            'page': page,
+            'per_page': per_page,
+            'page_first': (page - 1) * per_page + 1,
+            'page_last': min(page * per_page, result.total)
         }
         if isinstance(meta, dict) and len(meta.keys()) > 0:
             pages_meta = merge(pages_meta, meta)
