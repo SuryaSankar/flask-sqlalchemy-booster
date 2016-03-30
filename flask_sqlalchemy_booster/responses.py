@@ -15,6 +15,8 @@ from flask_sqlalchemy import Pagination
 RESTRICTED = ['limit', 'sort', 'orderby', 'groupby', 'attrs',
               'rels', 'expand', 'offset', 'page', 'per_page']
 
+PER_PAGE_ITEMS_COUNT = 20
+
 OPERATORS = ['~', '=', '>', '<', '>=', '!', '<=']
 OPERATOR_FUNC = {
     '~': 'ilike', '=': '__eq__', '>': '__ge__', '<': '__le__',
@@ -426,7 +428,7 @@ def fetch_results_in_requested_format(result):
     orderby = request.args.get('orderby', 'id')
     offset = request.args.get('offset', None)
     page = request.args.get('page', None)
-    per_page = request.args.get('per_page', 20)
+    per_page = request.args.get('per_page', PER_PAGE_ITEMS_COUNT)
     if sort:
         if sort == 'asc':
             result = result.asc(orderby)
@@ -449,7 +451,7 @@ def fetch_results_in_requested_format(result):
 def convert_result_to_response_structure(result, meta={}):
     if isinstance(result, Pagination):
         page = int(request.args.get('page', 1))
-        per_page = int(request.args.get('per_page', 10))
+        per_page = int(request.args.get('per_page', PER_PAGE_ITEMS_COUNT ))
         if result.total != 0 and int(page) > result.pages:
             return {
                 "status": "failure",
@@ -461,8 +463,8 @@ def convert_result_to_response_structure(result, meta={}):
             'total_items': result.total,
             'page': page,
             'per_page': per_page,
-            'page_first': (page - 1) * per_page + 1,
-            'page_last': min(page * per_page, result.total)
+            'curr_page_first_item_index': (page - 1) * per_page + 1,
+            'curr_page_last_item_index': min(page * per_page, result.total)
         }
         if isinstance(meta, dict) and len(meta.keys()) > 0:
             pages_meta = merge(pages_meta, meta)
@@ -564,7 +566,7 @@ def as_processed_list(func):
         if count_only:
             return as_json(filtered_query.count())
 
-        per_page = request.args.get('per_page', 20)
+        per_page = request.args.get('per_page', PER_PAGE_ITEMS_COUNT)
 
         try:
             result = fetch_results_in_requested_format(filtered_query)

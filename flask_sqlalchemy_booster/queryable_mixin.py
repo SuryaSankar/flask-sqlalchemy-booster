@@ -681,6 +681,10 @@ class QueryableMixin(object):
         return cls.first(**kwargs) or cls.build(**kwargs)
 
     @classmethod
+    def find_or_new(cls, **kwargs):
+        return cls.first(**kwargs) or cls.new(**kwargs)
+
+    @classmethod
     def new_all(cls, list_of_kwargs):
         return [cls.new(**kwargs) for kwargs in list_of_kwargs]
 

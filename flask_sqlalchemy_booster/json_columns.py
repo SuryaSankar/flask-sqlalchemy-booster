@@ -16,7 +16,10 @@ class JSONEncodedStruct(TypeDecorator):
 
     def process_result_value(self, value, dialect):
         if value is not None:
-            value = json.loads(value)
+            try:
+                value = json.loads(value)
+            except:
+                value = None
         return value
 
 
