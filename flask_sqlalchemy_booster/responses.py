@@ -10,6 +10,7 @@ from decimal import Decimal
 import dateutil.parser
 import math
 from flask_sqlalchemy import Pagination
+import traceback
 
 
 RESTRICTED = ['limit', 'sort', 'orderby', 'groupby', 'attrs',
@@ -448,6 +449,7 @@ def fetch_results_in_requested_format(result):
         result = result.all()
     return result
 
+
 def convert_result_to_response_structure(result, meta={}):
     if isinstance(result, Pagination):
         page = int(request.args.get('page', 1))
@@ -481,6 +483,7 @@ def convert_result_to_response_structure(result, meta={}):
         kwargs = _serializable_params(request.args, check_groupby=True)
     return as_dict_list(result, **kwargs)
 
+
 def decide_status_code_for_response(obj):
     status = 200
     if obj['status'] == 'failure':
@@ -490,39 +493,17 @@ def decide_status_code_for_response(obj):
             status = 400
     return status
 
+
 def convert_result_to_response(result, meta={}):
     obj = convert_result_to_response_structure(result, meta)
     return json_response(json_dump(obj), status=decide_status_code_for_response(obj))
-    # page = request.args.get('page', None)
-    # if isinstance(result, Pagination):
-    #     # if result.total == 0:
-    #     #     return as_json_list(
-    #     #         result.items,
-    #     #         **_serializable_params(request.args, check_groupby=True))
-    #     if result.total != 0 and int(page) > result.pages:
-    #         return as_json({
-    #             "status": "failure",
-    #             "error": "PAGE_NOT_FOUND",
-    #             "total_pages": result.pages
-    #         }, status=404, wrap=False)
-    #     pages_meta = {
-    #         'total_pages': result.pages,
-    #         'total_items': result.total
-    #     }
-    #     if isinstance(meta, dict) and len(meta.keys()) > 0:
-    #         pages_meta = merge(pages_meta, meta)
-    #     return as_json_list(
-    #         result.items,
-    #         **add_kv_to_dict(
-    #             _serializable_params(request.args, check_groupby=True),
-    #             'meta', pages_meta))
-    # if isinstance(meta, dict) and len(meta.keys()) > 0:
-    #     kwargs = merge(
-    #         _serializable_params(request.args, check_groupby=True),
-    #         {'meta': meta})
-    # else:
-    #     kwargs = _serializable_params(request.args, check_groupby=True)
-    # return as_json_list(result, **kwargs)
+
+
+def convert_query_to_response_object(query, args_to_skip=[], meta={}):
+    return convert_result_to_response_structure(
+        fetch_results_in_requested_format(
+            filter_query_using_args(query, args_to_skip=args_to_skip)), 
+        meta=meta)
 
 
 def as_processed_list(func):
@@ -571,6 +552,7 @@ def as_processed_list(func):
         try:
             result = fetch_results_in_requested_format(filtered_query)
         except:
+            traceback.print_exc()
             return as_json({
                 "status": "failure",
                 "error": "PAGE_NOT_FOUND",
