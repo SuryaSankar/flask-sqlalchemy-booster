@@ -1,5 +1,5 @@
 from flask.json import _json
-from flask import Response, request
+from flask import Response, request, render_template
 from functools import wraps
 from toolspy import deep_group, merge, add_kv_to_dict, boolify
 import inspect
@@ -504,6 +504,18 @@ def convert_query_to_response_object(query, args_to_skip=[], meta={}):
         fetch_results_in_requested_format(
             filter_query_using_args(query, args_to_skip=args_to_skip)), 
         meta=meta)
+
+
+def json_response_from_obj(obj):
+    return json_response(json_dump(obj), decide_status_code_for_response(obj))
+
+
+def template_response_from_obj(
+        obj, template, keys_to_be_replaced={}, merge_keyvals={}):
+    for k in keys_to_be_replaced:
+        if k in obj:
+            obj[keys_to_be_replaced[k]] = obj.pop(k)
+    return render_template(template, **merge(obj, merge_keyvals))
 
 
 def as_processed_list(func):
