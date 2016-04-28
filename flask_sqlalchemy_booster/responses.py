@@ -282,6 +282,25 @@ def _serializable_params(args, check_groupby=False):
             params['preserve_order'] = boolify(request.args.get('preserve_order'))
     return params
 
+def params_for_serialization(
+        attrs_to_serialize=None, rels_to_expand=None,
+        rels_to_serialize=None, group_listrels_by=None,
+        preserve_order=None, groupby=None, check_groupby=False):
+    params = _serializable_params(request.args, check_groupby=check_groupby)
+    if attrs_to_serialize is not None and 'attrs_to_serialize' not in params:
+        params['attrs_to_serialize'] = attrs_to_serialize
+    if rels_to_expand is not None and 'rels_to_expand' not in params:
+        params['rels_to_expand'] = rels_to_expand
+    if rels_to_serialize is not None and 'rels_to_serialize' not in params:
+        params['rels_to_serialize'] = rels_to_serialize
+    if 'group_listrels_by' is not None and 'group_listrels_by' not in params:
+        params['group_listrels_by'] = group_listrels_by
+    if 'preserve_order' is not None and 'preserve_order' not in params:
+        params['preserve_order'] = preserve_order
+    if 'groupby' is not None and 'groupby' not in params:
+        params['groupby'] = groupby
+    return params
+
 
 def as_list(func):
     """ A decorator used to return a JSON response of a list of model
@@ -450,7 +469,16 @@ def fetch_results_in_requested_format(result):
     return result
 
 
-def convert_result_to_response_structure(result, meta={}):
+def convert_result_to_response_structure(
+        result, meta={}, attrs_to_serialize=None, rels_to_expand=None,
+        rels_to_serialize=None, group_listrels_by=None,
+        preserve_order=None, groupby=None):
+    params_to_be_serialized = params_for_serialization(
+        attrs_to_serialize=attrs_to_serialize, rels_to_expand=rels_to_expand,
+        rels_to_serialize=rels_to_serialize,
+        group_listrels_by=group_listrels_by,
+        preserve_order=preserve_order, groupby=groupby,
+        check_groupby=True)
     if isinstance(result, Pagination):
         page = int(request.args.get('page', 1))
         per_page = int(request.args.get('per_page', PER_PAGE_ITEMS_COUNT ))
@@ -471,16 +499,12 @@ def convert_result_to_response_structure(result, meta={}):
         if isinstance(meta, dict) and len(meta.keys()) > 0:
             pages_meta = merge(pages_meta, meta)
         return structured(
-            serializable_list(
-                result.items,
-                **_serializable_params(request.args, check_groupby=True)),
+            serializable_list(result.items, **params_to_be_serialized),
             meta=pages_meta)
     if isinstance(meta, dict) and len(meta.keys()) > 0:
-        kwargs = merge(
-            _serializable_params(request.args, check_groupby=True),
-            {'meta': meta})
+        kwargs = merge(params_to_be_serialized, {'meta': meta})
     else:
-        kwargs = _serializable_params(request.args, check_groupby=True)
+        kwargs = params_to_be_serialized
     return as_dict_list(result, **kwargs)
 
 
@@ -495,7 +519,7 @@ def decide_status_code_for_response(obj):
 
 
 def convert_result_to_response(result, meta={}):
-    obj = convert_result_to_response_structure(result, meta)
+    obj = convert_result_to_response_structure(result, meta=meta)
     return json_response(json_dump(obj), status=decide_status_code_for_response(obj))
 
 
