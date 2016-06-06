@@ -13,6 +13,14 @@ class QueryableMixin(object):
 
     _no_overwrite_ = []
 
+
+    def update_without_commit(self, **kwargs):
+        kwargs = self._preprocess_params(kwargs)
+        for key, value in kwargs.iteritems():
+            if key not in self._no_overwrite_:
+                setattr(self, key, value)
+        return self
+
     def update(self, **kwargs):
         """Updates an instance.
 
@@ -678,7 +686,8 @@ class QueryableMixin(object):
         Args:
             **kwargs: instance parameters
         """
-        return cls.first(**kwargs) or cls.build(**kwargs)
+        keys = kwargs.pop('keys') if 'keys' in kwargs else []
+        return cls.first(**subdict(kwargs, keys)) or cls.build(**kwargs)
 
     @classmethod
     def find_or_new(cls, **kwargs):
