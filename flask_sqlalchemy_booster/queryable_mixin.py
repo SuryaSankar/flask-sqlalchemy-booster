@@ -342,6 +342,8 @@ class QueryableMixin(object):
             user35@i.com
 
         """
+        if keyval is None:
+            return None
         if (key in cls.__table__.columns
                 and cls.__table__.columns[key].primary_key):
             if user_id and hasattr(cls, 'user_id'):
