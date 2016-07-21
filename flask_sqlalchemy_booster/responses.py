@@ -523,11 +523,16 @@ def convert_result_to_response(result, meta={}):
     return json_response(json_dump(obj), status=decide_status_code_for_response(obj))
 
 
-def convert_query_to_response_object(query, args_to_skip=[], meta={}):
+def convert_query_to_response_object(
+        query, args_to_skip=[], meta={}, attrs_to_serialize=None, rels_to_expand=None,
+        rels_to_serialize=None, group_listrels_by=None,
+        preserve_order=None, groupby=None):
     return convert_result_to_response_structure(
         fetch_results_in_requested_format(
             filter_query_using_args(query, args_to_skip=args_to_skip)), 
-        meta=meta)
+        meta=meta, attrs_to_serialize=attrs_to_serialize, rels_to_expand=rels_to_expand,
+        rels_to_serialize=rels_to_serialize, group_listrels_by=group_listrels_by,
+        preserve_order=preserve_order, groupby=groupby)
 
 
 def json_response_from_obj(obj):
