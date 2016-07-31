@@ -135,14 +135,22 @@ class DictizableMixin(object):
         rels_to_expand_dict = {}
         for rel in rels_to_expand:
             partitioned_rels = rel.partition('.')
-            if partitioned_rels[0] not in rels_to_expand_dict:
-                rels_to_expand_dict[partitioned_rels[0]] = (
-                    [partitioned_rels[-1]] if partitioned_rels[-1]
-                    else [])
+            first_level_rel = partitioned_rels[0]
+            subsequent_rels = partitioned_rels[-1]
+            first_level_rel_attrs_list = None
+            if ':' in first_level_rel:
+                first_level_rel, colon, first_level_rel_attrs = first_level_rel.partition(':')
+                if first_level_rel_attrs != '':
+                    first_level_rel_attrs_list = first_level_rel_attrs.split("|")
+
+            if first_level_rel not in rels_to_expand_dict:
+                rels_to_expand_dict[first_level_rel] = {
+                    'rels_to_expand': [subsequent_rels] if subsequent_rels else [],
+                    'attrs_to_serialize': first_level_rel_attrs_list
+                }
             else:
-                if partitioned_rels[-1]:
-                    rels_to_expand_dict[partitioned_rels[0]].append(
-                        partitioned_rels[-1])
+                if subsequent_rels:
+                    rels_to_expand_dict[first_level_rel]['rels_to_expand'].append(subsequent_rels)
 
         # # Convert grouplistrelsby to a dict
         # group_listrels_dict = {}
@@ -197,10 +205,10 @@ class DictizableMixin(object):
                         result[rel] = deep_group(
                             rel_obj,
                             keys=group_listrels_by[rel], serializer='todict',
-                            serializer_kwargs={'rels_to_expand': child_rels}
+                            serializer_kwargs=child_rels
                         )
                     else:
-                        result[rel] = [i.todict(rels_to_expand=child_rels)
+                        result[rel] = [i.todict(**child_rels)
                                        if hasattr(i, 'todict') else i
                                        for i in rel_obj]
                         # result[rel] = serialized_list(
@@ -211,7 +219,7 @@ class DictizableMixin(object):
                                    for k, v in rel_obj.iteritems()}
                 else:
                     result[rel] = rel_obj.todict(
-                        rels_to_expand=child_rels) if hasattr(
+                        **child_rels) if hasattr(
                         rel_obj, 'todict') else rel_obj
 
         for key, mod_key in key_modifications.items():
