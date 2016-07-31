@@ -75,12 +75,44 @@ class DictizableMixin(object):
             rels_to_expand=rels_to_expand, rels_to_serialize=rels_to_serialize,
             key_modifications=key_modifications)
 
+    def todict_using_struct(self, result_struct={}):
+        """
+            result_struct:
+            {
+                'attrs': ['id', 'created_at'],
+                'rels': {
+                    'merchandise': {
+                        'attrs': ['id', 'label']
+                    }
+                }
+            }
+        """
+        result = self.serialize_attrs(*result_struct.get('attrs', []))
+        for rel, rel_result_struct in result_struct.get('rels', {}).items():
+            rel_obj = getattr(self, rel) if hasattr(self, rel) else None
+            if rel_obj is not None:
+                if is_list_like(rel_obj):
+                    result[rel] = [i.todict_using_struct(result_struct=rel_result_struct)
+                                   if hasattr(i, 'todict_using_struct') else i
+                                   for i in rel_obj]
+                elif is_dict_like(rel_obj):
+                    result[rel] = {k: v.todict_using_struct(result_struct=rel_result_struct)
+                                   if hasattr(v, 'todict_using_struct') else v
+                                   for k, v in rel_obj.iteritems()}
+                else:
+                    result[rel] = rel_obj.todict_using_struct(
+                        result_struct=rel_result_struct) if hasattr(
+                        rel_obj, 'todict_using_struct') else rel_obj
+        return result
+
+
     # Version 5.0
     def todict(self, attrs_to_serialize=None,
                rels_to_expand=None,
                rels_to_serialize=None,
                group_listrels_by=None,
-               key_modifications=None):
+               key_modifications=None,
+               result_struct=None):
 
         """Converts an instance to a dictionary form
 
@@ -116,6 +148,8 @@ class DictizableMixin(object):
         # even if you pass an empty list, it will take self._x_ value. But
         # we don't want that as the empty list is what we use to end
         # the recursion
+        if result_struct is not None:
+            return self.todict_using_struct(result_struct)
         attrs_to_serialize = (
             self._attrs_to_serialize_ if attrs_to_serialize is None
             else attrs_to_serialize)
