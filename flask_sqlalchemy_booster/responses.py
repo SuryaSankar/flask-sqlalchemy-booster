@@ -566,6 +566,32 @@ def template_response_from_obj(
     return render_template(template, **merge(obj, merge_keyvals))
 
 
+def process_args_and_render_json_list(q):
+
+    if isinstance(q, Response):
+        return q
+
+    filtered_query = filter_query_using_args(q)
+
+    count_only = boolify(request.args.get('count_only', 'false'))
+    if count_only:
+        return as_json(filtered_query.count())
+
+    per_page = request.args.get('per_page', PER_PAGE_ITEMS_COUNT)
+
+    try:
+        result = fetch_results_in_requested_format(filtered_query)
+    except:
+        traceback.print_exc()
+        return as_json({
+            "status": "failure",
+            "error": "PAGE_NOT_FOUND",
+            "total_pages": int(math.ceil(float(filtered_query.count()) / int(per_page)))
+        }, status=404, wrap=False)
+
+    return convert_result_to_response(result)
+
+
 def as_processed_list(func):
     """ A decorator used to return a JSON response of a list of model
         objects. It differs from `as_list` in that it accepts a variety
@@ -598,28 +624,31 @@ def as_processed_list(func):
                     and not any(kw.endswith(op) for op in OPERATORS)):
                 kwargs[kw] = request.args.get(kw)
         func_output = func(*args, **kwargs)
-        if isinstance(func_output, Response):
-            return func_output
 
-        filtered_query = filter_query_using_args(func_output)
+        return process_args_and_render_json_list(func_output)
 
-        count_only = boolify(request.args.get('count_only', 'false'))
-        if count_only:
-            return as_json(filtered_query.count())
+        # if isinstance(func_output, Response):
+        #     return func_output
 
-        per_page = request.args.get('per_page', PER_PAGE_ITEMS_COUNT)
+        # filtered_query = filter_query_using_args(func_output)
 
-        try:
-            result = fetch_results_in_requested_format(filtered_query)
-        except:
-            traceback.print_exc()
-            return as_json({
-                "status": "failure",
-                "error": "PAGE_NOT_FOUND",
-                "total_pages": int(math.ceil(float(filtered_query.count()) / int(per_page)))
-            }, status=404, wrap=False)
+        # count_only = boolify(request.args.get('count_only', 'false'))
+        # if count_only:
+        #     return as_json(filtered_query.count())
 
-        return convert_result_to_response(result)
+        # per_page = request.args.get('per_page', PER_PAGE_ITEMS_COUNT)
+
+        # try:
+        #     result = fetch_results_in_requested_format(filtered_query)
+        # except:
+        #     traceback.print_exc()
+        #     return as_json({
+        #         "status": "failure",
+        #         "error": "PAGE_NOT_FOUND",
+        #         "total_pages": int(math.ceil(float(filtered_query.count()) / int(per_page)))
+        #     }, status=404, wrap=False)
+
+        # return convert_result_to_response(result)
 
     return wrapper
 
