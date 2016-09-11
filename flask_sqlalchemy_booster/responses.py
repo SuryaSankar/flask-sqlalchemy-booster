@@ -261,6 +261,19 @@ def appropriate_json(olist, **kwargs):
     return as_json_list(olist, **kwargs)
 
 
+def success_json():
+    return Response(jsoned({'status': 'success'}, wrap=False),
+                    200, mimetype='application/json')
+
+
+def error_json(status_code, error=None):
+    return Response(_json.dumps({
+        'status': 'failure',
+        'error': error},
+        default=json_encoder),
+        status_code, mimetype='application/json')
+
+
 def _serializable_params(args, check_groupby=False):
     params = {}
     if '_rs' in args:
@@ -592,6 +605,14 @@ def process_args_and_render_json_list(q):
     return convert_result_to_response(result)
 
 
+def process_args_and_render_json_obj(obj):
+    if isinstance(obj, Response):
+        return obj
+    return as_json_obj(
+        obj,
+        **_serializable_params(request.args))
+
+
 def as_processed_list(func):
     """ A decorator used to return a JSON response of a list of model
         objects. It differs from `as_list` in that it accepts a variety
@@ -669,11 +690,7 @@ def as_obj(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         response = func(*args, **kwargs)
-        if isinstance(response, Response):
-            return response
-        return as_json_obj(
-            response,
-            **_serializable_params(request.args))
+        return process_args_and_render_json_obj(response)
     return wrapper
 
 
