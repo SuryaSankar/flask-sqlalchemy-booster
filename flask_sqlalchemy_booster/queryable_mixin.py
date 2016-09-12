@@ -109,6 +109,10 @@ class QueryableMixin(object):
             **kwargs: a dictionary of parameters
         """
         kwargs.pop('csrf_token', None)
+        for attr, val in kwargs.items():
+            if cls.is_a_to_many_rel(attr):
+                rel_cls = cls.mapped_rel_class(attr)
+                kwargs[attr] = [rel_cls.new(**rel_kwargs) for rel_kwargs in val]
         return kwargs
 
     @classmethod

@@ -63,6 +63,22 @@ class DictizableMixin(object):
                 rel_instance.target_collection].uselist
         return False
 
+    @classmethod
+    def is_a_to_many_rel(cls, attr):
+        return attr in cls.__mapper__.relationships and cls.__mapper__.relationships[attr].uselist
+
+    @classmethod
+    def is_a_to_one_rel(cls, attr):
+        return attr in cls.__mapper__.relationships and not cls.__mapper__.relationships[attr].uselist
+
+    @classmethod
+    def mapped_rel_class(cls, attr):
+        mapped_rel = next(
+            r for r in cls.__mapper__.relationships
+            if r.key == attr)
+        return mapped_rel.mapper.class_
+
+
     def to_serializable_dict(self, attrs_to_serialize=None,
                              rels_to_expand=None,
                              rels_to_serialize=None,
