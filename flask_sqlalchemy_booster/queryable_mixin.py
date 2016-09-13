@@ -1,5 +1,5 @@
 # from sqlalchemy import func
-from toolspy import subdict, remove_and_mark_duplicate_dicts
+from toolspy import subdict, remove_and_mark_duplicate_dicts, merge
 
 
 class QueryableMixin(object):
@@ -13,6 +13,31 @@ class QueryableMixin(object):
 
     _no_overwrite_ = []
 
+    _prevent_primary_key_initialization_ = True
+    _prevent_primary_key_updation_ = True
+
+    @classmethod
+    def is_a_to_many_rel(cls, attr):
+        return attr in cls.__mapper__.relationships and cls.__mapper__.relationships[attr].uselist
+
+    @classmethod
+    def is_a_to_one_rel(cls, attr):
+        return attr in cls.__mapper__.relationships and not cls.__mapper__.relationships[attr].uselist
+
+    @classmethod
+    def primary_key_name(cls):
+        return cls.__mapper__.primary_key[0].key
+
+    @classmethod
+    def is_the_primary_key(cls, attr):
+        return attr == cls.primary_key_name()
+
+    @classmethod
+    def mapped_rel_class(cls, attr):
+        mapped_rel = next(
+            r for r in cls.__mapper__.relationships
+            if r.key == attr)
+        return mapped_rel.mapper.class_
 
     def update_without_commit(self, **kwargs):
         kwargs = self._preprocess_params(kwargs)
@@ -20,29 +45,6 @@ class QueryableMixin(object):
             if key not in self._no_overwrite_:
                 setattr(self, key, value)
         return self
-
-    def update(self, **kwargs):
-        """Updates an instance.
-
-        Args:
-            **kwargs  :  Arbitrary keyword arguments. Column names are
-                keywords and their new values are the values.
-
-        Examples:
-
-            >>> customer.update(email="newemail@x.com", name="new")
-
-        """
-        kwargs = self._preprocess_params(kwargs)
-        for key, value in kwargs.iteritems():
-            if key not in self._no_overwrite_:
-                setattr(self, key, value)
-        try:
-            self.session.commit()
-            return self
-        except Exception as e:
-            self.session.rollback()
-            raise e
 
     def commit(self):
         """Commits a transaction.
@@ -108,12 +110,43 @@ class QueryableMixin(object):
 
             **kwargs: a dictionary of parameters
         """
-        kwargs.pop('csrf_token', None)
+        # kwargs.pop('csrf_token', None)
         for attr, val in kwargs.items():
+            if cls.is_the_primary_key(attr) and cls._prevent_primary_key_initialization_:
+                del kwargs[attr]
+                continue
             if cls.is_a_to_many_rel(attr):
                 rel_cls = cls.mapped_rel_class(attr)
-                kwargs[attr] = [rel_cls.new(**rel_kwargs) for rel_kwargs in val]
+                kwargs[attr] = rel_cls.update_or_new_all(
+                    list_of_kwargs=val, keys=[rel_cls.primary_key_name()])
+            elif cls.is_a_to_one_rel(attr):
+                rel_cls = cls.mapped_rel_class(attr)
+                kwargs[attr] = rel_cls.update_or_new(
+                    **merge(val, {'keys': [rel_cls.primary_key_name()]}))
         return kwargs
+
+    def update(self, **kwargs):
+        """Updates an instance.
+
+        Args:
+            **kwargs  :  Arbitrary keyword arguments. Column names are
+                keywords and their new values are the values.
+
+        Examples:
+
+            >>> customer.update(email="newemail@x.com", name="new")
+
+        """
+        kwargs = self._preprocess_params(kwargs)
+        for key, value in kwargs.iteritems():
+            if key not in self._no_overwrite_:
+                setattr(self, key, value)
+        try:
+            self.session.commit()
+            return self
+        except Exception as e:
+            self.session.rollback()
+            raise e
 
     @classmethod
     def filter_by(cls, **kwargs):
@@ -482,6 +515,34 @@ class QueryableMixin(object):
         return cls.first(**subdict(kwargs, keys)) or cls.create(**kwargs)
 
     @classmethod
+    def get_updated_or_new_obj(cls, kwargs={}, filter_keys=[]):
+        filter_kwargs = subdict(kwargs, filter_keys)
+        if filter_kwargs == {}:
+            obj = None
+        else:
+            obj = cls.first(**filter_kwargs)
+        if obj is not None:
+            for key, value in kwargs.iteritems():
+                if (key not in filter_keys and
+                        key not in cls._no_overwrite_):
+                    setattr(obj, key, value)
+        else:
+            obj = cls.new(**kwargs)
+        return obj
+
+    @classmethod
+    def update_or_new(cls, **kwargs):
+        keys = kwargs.pop('keys') if 'keys' in kwargs else []
+        return cls.get_updated_or_new_obj(kwargs, keys)
+
+    @classmethod
+    def update_or_new_all(cls, list_of_kwargs, keys=[]):
+        objs = []
+        for kwargs in list_of_kwargs:
+            objs.append(cls.get_updated_or_new_obj(kwargs, keys))
+        return objs
+
+    @classmethod
     def update_or_create(cls, **kwargs):
         """Checks if an instance already exists by filtering with the
         kwargs. If yes, updates the instance with new kwargs and
@@ -519,7 +580,11 @@ class QueryableMixin(object):
             True
         """
         keys = kwargs.pop('keys') if 'keys' in kwargs else []
-        obj = cls.first(**subdict(kwargs, keys))
+        filter_kwargs = subdict(kwargs, keys)
+        if filter_kwargs == {}:
+            obj = None
+        else:
+            obj = cls.first(**filter_kwargs)
         if obj is not None:
             for key, value in kwargs.iteritems():
                 if (key not in keys and
@@ -615,7 +680,11 @@ class QueryableMixin(object):
         """
         objs = []
         for kwargs in list_of_kwargs:
-            obj = cls.first(**subdict(kwargs, keys))
+            filter_kwargs = subdict(kwargs, keys)
+            if filter_kwargs == {}:
+                obj = None
+            else:
+                obj = cls.first(**filter_kwargs)
             if obj is not None:
                 for key, value in kwargs.iteritems():
                     if (key not in keys and
@@ -629,7 +698,6 @@ class QueryableMixin(object):
         except:
             cls.session.rollback()
             raise
-
 
     @classmethod
     def update_or_build_all(cls, list_of_kwargs, keys=[]):
@@ -654,7 +722,11 @@ class QueryableMixin(object):
         """
         objs = []
         for kwargs in list_of_kwargs:
-            obj = cls.first(**subdict(kwargs, keys))
+            filter_kwargs = subdict(kwargs, keys)
+            if filter_kwargs == {}:
+                obj = None
+            else:
+                obj = cls.first(**filter_kwargs)
             if obj is not None:
                 for key, value in kwargs.iteritems():
                     if (key not in keys and
