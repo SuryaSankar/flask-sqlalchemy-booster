@@ -49,8 +49,15 @@ class MutableDict(Mutable, dict):
         dict.__delitem__(self, key)
         self.changed()
 
+    @classmethod
+    def as_mutable(cls, sqltype):
+        sqltype = super(MutableDict, cls).as_mutable(sqltype)
+        sqltype.mutable_type = dict
+        return sqltype
+
 
 class MutableList(Mutable, list):
+
     @classmethod
     def coerce(cls, key, value):
         "Convert plain lists to MutableList."
@@ -81,3 +88,9 @@ class MutableList(Mutable, list):
 
         list.append(self, value)
         self.changed()
+
+    @classmethod
+    def as_mutable(cls, sqltype):
+        sqltype = super(MutableList, cls).as_mutable(sqltype)
+        sqltype.mutable_type = list
+        return sqltype

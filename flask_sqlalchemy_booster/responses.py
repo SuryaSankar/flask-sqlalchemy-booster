@@ -36,7 +36,7 @@ def json_response(json_string, status=200):
 def serializable_obj(
         obj, attrs_to_serialize=None, rels_to_expand=None,
         group_listrels_by=None, rels_to_serialize=None,
-        key_modifications=None, result_struct=None):
+        key_modifications=None, dict_struct=None):
     if obj:
         if hasattr(obj, 'todict'):
             return obj.todict(
@@ -45,7 +45,7 @@ def serializable_obj(
                 group_listrels_by=group_listrels_by,
                 rels_to_serialize=rels_to_serialize,
                 key_modifications=key_modifications,
-                result_struct=result_struct)
+                dict_struct=dict_struct)
         return str(obj)
     return None
 
@@ -55,17 +55,17 @@ def serialized_obj(obj, attrs_to_serialize=None,
                    group_listrels_by=None,
                    rels_to_serialize=None,
                    key_modifications=None,
-                   result_struct=None):
+                   dict_struct=None):
     return serializable_obj(
         obj, attrs_to_serialize, rels_to_expand, group_listrels_by,
-        rels_to_serialize, key_modifications, result_struct)
+        rels_to_serialize, key_modifications, dict_struct)
 
 
 def serializable_list(
         olist, attrs_to_serialize=None, rels_to_expand=None,
         group_listrels_by=None, rels_to_serialize=None,
         key_modifications=None, groupby=None, keyvals_to_merge=None,
-        preserve_order=False, result_struct=None):
+        preserve_order=False, dict_struct=None):
     """
     Converts a list of model instances to a list of dictionaries
     using their `todict` method.
@@ -92,7 +92,7 @@ def serializable_list(
     """
     if groupby:
         if preserve_order:
-            return json_encoder(deep_group(
+            result = json_encoder(deep_group(
                 olist, keys=groupby, serializer='todict',
                 preserve_order=preserve_order,
                 serializer_kwargs={
@@ -101,19 +101,21 @@ def serializable_list(
                     'attrs_to_serialize': attrs_to_serialize,
                     'group_listrels_by': group_listrels_by,
                     'key_modifications': key_modifications,
-                    'result_struct': result_struct
+                    'dict_struct': dict_struct
                 }))
-        return deep_group(
-            olist, keys=groupby, serializer='todict',
-            preserve_order=preserve_order,
-            serializer_kwargs={
-                'rels_to_serialize': rels_to_serialize,
-                'rels_to_expand': rels_to_expand,
-                'attrs_to_serialize': attrs_to_serialize,
-                'group_listrels_by': group_listrels_by,
-                'key_modifications': key_modifications,
-                'result_struct': result_struct
-            })
+        else:
+            result = deep_group(
+                olist, keys=groupby, serializer='todict',
+                preserve_order=preserve_order,
+                serializer_kwargs={
+                    'rels_to_serialize': rels_to_serialize,
+                    'rels_to_expand': rels_to_expand,
+                    'attrs_to_serialize': attrs_to_serialize,
+                    'group_listrels_by': group_listrels_by,
+                    'key_modifications': key_modifications,
+                    'dict_struct': dict_struct
+                })
+        return result
     else:
         result_list = map(
             lambda o: serialized_obj(
@@ -122,7 +124,7 @@ def serializable_list(
                 group_listrels_by=group_listrels_by,
                 rels_to_serialize=rels_to_serialize,
                 key_modifications=key_modifications,
-                result_struct=result_struct),
+                dict_struct=dict_struct),
             olist)
         if keyvals_to_merge:
             result_list = [merge(obj_dict, kvdict)
@@ -139,16 +141,19 @@ def serialized_list(olist, **kwargs):
         lambda o: serialized_obj(o, **kwargs),
         olist)
 
-def structured(struct, wrap=True, meta=None, struct_key='result'):
+
+def structured(struct, wrap=True, meta=None, struct_key='result', pre_render_callback=None):
     output = struct
     if wrap:
         output = {'status': 'success', struct_key: struct}
         if meta:
             output = merge(output, meta)
+    if pre_render_callback and callable(pre_render_callback):
+        output = pre_render_callback(output)
     return output
 
 
-def jsoned(struct, wrap=True, meta=None, struct_key='result'):
+def jsoned(struct, wrap=True, meta=None, struct_key='result', pre_render_callback=None):
     """ Provides a json dump of the struct
 
     Args:
@@ -170,7 +175,9 @@ def jsoned(struct, wrap=True, meta=None, struct_key='result'):
 
     """
     return _json.dumps(
-        structured(struct, wrap=wrap, meta=meta, struct_key=struct_key),
+        structured(
+            struct, wrap=wrap, meta=meta, struct_key=struct_key,
+            pre_render_callback=pre_render_callback),
         default=json_encoder)
     # if wrap:
         # output = {'status': 'success', struct_key: struct}
@@ -192,10 +199,12 @@ def jsoned_list(olist, **kwargs):
         serializable_list(olist, **kwargs))
 
 
-def as_json(struct, status=200, wrap=True, meta=None):
-    return Response(jsoned(struct, wrap=wrap, meta=meta),
-                    status, mimetype='application/json')
-
+def as_json(struct, status=200, wrap=True, meta=None, pre_render_callback=None):
+    return Response(
+        jsoned(
+            struct, wrap=wrap, meta=meta,
+            pre_render_callback=pre_render_callback),
+        status, mimetype='application/json')
 
 
 def as_json_obj(o, attrs_to_serialize=None,
@@ -203,7 +212,7 @@ def as_json_obj(o, attrs_to_serialize=None,
                 rels_to_serialize=None,
                 group_listrels_by=None,
                 key_modifications=None,
-                result_struct=None,
+                dict_struct=None,
                 groupkeys=None,
                 meta=None):
     return as_json(serialized_obj(
@@ -211,7 +220,7 @@ def as_json_obj(o, attrs_to_serialize=None,
         rels_to_expand=rels_to_expand,
         rels_to_serialize=rels_to_serialize,
         group_listrels_by=group_listrels_by,
-        result_struct=result_struct,
+        dict_struct=dict_struct,
         key_modifications=key_modifications),
         meta=meta)
 
@@ -220,7 +229,7 @@ def as_dict_list(olist, attrs_to_serialize=None,
                  rels_to_serialize=None,
                  group_listrels_by=None,
                  key_modifications=None,
-                 result_struct=None,
+                 dict_struct=None,
                  groupby=None,
                  preserve_order=False,
                  keyvals_to_merge=None,
@@ -230,7 +239,7 @@ def as_dict_list(olist, attrs_to_serialize=None,
         rels_to_expand=rels_to_expand, rels_to_serialize=rels_to_serialize,
         group_listrels_by=group_listrels_by,
         key_modifications=key_modifications,
-        result_struct=result_struct,
+        dict_struct=dict_struct,
         groupby=groupby, keyvals_to_merge=keyvals_to_merge,
         preserve_order=preserve_order), meta=meta)
 
@@ -240,19 +249,19 @@ def as_json_list(olist, attrs_to_serialize=None,
                  rels_to_serialize=None,
                  group_listrels_by=None,
                  key_modifications=None,
-                 result_struct=None,
+                 dict_struct=None,
                  groupby=None,
                  preserve_order=False,
                  keyvals_to_merge=None,
-                 meta=None):
+                 meta=None, pre_render_callback=None):
     return as_json(serializable_list(
         olist, attrs_to_serialize=attrs_to_serialize,
         rels_to_expand=rels_to_expand, rels_to_serialize=rels_to_serialize,
         group_listrels_by=group_listrels_by,
         key_modifications=key_modifications,
         groupby=groupby, keyvals_to_merge=keyvals_to_merge,
-        result_struct=result_struct,
-        preserve_order=preserve_order), meta=meta)
+        dict_struct=dict_struct,
+        preserve_order=preserve_order), meta=meta, pre_render_callback=pre_render_callback)
 
 
 def appropriate_json(olist, **kwargs):
@@ -276,8 +285,8 @@ def error_json(status_code, error=None):
 
 def _serializable_params(args, check_groupby=False):
     params = {}
-    if '_rs' in args:
-        params['result_struct'] = _json.loads(args['_rs'])
+    if '_ds' in args:
+        params['dict_struct'] = _json.loads(args['_ds'])
     if 'attrs' in args:
         attrs = args.get('attrs')
         if attrs.lower() == 'none':
@@ -311,7 +320,7 @@ def _serializable_params(args, check_groupby=False):
 def params_for_serialization(
         attrs_to_serialize=None, rels_to_expand=None,
         rels_to_serialize=None, group_listrels_by=None,
-        result_struct=None,
+        dict_struct=None,
         preserve_order=None, groupby=None, check_groupby=False):
     params = _serializable_params(request.args, check_groupby=check_groupby)
     if attrs_to_serialize is not None and 'attrs_to_serialize' not in params:
@@ -326,8 +335,8 @@ def params_for_serialization(
         params['preserve_order'] = preserve_order
     if 'groupby' is not None and 'groupby' not in params:
         params['groupby'] = groupby
-    if 'result_struct' is not None and 'result_struct' not in params:
-        params['result_struct'] = result_struct
+    if 'dict_struct' is not None and 'dict_struct' not in params:
+        params['dict_struct'] = dict_struct
     return params
 
 
@@ -446,6 +455,10 @@ def filter_query_with_key(query, keyword, value, op):
         return query
 
 
+def filter_query_using_filter_data_structure(query, filter_data_struct):
+    pass
+
+
 def filter_query_using_args(result, args_to_skip=[]):
     if not isinstance(result, QueryBooster):
         result = result.query
@@ -501,13 +514,13 @@ def fetch_results_in_requested_format(result):
 def convert_result_to_response_structure(
         result, meta={}, attrs_to_serialize=None, rels_to_expand=None,
         rels_to_serialize=None, group_listrels_by=None,
-        result_struct=None,
+        dict_struct=None,
         preserve_order=None, groupby=None):
     params_to_be_serialized = params_for_serialization(
         attrs_to_serialize=attrs_to_serialize, rels_to_expand=rels_to_expand,
         rels_to_serialize=rels_to_serialize,
         group_listrels_by=group_listrels_by,
-        result_struct=result_struct,
+        dict_struct=dict_struct,
         preserve_order=preserve_order, groupby=groupby,
         check_groupby=True)
     if isinstance(result, Pagination):
@@ -556,14 +569,14 @@ def convert_result_to_response(result, meta={}):
 
 def convert_query_to_response_object(
         query, args_to_skip=[], meta={}, attrs_to_serialize=None, rels_to_expand=None,
-        rels_to_serialize=None, group_listrels_by=None, result_struct=None,
+        rels_to_serialize=None, group_listrels_by=None, dict_struct=None,
         preserve_order=None, groupby=None):
     return convert_result_to_response_structure(
         fetch_results_in_requested_format(
             filter_query_using_args(query, args_to_skip=args_to_skip)), 
         meta=meta, attrs_to_serialize=attrs_to_serialize, rels_to_expand=rels_to_expand,
         rels_to_serialize=rels_to_serialize, group_listrels_by=group_listrels_by,
-        result_struct=result_struct,
+        dict_struct=dict_struct,
         preserve_order=preserve_order, groupby=groupby)
 
 
@@ -590,12 +603,11 @@ def process_args_and_render_json_list(q):
     if count_only:
         return as_json(filtered_query.count())
 
-    per_page = request.args.get('per_page', PER_PAGE_ITEMS_COUNT)
-
     try:
         result = fetch_results_in_requested_format(filtered_query)
     except:
         traceback.print_exc()
+        per_page = request.args.get('per_page', PER_PAGE_ITEMS_COUNT)
         return as_json({
             "status": "failure",
             "error": "PAGE_NOT_FOUND",
@@ -605,12 +617,20 @@ def process_args_and_render_json_list(q):
     return convert_result_to_response(result)
 
 
-def process_args_and_render_json_obj(obj):
+def render_json_obj_with_requested_structure(obj):
     if isinstance(obj, Response):
         return obj
     return as_json_obj(
         obj,
         **_serializable_params(request.args))
+
+
+def render_json_list_with_requested_structure(obj, pre_render_callback=None):
+    if isinstance(obj, Response):
+        return obj
+    return as_json_list(
+        obj,
+        **merge(_serializable_params(request.args), {'pre_render_callback': pre_render_callback}))
 
 
 def as_processed_list(func):
@@ -648,28 +668,6 @@ def as_processed_list(func):
 
         return process_args_and_render_json_list(func_output)
 
-        # if isinstance(func_output, Response):
-        #     return func_output
-
-        # filtered_query = filter_query_using_args(func_output)
-
-        # count_only = boolify(request.args.get('count_only', 'false'))
-        # if count_only:
-        #     return as_json(filtered_query.count())
-
-        # per_page = request.args.get('per_page', PER_PAGE_ITEMS_COUNT)
-
-        # try:
-        #     result = fetch_results_in_requested_format(filtered_query)
-        # except:
-        #     traceback.print_exc()
-        #     return as_json({
-        #         "status": "failure",
-        #         "error": "PAGE_NOT_FOUND",
-        #         "total_pages": int(math.ceil(float(filtered_query.count()) / int(per_page)))
-        #     }, status=404, wrap=False)
-
-        # return convert_result_to_response(result)
 
     return wrapper
 

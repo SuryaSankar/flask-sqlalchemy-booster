@@ -29,6 +29,14 @@ class QueryableMixin(object):
         return cls.__mapper__.primary_key[0].key
 
     @classmethod
+    def primary_key(cls):
+        return getattr(cls, cls.primary_key_name())
+
+    @classmethod
+    def column_names(cls):
+        return cls.__mapper__.columns.keys()
+
+    @classmethod
     def is_the_primary_key(cls, attr):
         return attr == cls.primary_key_name()
 
