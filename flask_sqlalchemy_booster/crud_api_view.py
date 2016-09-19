@@ -191,7 +191,7 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
     models_and_urls = registration_dict.get('models_and_urls', [])
     if not hasattr(app_or_bp, "registered_models_and_crud_routes"):
         app_or_bp.registered_models_and_crud_routes = {
-            "models": [],
+            "models_registered_for_views": [],
             "model_schemas": {
 
             },
@@ -203,8 +203,8 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
         view_dict_for_model = registration_dict.get('views', {}).get(_model, {})
         resource_name = _model.__tablename__
 
-        if _model.__name__ not in app_or_bp.registered_models_and_crud_routes["models"]:
-            app_or_bp.registered_models_and_crud_routes["models"].append(_model.__name__)
+        if _model.__name__ not in app_or_bp.registered_models_and_crud_routes["models_registered_for_views"]:
+            app_or_bp.registered_models_and_crud_routes["models_registered_for_views"].append(_model.__name__)
         model_schemas = app_or_bp.registered_models_and_crud_routes["model_schemas"]
         if _model.__name__ not in model_schemas:
             model_schemas[_model.__name__] = {
@@ -212,6 +212,13 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
                 "output_schema": _model.output_data_schema(),
                 "accepted_data_structure": _model.max_permissible_dict_structure()
             }
+        for rel in _model.__mapper__.relationships.values():
+            if rel.mapper.class_.__name__ not in model_schemas:
+                model_schemas[rel.mapper.class_.__name__] = {
+                    "input_schema": rel.mapper.class_.input_data_schema(),
+                    "output_schema": rel.mapper.class_.output_data_schema(),
+                    "accepted_data_structure": rel.mapper.class_.max_permissible_dict_structure()
+                }
 
         index_dict = view_dict_for_model.get('index', {})
         index_func = index_dict.get('view_func', None) or construct_index_view_function(
