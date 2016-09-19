@@ -282,7 +282,10 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
                     'url': patch_url
                 },
             }
-
+        if 'input_schema' in post_dict:
+            views[_model.__name__]['post']['input_schema'] = post_dict['input_schema']
+        if 'input_schema' in put_dict:
+            views[_model.__name__]['put']['input_schema'] = put_dict['input_schema']
         # def schema_def_func_generator():
         #     def schema_def_view():
         #         return Response(

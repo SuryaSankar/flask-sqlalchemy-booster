@@ -11,6 +11,9 @@ import dateutil.parser
 import math
 from flask_sqlalchemy import Pagination
 import traceback
+from schemalite.core import validate_object
+from schemalite.validators import is_a_type_of, is_a_list_of_types_of
+
 
 
 RESTRICTED = ['limit', 'sort', 'orderby', 'groupby', 'attrs',
@@ -281,6 +284,19 @@ def error_json(status_code, error=None):
         'error': error},
         default=json_encoder),
         status_code, mimetype='application/json')
+
+ds_schema = {
+    "fields": {
+        "attrs": {
+            "required": False,
+            "validators": [is_a_list_of_types_of(str, unicode)]
+        },
+        "rels": {
+            "required": False,
+            "validators": [is_a_type_of(dict)]
+        }
+    }
+}
 
 
 def _serializable_params(args, check_groupby=False):
