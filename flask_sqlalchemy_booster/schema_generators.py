@@ -24,8 +24,9 @@ def generate_input_data_schema(model_cls, seen_classes=None, required=None, forb
                 "validators": []
             }
             if type(col.type) == JSONEncodedStruct:
-                schema["fields"][col_name]["validators"].append(
-                    is_a_type_of(col.type.mutable_type))
+                schema["fields"][col_name]["type"] = col.type.mutable_type
+                if col.type.mutable_type == list and col.type.item_type is not None:
+                    schema["fields"][col_name]["list_item_type"] = col.type.item_type
             else:
                 type_mapping = {
                     sqltypes.Integer: int,

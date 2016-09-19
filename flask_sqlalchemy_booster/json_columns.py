@@ -90,7 +90,8 @@ class MutableList(Mutable, list):
         self.changed()
 
     @classmethod
-    def as_mutable(cls, sqltype):
+    def as_mutable(cls, sqltype, item_type=None):
         sqltype = super(MutableList, cls).as_mutable(sqltype)
         sqltype.mutable_type = list
+        sqltype.item_type = item_type
         return sqltype
