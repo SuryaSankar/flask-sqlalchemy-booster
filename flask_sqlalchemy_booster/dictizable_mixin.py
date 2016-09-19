@@ -88,11 +88,11 @@ class DictizableMixin(object):
     @classmethod
     def output_data_schema(cls):
         return {
-            "type": cls.__name__,
+            "model_name": cls.__name__,
             "attrs": cls.__mapper__.columns.keys(),
             "rels": {
                 rel_name: {
-                    "target_type": rel_property.mapper.class_.__name__,
+                    "rel_model_name": rel_property.mapper.class_.__name__,
                     "rel_type": "list" if rel_property.uselist else "scalar"
                 }
                 for rel_name, rel_property
