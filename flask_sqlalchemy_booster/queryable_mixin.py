@@ -294,6 +294,12 @@ class QueryableMixin(object):
         """Returns a new, unsaved instance of the model class.
 
         """
+        if cls.__mapper__.polymorphic_on is not None:
+            discriminator_key = cls.__mapper__.polymorphic_on.name
+            discriminator_val = kwargs.get(discriminator_key)
+            if discriminator_val is not None and discriminator_val in cls.__mapper__.polymorphic_map:
+                actual_cls = cls.__mapper__.polymorphic_map[discriminator_val].class_
+            return actual_cls(**actual_cls._preprocess_params(kwargs))
         return cls(**cls._preprocess_params(kwargs))
 
     @classmethod

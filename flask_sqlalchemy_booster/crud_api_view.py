@@ -285,27 +285,11 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
                 'patch': {
                     'url': patch_url
                 },
-                'patch': {
-                    'url': patch_url
+                'delete': {
+                    'url': delete_url
                 },
             }
         if 'input_schema' in post_dict:
             views[_model.__name__]['post']['input_schema'] = post_dict['input_schema']
         if 'input_schema' in put_dict:
             views[_model.__name__]['put']['input_schema'] = put_dict['input_schema']
-        # def schema_def_func_generator():
-        #     def schema_def_view():
-        #         return Response(
-        #             json.dumps(
-        #                 app_or_bp.registered_models_and_crud_routes,
-        #                 default=json_encoder),
-        #             200, mimetype='application/json')
-        #     return schema_def_view
-
-        # if register_schema_structure:
-        #     try:
-        #         app_or_bp.route(
-        #             '/schema-def', methods=['GET'], endpoint='%s_schema_definition' % app_or_bp.__name__)(
-        #             schema_def_func_generator())
-        #     except:
-        #         pass
