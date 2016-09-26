@@ -5,14 +5,16 @@ A mixin class to add `todict` method to objects.
 
 from sqlalchemy.ext.associationproxy import AssociationProxy
 from .utils import is_list_like, is_dict_like
-from .schema_generators import generate_input_data_schema
 from toolspy import deep_group
 import json
 from .json_encoder import json_encoder
 from sqlalchemy.sql import sqltypes
+from sqlalchemy.orm import class_mapper
 from decimal import Decimal
 from datetime import datetime, date
 from .json_columns import JSONEncodedStruct
+from toolspy import all_subclasses
+from schemalite.core import func_and_desc
 
 
 def serialized_list(olist, rels_to_expand=[]):
@@ -20,6 +22,47 @@ def serialized_list(olist, rels_to_expand=[]):
         lambda o: o.todict(
             rels_to_expand=rels_to_expand),
         olist)
+
+
+def _set_fields_for_col(col_name, col, schema, forbidden, required):
+    if col_name not in forbidden:
+        schema["fields"][col_name] = {
+            "required": col_name in required,
+            "allowed": col_name not in forbidden
+        }
+        if type(col.type) == JSONEncodedStruct:
+            schema["fields"][col_name]["type"] = col.type.mutable_type
+            if col.type.mutable_type == list and col.type.item_type is not None:
+                schema["fields"][col_name]["list_item_type"] = col.type.item_type
+        else:
+            type_mapping = {
+                sqltypes.Integer: int,
+                sqltypes.Numeric: (Decimal, float),
+                sqltypes.DateTime: datetime,
+                sqltypes.Date: date,
+                sqltypes.Unicode: (unicode, str),
+                sqltypes.UnicodeText: (unicode, str),
+                sqltypes.String: (unicode, str),
+                sqltypes.Text: (unicode, str),
+                sqltypes.Boolean: bool,
+            }
+            schema["fields"][col_name]["type"] = type_mapping[type(col.type)]
+
+
+def _set_fields_for_rel(rel_name, rel, schema, forbidden, required, seen_classes):
+    if rel_name not in forbidden and rel.mapper.class_ not in seen_classes:
+        schema["fields"][rel_name] = {
+            "required": rel_name in required,
+            "type": "list" if rel.uselist else 'dict',
+            "allowed": rel_name not in forbidden
+        }
+        if rel.uselist:
+            schema["fields"][rel_name]["list_item_type"] = dict
+            schema["fields"][rel_name]["list_item_schema"] = rel.mapper.class_.generate_input_data_schema(
+                seen_classes=seen_classes)
+        else:
+            schema["fields"][rel_name]["dict_schema"] = rel.mapper.class_.generate_input_data_schema(
+                seen_classes=seen_classes)
 
 
 class DictizableMixin(object):
@@ -87,47 +130,54 @@ class DictizableMixin(object):
             "fields": {
             }
         }
-        for col_name, col in model_cls.__mapper__.columns.items():
-            if col_name not in forbidden:
-                schema["fields"][col_name] = {
-                    "required": col_name in required,
-                    "validators": []
-                }
-                if type(col.type) == JSONEncodedStruct:
-                    schema["fields"][col_name]["type"] = col.type.mutable_type
-                    if col.type.mutable_type == list and col.type.item_type is not None:
-                        schema["fields"][col_name]["list_item_type"] = col.type.item_type
-                else:
-                    type_mapping = {
-                        sqltypes.Integer: int,
-                        sqltypes.Numeric: (Decimal, float),
-                        sqltypes.DateTime: datetime,
-                        sqltypes.Date: date,
-                        sqltypes.Unicode: (unicode, str),
-                        sqltypes.UnicodeText: (unicode, str),
-                        sqltypes.String: (unicode, str),
-                        sqltypes.Text: (unicode, str),
-                        sqltypes.Boolean: bool,
-                    }
-                    schema["fields"][col_name]["type"] = type_mapping[type(col.type)]
-                    # schema["fields"][col_name]["validators"].append(
-                    #     is_a_type_of(*type_mapping[type(col.type)]))
-        for rel_name, rel in model_cls.__mapper__.relationships.items():
-            if rel_name not in forbidden and rel.mapper.class_ not in seen_classes:
-                schema["fields"][rel_name] = {
-                    "required": col_name in required,
-                    "validators": [],
-                    "type": "list" if rel.uselist else 'dict'
-                }
-                if rel.uselist:
-                    schema["fields"][rel_name]["list_item_type"] = dict
-                    schema["fields"][rel_name]["list_item_schema"] = generate_input_data_schema(
-                        rel.mapper.class_,
-                        seen_classes)
-                else:
-                    schema["fields"][rel_name]["dict_schema"] = generate_input_data_schema(
-                        rel.mapper.class_,
-                        seen_classes)
+
+        # cols = all_cols_including_subclasses(model_cls)
+
+        # rels = all_rels_including_subclasses(model_cls)
+
+        cols_in_class = class_mapper(model_cls).columns.items()
+        rels_in_class = class_mapper(model_cls).relationships.items()
+
+        for col_name, col in cols_in_class:
+            _set_fields_for_col(col_name, col, schema, forbidden, required)
+
+        for rel_name, rel in rels_in_class:
+            _set_fields_for_rel(rel_name, rel, schema, forbidden, required, seen_classes)
+
+        polymorphic_attr = class_mapper(model_cls).polymorphic_on
+
+        if polymorphic_attr is not None:
+            schema['fields'][polymorphic_attr.key]['permitted_values'] = [
+                k for k, v in class_mapper(model_cls).polymorphic_map.items() if v!=class_mapper(model_cls)]
+            seen_cols = [cname for cname, col in cols_in_class]
+            seen_rels = [rname for rname, rel in rels_in_class]
+            for subcls in all_subclasses(model_cls):
+                polymorphic_identity = subcls.__mapper_args__.get('polymorphic_identity')
+                cols_in_subcls = class_mapper(subcls).columns.items()
+                for col_name, col in cols_in_subcls:
+                    if col_name not in seen_cols:
+                        _set_fields_for_col(col_name, col, schema, forbidden, required)
+                        if schema['fields'][col_name]['allowed']:
+                            schema['fields'][col_name]['allowed'] = func_and_desc(
+                                lambda data, schema, context: data.get(polymorphic_attr.key)==polymorphic_identity,
+                                'Allowed only if {polymorphic_attr} is {polymorphic_identity}'.format(
+                                    polymorphic_attr=polymorphic_attr.key,
+                                    polymorphic_identity=polymorphic_identity))
+                        seen_cols.append(col_name)
+
+                rels_in_subcls = class_mapper(subcls).relationships.items()
+                for rel_name, rel in rels_in_subcls:
+                    if rel_name not in seen_rels:
+                        _set_fields_for_rel(rel_name, rel, schema, forbidden, required, seen_classes)
+                        if rel_name in schema['fields']:
+                            if schema['fields'][rel_name]['allowed']:
+                                schema['fields'][rel_name]['allowed'] = func_and_desc(
+                                    lambda data, schema, context: data.get(polymorphic_attr.key) == polymorphic_identity,
+                                    'Allowed only if {polymorphic_attr} is {polymorphic_identity}'.format(
+                                        polymorphic_attr=polymorphic_attr.key,
+                                        polymorphic_identity=polymorphic_identity))
+                            seen_rels.append(rel_name)
+
         if post_processor and callable(post_processor):
             post_processor(schema)
         return schema

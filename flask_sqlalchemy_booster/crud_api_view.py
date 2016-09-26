@@ -159,7 +159,9 @@ def construct_put_view_function(model_class, input_schema=None):
     def put(_id):
         obj = model_class.get(_id)
         schema = input_schema or model_class.input_data_schema()
-        is_valid, errors = validate_object(schema, g.json)
+        is_valid, errors = validate_object(
+            schema, g.json, allow_required_fields_to_be_skipped=True,
+            context={"existing_instance": obj})
         if not is_valid:
             return error_json(400, errors)
         return render_json_obj_with_requested_structure(obj.update(**g.json))
@@ -171,7 +173,9 @@ def construct_patch_view_function(model_class, input_schema=None):
     def patch(_id):
         obj = model_class.get(_id)
         schema = input_schema or model_class.input_data_schema()
-        is_valid, errors = validate_object(schema, g.json)
+        is_valid, errors = validate_object(
+            schema, g.json, allow_required_fields_to_be_skipped=True,
+            context={"existing_instance": obj})
         if not is_valid:
             return error_json(400, errors)
         return render_json_obj_with_requested_structure(obj.update(**g.json))
