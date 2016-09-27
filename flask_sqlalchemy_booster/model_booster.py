@@ -58,3 +58,29 @@ class ModelBooster(Model, QueryableMixin, DictizableMixin):
     @classmethod
     def relationship_keys(cls):
         return map(lambda r: r.key, cls.__mapper__.relationships)
+
+    @classmethod
+    def col_assoc_proxy_keys(cls):
+        result = []
+        for k in cls.association_proxy_keys():
+            assoc_proxy = getattr(cls, k)
+            assoc_rel = next(
+                r for r in cls.__mapper__.relationships
+                if r.key == assoc_proxy.target_collection)
+            assoc_rel_class = assoc_rel.mapper.class_
+            if assoc_proxy.value_attr in assoc_rel_class.__mapper__.columns.keys():
+                result.append(k)
+        return result
+
+    @classmethod
+    def rel_assoc_proxy_keys(cls):
+        result = []
+        for k in cls.association_proxy_keys():
+            assoc_proxy = getattr(cls, k)
+            assoc_rel = next(
+                r for r in cls.__mapper__.relationships
+                if r.key == assoc_proxy.target_collection)
+            assoc_rel_class = assoc_rel.mapper.class_
+            if assoc_proxy.value_attr in assoc_rel_class.__mapper__.relationships.keys():
+                result.append(k)
+        return result
