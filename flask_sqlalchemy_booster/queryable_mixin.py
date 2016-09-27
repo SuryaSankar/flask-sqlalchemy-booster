@@ -351,7 +351,10 @@ class QueryableMixin(object):
             for model in models:
                 if not isinstance(model, cls):
                     raise ValueError('%s is not of type %s' (model, cls))
-        cls.session.add_all(models)
+        if None in models:
+            cls.session.add_all([m for m in models if m is not None])
+        else:
+            cls.session.add_all(models)
         try:
             if commit:
                 cls.session.commit()
@@ -630,7 +633,7 @@ class QueryableMixin(object):
         """
         try:
             return cls.add_all([
-                cls.new(**kwargs) for kwargs in list_of_kwargs])
+                cls.new(**kwargs) if kwargs is not None else None for kwargs in list_of_kwargs])
         except:
             cls.session.rollback()
             raise

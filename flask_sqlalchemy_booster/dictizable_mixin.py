@@ -131,6 +131,11 @@ class DictizableMixin(object):
             }
         }
 
+        def allowing_callable_for_polymorphic_classes(polymorphic_attr, polymorphic_identity):
+            def _allowed(data, schema, context):
+                return data.get(polymorphic_attr.key)==polymorphic_identity
+            return _allowed
+
         # cols = all_cols_including_subclasses(model_cls)
 
         # rels = all_rels_including_subclasses(model_cls)
@@ -159,7 +164,7 @@ class DictizableMixin(object):
                         _set_fields_for_col(col_name, col, schema, forbidden, required)
                         if schema['fields'][col_name]['allowed']:
                             schema['fields'][col_name]['allowed'] = func_and_desc(
-                                lambda data, schema, context: data.get(polymorphic_attr.key)==polymorphic_identity,
+                                allowing_callable_for_polymorphic_classes(polymorphic_attr, polymorphic_identity),
                                 'Allowed only if {polymorphic_attr} is {polymorphic_identity}'.format(
                                     polymorphic_attr=polymorphic_attr.key,
                                     polymorphic_identity=polymorphic_identity))
@@ -172,7 +177,7 @@ class DictizableMixin(object):
                         if rel_name in schema['fields']:
                             if schema['fields'][rel_name]['allowed']:
                                 schema['fields'][rel_name]['allowed'] = func_and_desc(
-                                    lambda data, schema, context: data.get(polymorphic_attr.key) == polymorphic_identity,
+                                    allowing_callable_for_polymorphic_classes(polymorphic_attr, polymorphic_identity),
                                     'Allowed only if {polymorphic_attr} is {polymorphic_identity}'.format(
                                         polymorphic_attr=polymorphic_attr.key,
                                         polymorphic_identity=polymorphic_identity))

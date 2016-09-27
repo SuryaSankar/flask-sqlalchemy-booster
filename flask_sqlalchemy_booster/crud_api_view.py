@@ -3,9 +3,11 @@ from .responses import (
     process_args_and_render_json_list, success_json, error_json,
     render_json_obj_with_requested_structure,
     render_json_list_with_requested_structure)
-from flask import g, Response
+from flask import g, request
+from flask_sqlalchemy_booster.responses import _serializable_params, serializable_obj, as_json
 from schemalite import SchemaError
 from schemalite.core import validate_object, validate_list_of_objects, json_encoder
+from sqlalchemy.sql import sqltypes
 import json
 
 
@@ -116,12 +118,13 @@ def construct_get_view_function(model_class):
                 resources,
                 pre_render_callback=lambda output_dict: {
                     'status': 'partial_success' if None in resources else 'success',
-                    'result': [
-                        {'status': 'failure', 'error': 'Resource not found'}
+                    'result': {
+                        _id: {'status': 'failure', 'error': 'Resource not found'}
                         if obj is None
-                        else
-                        {'status': 'success', 'result': obj}
-                        for obj in output_dict['result']]})
+                        else {'status': 'success', 'result': obj}
+                        for _id, obj in zip(ids, output_dict['result'])}
+                }
+            )
             return process_args_and_render_json_list(
                 model_class.query.filter(
                     model_class.primary_key().in_(ids)))
@@ -142,10 +145,22 @@ def construct_post_view_function(model_class, input_schema=None):
         schema = input_schema or model_class.input_data_schema()
         if isinstance(g.json, list):
             is_valid, errors = validate_list_of_objects(schema, g.json)
+            input_objs = g.json
             if not is_valid:
-                return error_json(400, errors)
+                input_objs = [
+                    input_obj if error is None else None
+                    for input_obj, error in zip(g.json, errors)]
+            resources = model_class.create_all(input_objs)
             return render_json_list_with_requested_structure(
-                model_class.create_all(g.json))
+                resources,
+                pre_render_callback=lambda output_dict: {
+                    'status': 'partial_success' if None in resources else 'success',
+                    'result': [
+                        {'status': 'failure', 'error': error}
+                        if obj is None
+                        else
+                        {'status': 'success', 'result': obj}
+                        for obj, error in zip(output_dict['result'], errors)]})
         else:
             is_valid, errors = validate_object(schema, g.json)
             if not is_valid:
@@ -157,8 +172,8 @@ def construct_post_view_function(model_class, input_schema=None):
 
 def construct_put_view_function(model_class, input_schema=None):
     def put(_id):
-        obj = model_class.get(_id)
         schema = input_schema or model_class.input_data_schema()
+        obj = model_class.get(_id)
         is_valid, errors = validate_object(
             schema, g.json, allow_required_fields_to_be_skipped=True,
             context={"existing_instance": obj})
@@ -167,6 +182,62 @@ def construct_put_view_function(model_class, input_schema=None):
         return render_json_obj_with_requested_structure(obj.update(**g.json))
 
     return put
+
+
+def construct_batch_put_view_function(model_class, input_schema=None):
+    def batch_put():
+        schema = input_schema or model_class.input_data_schema()
+        output = {}
+        obj_ids = g.json.keys()
+        if type(model_class.primary_key().type)==sqltypes.Integer:
+            obj_ids = [int(obj_id) for obj_id in obj_ids]
+        existing_instances = dict(zip(obj_ids, model_class.get_all(obj_ids)))
+        all_success = True
+        any_success = False
+        for obj_id, put_data_for_obj in g.json.items():
+            output_key = obj_id
+            if type(model_class.primary_key().type)==sqltypes.Integer:
+                output_key = int(obj_id)
+            existing_instance = existing_instances[output_key]
+            if existing_instance is None:
+                output[output_key] = {
+                    "status": "failure",
+                    "result": "Resource not found"
+                }
+                all_success = False
+                any_success = any_success or False
+            else:
+                is_valid, errors = validate_object(
+                    schema, put_data_for_obj, allow_required_fields_to_be_skipped=True,
+                    context={"existing_instance": existing_instance})
+                if is_valid:
+                    updated_object = existing_instance.update_without_commit(
+                        **put_data_for_obj)
+                    output[output_key] = {
+                        "status": "success",
+                        "result": serializable_obj(
+                            updated_object, **_serializable_params(request.args))
+                    }
+                    all_success = all_success and True
+                    any_success = True
+                else:
+                    output[output_key] = {
+                        "status": "failure",
+                        "error": errors
+                    }
+                    all_success = False
+                    any_success = any_success or False
+        final_status = "success"
+        if not all_success:
+            if any_success:
+                final_status = "partial_success"
+            else:
+                final_status = "failure"
+        return as_json({
+            "status": final_status,
+            "result": output
+        })
+    return batch_put
 
 
 def construct_patch_view_function(model_class, input_schema=None):
@@ -255,6 +326,14 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
             put_url, methods=['PUT'], endpoint='put_%s' % resource_name)(
             put_func)
 
+        batch_put_dict = view_dict_for_model.get('batch_put', {})
+        batch_put_func = batch_put_dict.get('view_func', None) or construct_batch_put_view_function(
+            _model, input_schema=batch_put_dict.get('input_schema'))
+        batch_put_url = batch_put_dict.get('url', None) or "/%s" % base_url
+        app_or_bp.route(
+            batch_put_url, methods=['PUT'], endpoint='batch_put_%s' % resource_name)(
+            batch_put_func)
+
         patch_dict = view_dict_for_model.get('patch', {})
         patch_func = put_dict.get('view_func', None) or construct_patch_view_function(
             _model, input_schema=patch_dict.get('input_schema'))
@@ -286,6 +365,9 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
                 'put': {
                     'url': put_url
                 },
+                'batch_put': {
+                    'url': batch_put_url
+                },
                 'patch': {
                     'url': patch_url
                 },
@@ -297,3 +379,5 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
             views[_model.__name__]['post']['input_schema'] = post_dict['input_schema']
         if 'input_schema' in put_dict:
             views[_model.__name__]['put']['input_schema'] = put_dict['input_schema']
+        if 'input_schema' in batch_put_dict:
+            views[_model.__name__]['batch_put']['input_schema'] = batch_put_dict['input_schema']
