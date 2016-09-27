@@ -10,14 +10,16 @@ from types import FunctionType
 def json_encoder(obj):
     if isinstance(obj, datetime):
         return obj.isoformat()
+    elif isinstance(obj, int) or isinstance(obj, long) or isinstance(obj, float):
+        return obj
+    elif isinstance(obj, Decimal):
+        return float(obj)
+    elif isinstance(obj, unicode):
+        return obj
     elif isinstance(obj, OrderedDict):
         return [[k, json_encoder(v)]
                 for k, v in obj.items()
                 if not (k == 'key' and isinstance(v, FunctionType))]
-    elif isinstance(obj, Decimal):
-        return str(obj)
-    elif isinstance(obj, unicode):
-        return obj
     elif hasattr(obj, 'todict'):
         return obj.todict()
     elif is_list_like(obj):
