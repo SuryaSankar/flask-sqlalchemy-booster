@@ -24,8 +24,9 @@ class CrudApiView(MethodView):
         if _id is None:
             return process_args_and_render_json_list(list_query)
         else:
-            if "," in _id:
-                ids = [int(i) for i in _id.split(",")]
+            _id = _id.strip()
+            if _id.startswith('[') and _id.endswith(']'):
+                ids = [int(i) for i in json.loads(_id)]
                 resources = self._model_class_.get_all(ids)
                 if all(r is None for r in resources):
                     return error_json(404, "No matching resources found")
@@ -109,8 +110,9 @@ def register_crud_api_view(view, bp_or_app, endpoint, url_slug):
 
 def construct_get_view_function(model_class):
     def get(_id):
-        if "," in _id:
-            ids = [int(i) for i in _id.split(",")]
+        _id = _id.strip()
+        if _id.startswith('[') and _id.endswith(']'):
+            ids = [int(i) for i in json.loads(_id)]
             resources = model_class.get_all(ids)
             if all(r is None for r in resources):
                 return error_json(404, "No matching resources found")
@@ -236,7 +238,7 @@ def construct_batch_put_view_function(model_class, input_schema=None):
         return as_json({
             "status": final_status,
             "result": output
-        })
+        }, wrap=False)
     return batch_put
 
 
