@@ -130,8 +130,10 @@ def construct_get_view_function(model_class):
             return process_args_and_render_json_list(
                 model_class.query.filter(
                     model_class.primary_key().in_(ids)))
-        return render_json_obj_with_requested_structure(
-            model_class.get(_id))
+        obj = model_class.get(_id)
+        if obj is None:
+            return error_json(404, 'Resource not found')
+        return render_json_obj_with_requested_structure(obj)
     return get
 
 
@@ -176,6 +178,8 @@ def construct_put_view_function(model_class, input_schema=None):
     def put(_id):
         schema = input_schema or model_class.input_data_schema()
         obj = model_class.get(_id)
+        if obj is None:
+            return error_json(404, 'Resource not found')
         is_valid, errors = validate_object(
             schema, g.json, allow_required_fields_to_be_skipped=True,
             context={"existing_instance": obj})
@@ -259,6 +263,8 @@ def construct_patch_view_function(model_class, input_schema=None):
 def construct_delete_view_function(model_class):
     def delete(_id):
         obj = model_class.get(_id)
+        if obj is None:
+            return error_json(404, 'Resource not found')
         obj.delete()
         return success_json()
     return delete

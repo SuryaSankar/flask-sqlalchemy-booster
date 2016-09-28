@@ -80,7 +80,7 @@ class QueryableMixin(object):
         """
         self.session.delete(self)
         if commit:
-            self.session.commit
+            self.session.commit()
 
     def _isinstance(self, model, raise_error=True):
         """Checks if the specified model instance matches the class model.
