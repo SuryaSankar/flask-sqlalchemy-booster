@@ -3,7 +3,6 @@ from .query_booster import QueryBooster
 from .queryable_mixin import QueryableMixin
 from .dictizable_mixin import DictizableMixin
 from sqlalchemy.ext.associationproxy import AssociationProxy
-import flask_sqlalchemy
 
 
 class ModelBooster(Model, QueryableMixin, DictizableMixin):
@@ -51,9 +50,16 @@ class ModelBooster(Model, QueryableMixin, DictizableMixin):
             getattr(cls, k), property)]
 
     @classmethod
-    def association_proxy_keys(cls):
-        return [k for k in cls.all_keys() if isinstance(
-            getattr(cls, k), AssociationProxy)]
+    def association_proxy_keys(cls, include_parent_classes=True):
+        result = []
+        keys = cls.all_keys() if include_parent_classes else cls.__dict__.keys()
+        for k in keys:
+            try:
+                if isinstance(getattr(cls, k), AssociationProxy):
+                    result.append(k)
+            except:
+                continue
+        return result
 
     @classmethod
     def relationship_keys(cls):

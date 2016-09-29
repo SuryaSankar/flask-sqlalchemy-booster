@@ -15,6 +15,7 @@ from datetime import datetime, date
 from .json_columns import JSONEncodedStruct
 from toolspy import all_subclasses
 from schemalite.core import func_and_desc
+from types import NoneType
 
 
 def serialized_list(olist, rels_to_expand=[]):
@@ -36,17 +37,17 @@ def _set_fields_for_col(col_name, col, schema, forbidden, required):
                 schema["fields"][col_name]["list_item_type"] = col.type.item_type
         else:
             type_mapping = {
-                sqltypes.Integer: int,
+                sqltypes.Integer: (int,),
                 sqltypes.Numeric: (Decimal, float),
-                sqltypes.DateTime: datetime,
-                sqltypes.Date: date,
+                sqltypes.DateTime: (datetime,),
+                sqltypes.Date: (date,),
                 sqltypes.Unicode: (unicode, str),
                 sqltypes.UnicodeText: (unicode, str),
                 sqltypes.String: (unicode, str),
                 sqltypes.Text: (unicode, str),
-                sqltypes.Boolean: bool,
+                sqltypes.Boolean: (bool,)
             }
-            schema["fields"][col_name]["type"] = type_mapping[type(col.type)]
+            schema["fields"][col_name]["type"] = type_mapping[type(col.type)] + (NoneType, )
 
 
 def _set_fields_for_rel(rel_name, rel, schema, forbidden, required, seen_classes):
@@ -149,6 +150,11 @@ class DictizableMixin(object):
         for rel_name, rel in rels_in_class:
             _set_fields_for_rel(rel_name, rel, schema, forbidden, required, seen_classes)
 
+        for assoc_proxy_name in model_cls.association_proxy_keys():
+            schema['fields'][assoc_proxy_name] = {
+                "allowed": True
+            }
+
         polymorphic_attr = class_mapper(model_cls).polymorphic_on
 
         if polymorphic_attr is not None:
@@ -182,6 +188,11 @@ class DictizableMixin(object):
                                         polymorphic_attr=polymorphic_attr.key,
                                         polymorphic_identity=polymorphic_identity))
                             seen_rels.append(rel_name)
+
+                for assoc_proxy_name in subcls.association_proxy_keys(include_parent_classes=False):
+                    schema['fields'][assoc_proxy_name] = {
+                        "allowed": True
+                    }
 
         if post_processor and callable(post_processor):
             post_processor(schema)
