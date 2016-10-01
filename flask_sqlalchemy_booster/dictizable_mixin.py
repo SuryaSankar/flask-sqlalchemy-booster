@@ -50,20 +50,29 @@ def _set_fields_for_col(col_name, col, schema, forbidden, required):
             schema["fields"][col_name]["type"] = type_mapping[type(col.type)] + (NoneType, )
 
 
-def _set_fields_for_rel(rel_name, rel, schema, forbidden, required, seen_classes):
+def _set_fields_for_rel(rel_name, rel, schema, forbidden, required, seen_classes, show_rel_schema=True):
+    # print "Tree so far - %s" % seen_classes
+    # if rel.mapper.class_ in seen_classes:
+    #     print "SKIPPING %s" % rel_name
+    # else:
+    #     print "Adding %s" % rel_name
+    # print
     if rel_name not in forbidden and rel.mapper.class_ not in seen_classes:
         schema["fields"][rel_name] = {
             "required": rel_name in required,
-            "type": "list" if rel.uselist else 'dict',
-            "allowed": rel_name not in forbidden
+            "type": list if rel.uselist else dict,
+            "allowed": rel_name not in forbidden,
+            "is_a_relation_to": rel.mapper.class_
         }
         if rel.uselist:
             schema["fields"][rel_name]["list_item_type"] = dict
-            schema["fields"][rel_name]["list_item_schema"] = rel.mapper.class_.generate_input_data_schema(
-                seen_classes=seen_classes)
+            if show_rel_schema:
+                schema["fields"][rel_name]["list_item_schema"] = rel.mapper.class_.generate_input_data_schema(
+                    seen_classes=seen_classes)
         else:
-            schema["fields"][rel_name]["dict_schema"] = rel.mapper.class_.generate_input_data_schema(
-                seen_classes=seen_classes)
+            if show_rel_schema:
+                schema["fields"][rel_name]["dict_schema"] = rel.mapper.class_.generate_input_data_schema(
+                    seen_classes=seen_classes)
 
 
 class DictizableMixin(object):
@@ -115,11 +124,17 @@ class DictizableMixin(object):
         }
 
     @classmethod
-    def input_data_schema(cls):
-        return cls._input_data_schema_ or cls.generate_input_data_schema()
+    def input_data_schema(cls, seen_classes=None, required=None,
+                          forbidden=None, post_processor=None,
+                          show_rel_schema=True):
+        return cls._input_data_schema_ or cls.generate_input_data_schema(
+            seen_classes=seen_classes, required=required, forbidden=forbidden,
+            post_processor=post_processor, show_rel_schema=show_rel_schema)
 
     @classmethod
-    def generate_input_data_schema(model_cls, seen_classes=None, required=None, forbidden=None, post_processor=None):
+    def generate_input_data_schema(model_cls, seen_classes=None, required=None,
+                                   forbidden=None, post_processor=None,
+                                   show_rel_schema=True):
         if seen_classes is None:
             seen_classes = []
         if required is None:
@@ -127,19 +142,17 @@ class DictizableMixin(object):
         if forbidden is None:
             forbidden = []
         seen_classes.append(model_cls)
+
         schema = {
             "fields": {
             }
         }
 
-        def allowing_callable_for_polymorphic_classes(polymorphic_attr, polymorphic_identity):
+        def allowing_callable_for_polymorphic_classes(
+                polymorphic_attr, polymorphic_identity):
             def _allowed(data, schema, context):
-                return data.get(polymorphic_attr.key)==polymorphic_identity
+                return data.get(polymorphic_attr.key) == polymorphic_identity
             return _allowed
-
-        # cols = all_cols_including_subclasses(model_cls)
-
-        # rels = all_rels_including_subclasses(model_cls)
 
         cols_in_class = class_mapper(model_cls).columns.items()
         rels_in_class = class_mapper(model_cls).relationships.items()
@@ -148,7 +161,9 @@ class DictizableMixin(object):
             _set_fields_for_col(col_name, col, schema, forbidden, required)
 
         for rel_name, rel in rels_in_class:
-            _set_fields_for_rel(rel_name, rel, schema, forbidden, required, seen_classes)
+            _set_fields_for_rel(
+                rel_name, rel, schema, forbidden, required, seen_classes[0:],
+                show_rel_schema=show_rel_schema)
 
         for assoc_proxy_name in model_cls.association_proxy_keys():
             schema['fields'][assoc_proxy_name] = {
@@ -157,42 +172,52 @@ class DictizableMixin(object):
 
         polymorphic_attr = class_mapper(model_cls).polymorphic_on
 
+        subclasses = all_subclasses(model_cls)
+
         if polymorphic_attr is not None:
-            schema['fields'][polymorphic_attr.key]['permitted_values'] = [
-                k for k, v in class_mapper(model_cls).polymorphic_map.items() if v!=class_mapper(model_cls)]
-            seen_cols = [cname for cname, col in cols_in_class]
-            seen_rels = [rname for rname, rel in rels_in_class]
-            for subcls in all_subclasses(model_cls):
-                polymorphic_identity = subcls.__mapper_args__.get('polymorphic_identity')
-                cols_in_subcls = class_mapper(subcls).columns.items()
-                for col_name, col in cols_in_subcls:
-                    if col_name not in seen_cols:
-                        _set_fields_for_col(col_name, col, schema, forbidden, required)
-                        if schema['fields'][col_name]['allowed']:
-                            schema['fields'][col_name]['allowed'] = func_and_desc(
-                                allowing_callable_for_polymorphic_classes(polymorphic_attr, polymorphic_identity),
-                                'Allowed only if {polymorphic_attr} is {polymorphic_identity}'.format(
-                                    polymorphic_attr=polymorphic_attr.key,
-                                    polymorphic_identity=polymorphic_identity))
-                        seen_cols.append(col_name)
+            if len(subclasses) == 0:
+                del schema['fields'][polymorphic_attr.key]
+            else:
+                schema["polymorphic_on"] = polymorphic_attr.key
+                schema["additional_schema_for_polymorphs"] = {
+                }
+                schema['fields'][polymorphic_attr.key]['permitted_values'] = [
+                    sc.__mapper_args__['polymorphic_identity']
+                    for sc in subclasses]
 
-                rels_in_subcls = class_mapper(subcls).relationships.items()
-                for rel_name, rel in rels_in_subcls:
-                    if rel_name not in seen_rels:
-                        _set_fields_for_rel(rel_name, rel, schema, forbidden, required, seen_classes)
-                        if rel_name in schema['fields']:
-                            if schema['fields'][rel_name]['allowed']:
-                                schema['fields'][rel_name]['allowed'] = func_and_desc(
-                                    allowing_callable_for_polymorphic_classes(polymorphic_attr, polymorphic_identity),
-                                    'Allowed only if {polymorphic_attr} is {polymorphic_identity}'.format(
-                                        polymorphic_attr=polymorphic_attr.key,
-                                        polymorphic_identity=polymorphic_identity))
-                            seen_rels.append(rel_name)
+                for subcls in subclasses:
+                    polymorphic_identity = subcls.__mapper_args__.get(
+                        'polymorphic_identity')
+                    schema["additional_schema_for_polymorphs"][
+                        polymorphic_identity] = {"fields": {}}
+                    cols_in_subcls = filter(
+                        lambda col_item:
+                        col_item[1].table.name == subcls.__tablename__ and
+                        subcls.__tablename__ != model_cls.__tablename__ and
+                        not col_item[1].primary_key,
+                        class_mapper(subcls).columns.items())
+                    for col_name, col in cols_in_subcls:
+                        _set_fields_for_col(
+                            col_name, col,
+                            schema["additional_schema_for_polymorphs"][
+                                polymorphic_identity],
+                            forbidden, required)
+                    rels_in_subcls = filter(
+                        lambda rel_item: not hasattr(model_cls, rel_item[0]),
+                        class_mapper(subcls).relationships.items())
+                    for rel_name, rel in rels_in_subcls:
+                        _set_fields_for_rel(
+                            rel_name, rel,
+                            schema["additional_schema_for_polymorphs"][
+                                polymorphic_identity],
+                            forbidden, required, seen_classes[0:],
+                            show_rel_schema=show_rel_schema)
 
-                for assoc_proxy_name in subcls.association_proxy_keys(include_parent_classes=False):
-                    schema['fields'][assoc_proxy_name] = {
-                        "allowed": True
-                    }
+                    for assoc_proxy_name in subcls.association_proxy_keys(
+                            include_parent_classes=False):
+                        schema["additional_schema_for_polymorphs"][
+                            polymorphic_identity]['fields'][
+                                assoc_proxy_name] = {"allowed": True}
 
         if post_processor and callable(post_processor):
             post_processor(schema)

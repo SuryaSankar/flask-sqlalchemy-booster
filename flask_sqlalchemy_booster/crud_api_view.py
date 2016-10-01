@@ -9,6 +9,7 @@ from schemalite import SchemaError
 from schemalite.core import validate_object, validate_list_of_objects, json_encoder
 from sqlalchemy.sql import sqltypes
 import json
+from toolspy import all_subclasses
 
 
 class CrudApiView(MethodView):
@@ -144,9 +145,9 @@ def construct_index_view_function(model_class, index_query=None):
     return index
 
 
-def construct_post_view_function(model_class, input_schema=None):
+def construct_post_view_function(model_class, schema):
+
     def post():
-        schema = input_schema or model_class.input_data_schema()
         if isinstance(g.json, list):
             is_valid, errors = validate_list_of_objects(schema, g.json)
             input_objs = g.json
@@ -174,13 +175,11 @@ def construct_post_view_function(model_class, input_schema=None):
     return post
 
 
-def construct_put_view_function(model_class, input_schema=None):
+def construct_put_view_function(model_class, schema):
     def put(_id):
-        schema = input_schema or model_class.input_data_schema()
         obj = model_class.get(_id)
         if obj is None:
             return error_json(404, 'Resource not found')
-        print g.json
         is_valid, errors = validate_object(
             schema, g.json, allow_required_fields_to_be_skipped=True,
             context={"existing_instance": obj, "session": model_class.session})
@@ -191,9 +190,9 @@ def construct_put_view_function(model_class, input_schema=None):
     return put
 
 
-def construct_batch_put_view_function(model_class, input_schema=None):
+def construct_batch_put_view_function(model_class, schema):
+
     def batch_put():
-        schema = input_schema or model_class.input_data_schema()
         output = {}
         obj_ids = g.json.keys()
         if type(model_class.primary_key().type)==sqltypes.Integer:
@@ -247,10 +246,9 @@ def construct_batch_put_view_function(model_class, input_schema=None):
     return batch_put
 
 
-def construct_patch_view_function(model_class, input_schema=None):
+def construct_patch_view_function(model_class, schema):
     def patch(_id):
         obj = model_class.get(_id)
-        schema = input_schema or model_class.input_data_schema()
         is_valid, errors = validate_object(
             schema, g.json, allow_required_fields_to_be_skipped=True,
             context={"existing_instance": obj, "session": model_class.session})
@@ -283,26 +281,34 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
 
             }
         }
+    model_schemas = app_or_bp.registered_models_and_crud_routes["model_schemas"]
+
+    def populate_model_schema(modelcls):
+        model_schemas[modelcls.__name__] = {
+            "input_schema": modelcls._input_data_schema_ or modelcls.generate_input_data_schema(show_rel_schema=False),
+            "output_schema": modelcls.output_data_schema(),
+            "accepted_data_structure": modelcls.max_permissible_dict_structure()
+        }
+        for subcls in all_subclasses(modelcls):
+            if subcls.__name__ not in model_schemas:
+                model_schemas[subcls.__name__] = {
+                    'is_a_polymorphically_derived_from': modelcls.__name__,
+                    'polymorphic_identity': subcls.__mapper_args__['polymorphic_identity'] 
+                }
+        for rel in modelcls.__mapper__.relationships.values():
+            if rel.mapper.class_.__name__ not in model_schemas:
+                populate_model_schema(rel.mapper.class_)
+
     for _model, base_url in models_and_urls:
         view_dict_for_model = registration_dict.get('views', {}).get(_model, {})
         resource_name = _model.__tablename__
 
         if _model.__name__ not in app_or_bp.registered_models_and_crud_routes["models_registered_for_views"]:
             app_or_bp.registered_models_and_crud_routes["models_registered_for_views"].append(_model.__name__)
-        model_schemas = app_or_bp.registered_models_and_crud_routes["model_schemas"]
         if _model.__name__ not in model_schemas:
-            model_schemas[_model.__name__] = {
-                "input_schema": _model.input_data_schema(),
-                "output_schema": _model.output_data_schema(),
-                "accepted_data_structure": _model.max_permissible_dict_structure()
-            }
-        for rel in _model.__mapper__.relationships.values():
-            if rel.mapper.class_.__name__ not in model_schemas:
-                model_schemas[rel.mapper.class_.__name__] = {
-                    "input_schema": rel.mapper.class_.input_data_schema(),
-                    "output_schema": rel.mapper.class_.output_data_schema(),
-                    "accepted_data_structure": rel.mapper.class_.max_permissible_dict_structure()
-                }
+            populate_model_schema(_model)
+
+        model_default_input_schema = _model._input_data_schema_ or _model.generate_input_data_schema(show_rel_schema=True)
 
         index_dict = view_dict_for_model.get('index', {})
         index_func = index_dict.get('view_func', None) or construct_index_view_function(
@@ -321,7 +327,7 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
 
         post_dict = view_dict_for_model.get('post', {})
         post_func = post_dict.get('view_func', None) or construct_post_view_function(
-            _model, input_schema=post_dict.get('input_schema'))
+            _model, post_dict.get('input_schema') or model_default_input_schema)
         post_url = post_dict.get('url', None) or "/%s" % base_url
         app_or_bp.route(
             post_url, methods=['POST'], endpoint='post_%s' % resource_name)(
@@ -329,7 +335,7 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
 
         put_dict = view_dict_for_model.get('put', {})
         put_func = put_dict.get('view_func', None) or construct_put_view_function(
-            _model, input_schema=put_dict.get('input_schema'))
+            _model, put_dict.get('input_schema') or model_default_input_schema)
         put_url = put_dict.get('url', None) or "/%s/<_id>" % base_url
         app_or_bp.route(
             put_url, methods=['PUT'], endpoint='put_%s' % resource_name)(
@@ -337,7 +343,7 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
 
         batch_put_dict = view_dict_for_model.get('batch_put', {})
         batch_put_func = batch_put_dict.get('view_func', None) or construct_batch_put_view_function(
-            _model, input_schema=batch_put_dict.get('input_schema'))
+            _model, batch_put_dict.get('input_schema') or model_default_input_schema)
         batch_put_url = batch_put_dict.get('url', None) or "/%s" % base_url
         app_or_bp.route(
             batch_put_url, methods=['PUT'], endpoint='batch_put_%s' % resource_name)(
@@ -345,7 +351,7 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
 
         patch_dict = view_dict_for_model.get('patch', {})
         patch_func = put_dict.get('view_func', None) or construct_patch_view_function(
-            _model, input_schema=patch_dict.get('input_schema'))
+            _model, patch_dict.get('input_schema') or model_default_input_schema)
         patch_url = patch_dict.get('url', None) or "/%s/<_id>" % base_url
         app_or_bp.route(
             patch_url, methods=['PATCH'], endpoint='patch_%s' % resource_name)(
