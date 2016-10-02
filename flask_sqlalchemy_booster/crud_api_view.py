@@ -270,7 +270,6 @@ def construct_delete_view_function(model_class):
 
 
 def register_crud_routes_for_models(app_or_bp, registration_dict, register_schema_structure=True):
-    models_and_urls = registration_dict.get('models_and_urls', [])
     if not hasattr(app_or_bp, "registered_models_and_crud_routes"):
         app_or_bp.registered_models_and_crud_routes = {
             "models_registered_for_views": [],
@@ -299,9 +298,13 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
             if rel.mapper.class_.__name__ not in model_schemas:
                 populate_model_schema(rel.mapper.class_)
 
-    for _model, base_url in models_and_urls:
-        view_dict_for_model = registration_dict.get('views', {}).get(_model, {})
+    for _model, _model_dict in registration_dict.items():
+        base_url = _model_dict.get('url_slug')
+        forbidden_views = _model_dict.get('forbidden_views', [])
+        view_dict_for_model = _model_dict.get('views', {})
         resource_name = _model.__tablename__
+
+        print forbidden_views
 
         if _model.__name__ not in app_or_bp.registered_models_and_crud_routes["models_registered_for_views"]:
             app_or_bp.registered_models_and_crud_routes["models_registered_for_views"].append(_model.__name__)
@@ -310,89 +313,81 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
 
         model_default_input_schema = _model._input_data_schema_ or _model.generate_input_data_schema(show_rel_schema=True)
 
-        index_dict = view_dict_for_model.get('index', {})
-        index_func = index_dict.get('view_func', None) or construct_index_view_function(
-            _model, index_query=index_dict.get('query'))
-        index_url = index_dict.get('url', None) or "/%s" % base_url
-        app_or_bp.route(
-            index_url, methods=['GET'], endpoint='index_%s' % resource_name)(
-            index_func)
-
-        get_dict = view_dict_for_model.get('get', {})
-        get_func = get_dict.get('view_func', None) or construct_get_view_function(_model)
-        get_url = get_dict.get('url', None) or '/%s/<_id>' % base_url
-        app_or_bp.route(
-            get_url, methods=['GET'], endpoint='get_%s' % resource_name)(
-            get_func)
-
-        post_dict = view_dict_for_model.get('post', {})
-        post_func = post_dict.get('view_func', None) or construct_post_view_function(
-            _model, post_dict.get('input_schema') or model_default_input_schema)
-        post_url = post_dict.get('url', None) or "/%s" % base_url
-        app_or_bp.route(
-            post_url, methods=['POST'], endpoint='post_%s' % resource_name)(
-            post_func)
-
-        put_dict = view_dict_for_model.get('put', {})
-        put_func = put_dict.get('view_func', None) or construct_put_view_function(
-            _model, put_dict.get('input_schema') or model_default_input_schema)
-        put_url = put_dict.get('url', None) or "/%s/<_id>" % base_url
-        app_or_bp.route(
-            put_url, methods=['PUT'], endpoint='put_%s' % resource_name)(
-            put_func)
-
-        batch_put_dict = view_dict_for_model.get('batch_put', {})
-        batch_put_func = batch_put_dict.get('view_func', None) or construct_batch_put_view_function(
-            _model, batch_put_dict.get('input_schema') or model_default_input_schema)
-        batch_put_url = batch_put_dict.get('url', None) or "/%s" % base_url
-        app_or_bp.route(
-            batch_put_url, methods=['PUT'], endpoint='batch_put_%s' % resource_name)(
-            batch_put_func)
-
-        patch_dict = view_dict_for_model.get('patch', {})
-        patch_func = put_dict.get('view_func', None) or construct_patch_view_function(
-            _model, patch_dict.get('input_schema') or model_default_input_schema)
-        patch_url = patch_dict.get('url', None) or "/%s/<_id>" % base_url
-        app_or_bp.route(
-            patch_url, methods=['PATCH'], endpoint='patch_%s' % resource_name)(
-            patch_func)
-
-        delete_dict = view_dict_for_model.get('delete', {})
-        delete_func = delete_dict.get('view_func', None) or construct_delete_view_function(
-            _model)
-        delete_url = delete_dict.get('url', None) or "/%s/<_id>" % base_url
-        app_or_bp.route(
-            delete_url, methods=['DELETE'], endpoint='delete_%s' % resource_name)(
-            delete_func)
-
         views = app_or_bp.registered_models_and_crud_routes["views"]
         if _model.__name__ not in views:
-            views[_model.__name__] = {
-                'index': {
-                    'url': index_url
-                },
-                'get': {
-                    'url': get_url
-                },
-                'post': {
-                    'url': post_url
-                },
-                'put': {
-                    'url': put_url
-                },
-                'batch_put': {
-                    'url': batch_put_url
-                },
-                'patch': {
-                    'url': patch_url
-                },
-                'delete': {
-                    'url': delete_url
-                },
-            }
-        if 'input_schema' in post_dict:
-            views[_model.__name__]['post']['input_schema'] = post_dict['input_schema']
-        if 'input_schema' in put_dict:
-            views[_model.__name__]['put']['input_schema'] = put_dict['input_schema']
-        if 'input_schema' in batch_put_dict:
-            views[_model.__name__]['batch_put']['input_schema'] = batch_put_dict['input_schema']
+            views[_model.__name__] = {}
+
+        if 'index' not in forbidden_views:
+            index_dict = view_dict_for_model.get('index', {})
+            index_func = index_dict.get('view_func', None) or construct_index_view_function(
+                _model, index_query=index_dict.get('query'))
+            index_url = index_dict.get('url', None) or "/%s" % base_url
+            app_or_bp.route(
+                index_url, methods=['GET'], endpoint='index_%s' % resource_name)(
+                index_func)
+            views[_model.__name__]['index'] = {'url': index_url}
+
+        if 'get' not in forbidden_views:
+            get_dict = view_dict_for_model.get('get', {})
+            get_func = get_dict.get('view_func', None) or construct_get_view_function(_model)
+            get_url = get_dict.get('url', None) or '/%s/<_id>' % base_url
+            app_or_bp.route(
+                get_url, methods=['GET'], endpoint='get_%s' % resource_name)(
+                get_func)
+            views[_model.__name__]['get'] = {'url': get_url}
+
+        if 'post' not in forbidden_views:
+            post_dict = view_dict_for_model.get('post', {})
+            post_func = post_dict.get('view_func', None) or construct_post_view_function(
+                _model, post_dict.get('input_schema') or model_default_input_schema)
+            post_url = post_dict.get('url', None) or "/%s" % base_url
+            app_or_bp.route(
+                post_url, methods=['POST'], endpoint='post_%s' % resource_name)(
+                post_func)
+            views[_model.__name__]['post'] = {'url': post_url}
+            if 'input_schema' in post_dict:
+                views[_model.__name__]['post']['input_schema'] = post_dict['input_schema']
+
+        if 'put' not in forbidden_views:
+            put_dict = view_dict_for_model.get('put', {})
+            put_func = put_dict.get('view_func', None) or construct_put_view_function(
+                _model, put_dict.get('input_schema') or model_default_input_schema)
+            put_url = put_dict.get('url', None) or "/%s/<_id>" % base_url
+            app_or_bp.route(
+                put_url, methods=['PUT'], endpoint='put_%s' % resource_name)(
+                put_func)
+            views[_model.__name__]['put'] = {'url': put_url}
+            if 'input_schema' in put_dict:
+                views[_model.__name__]['put']['input_schema'] = put_dict['input_schema']
+
+        if 'batch_put' not in forbidden_views:
+            batch_put_dict = view_dict_for_model.get('batch_put', {})
+            batch_put_func = batch_put_dict.get('view_func', None) or construct_batch_put_view_function(
+                _model, batch_put_dict.get('input_schema') or model_default_input_schema)
+            batch_put_url = batch_put_dict.get('url', None) or "/%s" % base_url
+            app_or_bp.route(
+                batch_put_url, methods=['PUT'], endpoint='batch_put_%s' % resource_name)(
+                batch_put_func)
+            views[_model.__name__]['batch_put'] = {'url': batch_put_url}
+            if 'input_schema' in batch_put_dict:
+                views[_model.__name__]['batch_put']['input_schema'] = batch_put_dict['input_schema']
+
+        if 'patch' not in forbidden_views:
+            patch_dict = view_dict_for_model.get('patch', {})
+            patch_func = put_dict.get('view_func', None) or construct_patch_view_function(
+                _model, patch_dict.get('input_schema') or model_default_input_schema)
+            patch_url = patch_dict.get('url', None) or "/%s/<_id>" % base_url
+            app_or_bp.route(
+                patch_url, methods=['PATCH'], endpoint='patch_%s' % resource_name)(
+                patch_func)
+            views[_model.__name__]['patch'] = {'url': patch_url}
+
+        if 'delete' not in forbidden_views:
+            delete_dict = view_dict_for_model.get('delete', {})
+            delete_func = delete_dict.get('view_func', None) or construct_delete_view_function(
+                _model)
+            delete_url = delete_dict.get('url', None) or "/%s/<_id>" % base_url
+            app_or_bp.route(
+                delete_url, methods=['DELETE'], endpoint='delete_%s' % resource_name)(
+                delete_func)
+            views[_model.__name__]['delete'] = {'url': delete_url}
