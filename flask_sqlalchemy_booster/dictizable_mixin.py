@@ -37,7 +37,7 @@ def _set_fields_for_col(col_name, col, schema, forbidden, required):
                 schema["fields"][col_name]["list_item_type"] = col.type.item_type
         else:
             type_mapping = {
-                sqltypes.Integer: (int,),
+                sqltypes.Integer: (int, long),
                 sqltypes.Numeric: (Decimal, float),
                 sqltypes.DateTime: (datetime,),
                 sqltypes.Date: (date,),
@@ -222,6 +222,28 @@ class DictizableMixin(object):
         if post_processor and callable(post_processor):
             post_processor(schema)
         return schema
+
+    @classmethod
+    def pre_validation_adapter(cls, data, existing_instance=None):
+        return data
+
+    @classmethod
+    def pre_validation_adapter_for_list(cls, data_list, existing_instances=None):
+        if existing_instances is not None:
+            return [cls.pre_validation_adapter(data, instance)
+                    for data, instance in
+                    zip(data_list, existing_instances)]
+        else:
+            return map(lambda data: cls.pre_validation_adapter(data), data_list)
+
+    @classmethod
+    def pre_validation_adapter_for_mapped_collection(cls, data_map, existing_instances=None):
+        if existing_instances is not None:
+            return {
+                k: cls.pre_validation_adapter(v, existing_instances.get(k))
+                for k, v in data_map.items()}
+        else:
+            return {k: cls.pre_validation_adapter(v) for k, v in data_map.items()}
 
     @classmethod
     def is_list_attribute(cls, rel):

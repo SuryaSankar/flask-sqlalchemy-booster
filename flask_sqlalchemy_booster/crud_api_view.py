@@ -149,12 +149,13 @@ def construct_post_view_function(model_class, schema):
 
     def post():
         if isinstance(g.json, list):
-            is_valid, errors = validate_list_of_objects(schema, g.json)
-            input_objs = g.json
+            input_data = model_class.pre_validation_adapter_for_list(g.json)
+            is_valid, errors = validate_list_of_objects(schema, input_data)
+            input_objs = input_data
             if not is_valid:
                 input_objs = [
                     input_obj if error is None else None
-                    for input_obj, error in zip(g.json, errors)]
+                    for input_obj, error in zip(input_data, errors)]
             resources = model_class.create_all(input_objs)
             return render_json_list_with_requested_structure(
                 resources,
@@ -167,11 +168,12 @@ def construct_post_view_function(model_class, schema):
                         {'status': 'success', 'result': obj}
                         for obj, error in zip(output_dict['result'], errors)]})
         else:
-            is_valid, errors = validate_object(schema, g.json)
+            input_data = model_class.pre_validation_adapter(g.json)
+            is_valid    , errors = validate_object(schema, input_data)
             if not is_valid:
                 return error_json(400, errors)
             return render_json_obj_with_requested_structure(
-                model_class.create(**g.json))
+                model_class.create(**input_data))
     return post
 
 
@@ -180,12 +182,13 @@ def construct_put_view_function(model_class, schema):
         obj = model_class.get(_id)
         if obj is None:
             return error_json(404, 'Resource not found')
+        input_data = model_class.pre_validation_adapter(g.json, existing_instance=obj)
         is_valid, errors = validate_object(
-            schema, g.json, allow_required_fields_to_be_skipped=True,
+            schema, input_data, allow_required_fields_to_be_skipped=True,
             context={"existing_instance": obj, "session": model_class.session})
         if not is_valid:
             return error_json(400, errors)
-        return render_json_obj_with_requested_structure(obj.update(**g.json))
+        return render_json_obj_with_requested_structure(obj.update(**input_data))
 
     return put
 
@@ -200,7 +203,8 @@ def construct_batch_put_view_function(model_class, schema):
         existing_instances = dict(zip(obj_ids, model_class.get_all(obj_ids)))
         all_success = True
         any_success = False
-        for obj_id, put_data_for_obj in g.json.items():
+        input_data = model_class.pre_validation_adapter_for_mapped_collection(g.json, existing_instances)
+        for obj_id, put_data_for_obj in input_data.items():
             output_key = obj_id
             if type(model_class.primary_key().type)==sqltypes.Integer:
                 output_key = int(obj_id)
@@ -303,8 +307,6 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
         forbidden_views = _model_dict.get('forbidden_views', [])
         view_dict_for_model = _model_dict.get('views', {})
         resource_name = _model.__tablename__
-
-        print forbidden_views
 
         if _model.__name__ not in app_or_bp.registered_models_and_crud_routes["models_registered_for_views"]:
             app_or_bp.registered_models_and_crud_routes["models_registered_for_views"].append(_model.__name__)
