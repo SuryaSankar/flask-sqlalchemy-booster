@@ -138,16 +138,22 @@ def construct_get_view_function(model_class):
     return get
 
 
-def construct_index_view_function(model_class, index_query=None):
+def construct_index_view_function(model_class, index_query_creator=None):
     def index():
-        return process_args_and_render_json_list(index_query or model_class)
+        if callable(index_query_creator):
+            return process_args_and_render_json_list(index_query_creator())
+        return process_args_and_render_json_list(model_class)
 
     return index
 
 
-def construct_post_view_function(model_class, schema):
+def construct_post_view_function(model_class, schema, pre_processors=None):
 
     def post():
+        if pre_processors is not None:
+            for processor in pre_processors:
+                if callable(processor):
+                    processor()
         if isinstance(g.json, list):
             input_data = model_class.pre_validation_adapter_for_list(g.json)
             is_valid, errors = validate_list_of_objects(schema, input_data)
@@ -169,7 +175,7 @@ def construct_post_view_function(model_class, schema):
                         for obj, error in zip(output_dict['result'], errors)]})
         else:
             input_data = model_class.pre_validation_adapter(g.json)
-            is_valid    , errors = validate_object(schema, input_data)
+            is_valid, errors = validate_object(schema, input_data)
             if not is_valid:
                 return error_json(400, errors)
             return render_json_obj_with_requested_structure(
@@ -177,8 +183,12 @@ def construct_post_view_function(model_class, schema):
     return post
 
 
-def construct_put_view_function(model_class, schema):
+def construct_put_view_function(model_class, schema, pre_processors=None):
     def put(_id):
+        if pre_processors is not None:
+            for processor in pre_processors:
+                if callable(processor):
+                    processor()
         obj = model_class.get(_id)
         if obj is None:
             return error_json(404, 'Resource not found')
@@ -193,9 +203,13 @@ def construct_put_view_function(model_class, schema):
     return put
 
 
-def construct_batch_put_view_function(model_class, schema):
+def construct_batch_put_view_function(model_class, schema, pre_processors=None):
 
     def batch_put():
+        if pre_processors is not None:
+            for processor in pre_processors:
+                if callable(processor):
+                    processor()
         output = {}
         obj_ids = g.json.keys()
         if type(model_class.primary_key().type)==sqltypes.Integer:
@@ -250,8 +264,12 @@ def construct_batch_put_view_function(model_class, schema):
     return batch_put
 
 
-def construct_patch_view_function(model_class, schema):
+def construct_patch_view_function(model_class, schema, pre_processors=None):
     def patch(_id):
+        if pre_processors is not None:
+            for processor in pre_processors:
+                if callable(processor):
+                    processor()
         obj = model_class.get(_id)
         is_valid, errors = validate_object(
             schema, g.json, allow_required_fields_to_be_skipped=True,
@@ -322,7 +340,7 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
         if 'index' not in forbidden_views:
             index_dict = view_dict_for_model.get('index', {})
             index_func = index_dict.get('view_func', None) or construct_index_view_function(
-                _model, index_query=index_dict.get('query'))
+                _model, index_query_creator=index_dict.get('query'))
             index_url = index_dict.get('url', None) or "/%s" % base_url
             app_or_bp.route(
                 index_url, methods=['GET'], endpoint='index_%s' % resource_name)(
@@ -341,7 +359,8 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
         if 'post' not in forbidden_views:
             post_dict = view_dict_for_model.get('post', {})
             post_func = post_dict.get('view_func', None) or construct_post_view_function(
-                _model, post_dict.get('input_schema') or model_default_input_schema)
+                _model, post_dict.get('input_schema') or model_default_input_schema,
+                post_dict.get('pre_processors'))
             post_url = post_dict.get('url', None) or "/%s" % base_url
             app_or_bp.route(
                 post_url, methods=['POST'], endpoint='post_%s' % resource_name)(
@@ -353,7 +372,8 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
         if 'put' not in forbidden_views:
             put_dict = view_dict_for_model.get('put', {})
             put_func = put_dict.get('view_func', None) or construct_put_view_function(
-                _model, put_dict.get('input_schema') or model_default_input_schema)
+                _model, put_dict.get('input_schema') or model_default_input_schema,
+                put_dict.get('pre_processors'))
             put_url = put_dict.get('url', None) or "/%s/<_id>" % base_url
             app_or_bp.route(
                 put_url, methods=['PUT'], endpoint='put_%s' % resource_name)(
@@ -365,7 +385,8 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
         if 'batch_put' not in forbidden_views:
             batch_put_dict = view_dict_for_model.get('batch_put', {})
             batch_put_func = batch_put_dict.get('view_func', None) or construct_batch_put_view_function(
-                _model, batch_put_dict.get('input_schema') or model_default_input_schema)
+                _model, batch_put_dict.get('input_schema') or model_default_input_schema,
+                batch_put_dict.get('pre_processors'))
             batch_put_url = batch_put_dict.get('url', None) or "/%s" % base_url
             app_or_bp.route(
                 batch_put_url, methods=['PUT'], endpoint='batch_put_%s' % resource_name)(
@@ -376,8 +397,9 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
 
         if 'patch' not in forbidden_views:
             patch_dict = view_dict_for_model.get('patch', {})
-            patch_func = put_dict.get('view_func', None) or construct_patch_view_function(
-                _model, patch_dict.get('input_schema') or model_default_input_schema)
+            patch_func = patch_dict.get('view_func', None) or construct_patch_view_function(
+                _model, patch_dict.get('input_schema') or model_default_input_schema,
+                patch_dict.get('pre_processors'))
             patch_url = patch_dict.get('url', None) or "/%s/<_id>" % base_url
             app_or_bp.route(
                 patch_url, methods=['PATCH'], endpoint='patch_%s' % resource_name)(
