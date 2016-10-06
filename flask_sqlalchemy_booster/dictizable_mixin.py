@@ -38,7 +38,7 @@ def _set_fields_for_col(col_name, col, schema, forbidden, required):
         else:
             type_mapping = {
                 sqltypes.Integer: (int, long),
-                sqltypes.Numeric: (Decimal, float),
+                sqltypes.Numeric: (Decimal, float, int, long),
                 sqltypes.DateTime: (datetime,),
                 sqltypes.Date: (date,),
                 sqltypes.Unicode: (unicode, str),

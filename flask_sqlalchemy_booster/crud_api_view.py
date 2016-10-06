@@ -340,7 +340,7 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
         if 'index' not in forbidden_views:
             index_dict = view_dict_for_model.get('index', {})
             index_func = index_dict.get('view_func', None) or construct_index_view_function(
-                _model, index_query_creator=index_dict.get('query'))
+                _model, index_query_creator=index_dict.get('query_constructor'))
             index_url = index_dict.get('url', None) or "/%s" % base_url
             app_or_bp.route(
                 index_url, methods=['GET'], endpoint='index_%s' % resource_name)(

@@ -13,7 +13,7 @@ from flask_sqlalchemy import Pagination
 import traceback
 from schemalite.core import validate_object
 from schemalite.validators import is_a_type_of, is_a_list_of_types_of
-
+from sqlalchemy.orm.query import Query
 
 
 RESTRICTED = ['limit', 'sort', 'orderby', 'groupby', 'attrs',
@@ -476,7 +476,7 @@ def filter_query_using_filter_data_structure(query, filter_data_struct):
 
 
 def filter_query_using_args(result, args_to_skip=[]):
-    if not isinstance(result, QueryBooster):
+    if not (isinstance(result, Query) or isinstance(result, QueryBooster)):
         result = result.query
     for kw in request.args:
         if kw not in args_to_skip:
