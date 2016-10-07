@@ -400,14 +400,14 @@ class QueryableMixin(object):
             return None
         if (key in cls.__table__.columns
                 and cls.__table__.columns[key].primary_key):
-            if user_id and hasattr(cls, 'user_id'):
-                return cls.query.filter_by(id=keyval, user_id=user_id).first()
+            # if user_id and hasattr(cls, 'user_id'):
+            #     return cls.query.filter_by(id=keyval, user_id=user_id).first()
             return cls.query.get(keyval)
         else:
             result = cls.query.filter(
                 getattr(cls, key) == keyval)
-            if user_id and hasattr(cls, 'user_id'):
-                result = result.filter(cls.user_id == user_id)
+            # if user_id and hasattr(cls, 'user_id'):
+            #     result = result.filter(cls.user_id == user_id)
             return result.first()
 
     @classmethod
@@ -446,8 +446,8 @@ class QueryableMixin(object):
         resultset = cls.query.filter(getattr(cls, key).in_(keyvals_set))
         # This is ridiculous. user_id check cannot be here. A hangover
         # from the time this lib was inside our app codebase
-        if user_id and hasattr(cls, 'user_id'):
-            resultset = resultset.filter(cls.user_id == user_id)
+        # if user_id and hasattr(cls, 'user_id'):
+        #     resultset = resultset.filter(cls.user_id == user_id)
         # We need the results in the same order as the input keyvals
         # So order by field in SQL
         key_result_mapping = {getattr(result, key): result for result in resultset.all()}

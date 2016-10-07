@@ -109,18 +109,26 @@ def register_crud_api_view(view, bp_or_app, endpoint, url_slug):
         methods=['DELETE'])
 
 
-def construct_get_view_function(model_class):
+def construct_get_view_function(model_class, get_query_creator=None):
     def get(_id):
         _id = _id.strip()
         if _id.startswith('[') and _id.endswith(']'):
             ids = [int(i) for i in json.loads(_id)]
-            resources = model_class.get_all(ids)
-            if all(r is None for r in resources):
-                return error_json(404, "No matching resources found")
+            if get_query_creator:
+                resources = get_query_creator().get_all(ids)
+            else:
+                resources = model_class.get_all(ids)
+            if None in resources:
+                if all(r is None for r in resources):
+                    status = "failure"
+                else:
+                    status = "partial_success"
+            else:
+                status = "success"
             return render_json_list_with_requested_structure(
                 resources,
                 pre_render_callback=lambda output_dict: {
-                    'status': 'partial_success' if None in resources else 'success',
+                    'status': status,
                     'result': {
                         _id: {'status': 'failure', 'error': 'Resource not found'}
                         if obj is None
@@ -128,10 +136,10 @@ def construct_get_view_function(model_class):
                         for _id, obj in zip(ids, output_dict['result'])}
                 }
             )
-            return process_args_and_render_json_list(
-                model_class.query.filter(
-                    model_class.primary_key().in_(ids)))
-        obj = model_class.get(_id)
+        if get_query_creator:
+            obj = get_query_creator().get(_id)
+        else:
+            obj = model_class.get(_id)
         if obj is None:
             return error_json(404, 'Resource not found')
         return render_json_obj_with_requested_structure(obj)
@@ -163,10 +171,17 @@ def construct_post_view_function(model_class, schema, pre_processors=None):
                     input_obj if error is None else None
                     for input_obj, error in zip(input_data, errors)]
             resources = model_class.create_all(input_objs)
+            if None in resources:
+                if all(r is None for r in resources):
+                    status = "failure"
+                else:
+                    status = "partial_success"
+            else:
+                status = "success"
             return render_json_list_with_requested_structure(
                 resources,
                 pre_render_callback=lambda output_dict: {
-                    'status': 'partial_success' if None in resources else 'success',
+                    'status': status,
                     'result': [
                         {'status': 'failure', 'error': error}
                         if obj is None
@@ -183,13 +198,16 @@ def construct_post_view_function(model_class, schema, pre_processors=None):
     return post
 
 
-def construct_put_view_function(model_class, schema, pre_processors=None):
+def construct_put_view_function(model_class, schema, pre_processors=None, query_constructor=None):
     def put(_id):
         if pre_processors is not None:
             for processor in pre_processors:
                 if callable(processor):
                     processor()
-        obj = model_class.get(_id)
+        if callable(query_constructor):
+            obj = query_constructor().get(_id)
+        else:
+            obj = model_class.get(_id)
         if obj is None:
             return error_json(404, 'Resource not found')
         input_data = model_class.pre_validation_adapter(g.json, existing_instance=obj)
@@ -203,7 +221,7 @@ def construct_put_view_function(model_class, schema, pre_processors=None):
     return put
 
 
-def construct_batch_put_view_function(model_class, schema, pre_processors=None):
+def construct_batch_put_view_function(model_class, schema, pre_processors=None, query_constructor=None):
 
     def batch_put():
         if pre_processors is not None:
@@ -214,7 +232,11 @@ def construct_batch_put_view_function(model_class, schema, pre_processors=None):
         obj_ids = g.json.keys()
         if type(model_class.primary_key().type)==sqltypes.Integer:
             obj_ids = [int(obj_id) for obj_id in obj_ids]
-        existing_instances = dict(zip(obj_ids, model_class.get_all(obj_ids)))
+        if callable(query_constructor):
+            objs = query_constructor().get_all(obj_ids)
+        else:
+            objs = model_class.get_all(obj_ids)
+        existing_instances = dict(zip(obj_ids, objs))
         all_success = True
         any_success = False
         input_data = model_class.pre_validation_adapter_for_mapped_collection(g.json, existing_instances)
@@ -264,13 +286,16 @@ def construct_batch_put_view_function(model_class, schema, pre_processors=None):
     return batch_put
 
 
-def construct_patch_view_function(model_class, schema, pre_processors=None):
+def construct_patch_view_function(model_class, schema, pre_processors=None, query_constructor=None):
     def patch(_id):
         if pre_processors is not None:
             for processor in pre_processors:
                 if callable(processor):
                     processor()
-        obj = model_class.get(_id)
+        if callable(query_constructor):
+            obj = query_constructor().get(_id)
+        else:
+            obj = model_class.get(_id)
         is_valid, errors = validate_object(
             schema, g.json, allow_required_fields_to_be_skipped=True,
             context={"existing_instance": obj, "session": model_class.session})
@@ -281,9 +306,12 @@ def construct_patch_view_function(model_class, schema, pre_processors=None):
     return patch
 
 
-def construct_delete_view_function(model_class):
+def construct_delete_view_function(model_class, query_constructor=None):
     def delete(_id):
-        obj = model_class.get(_id)
+        if callable(query_constructor):
+            obj = query_constructor().get(_id)
+        else:
+            obj = model_class.get(_id)
         if obj is None:
             return error_json(404, 'Resource not found')
         obj.delete()
@@ -323,6 +351,7 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
     for _model, _model_dict in registration_dict.items():
         base_url = _model_dict.get('url_slug')
         forbidden_views = _model_dict.get('forbidden_views', [])
+        default_query_constructor = _model_dict.get('query_constructor')
         view_dict_for_model = _model_dict.get('views', {})
         resource_name = _model.__tablename__
 
@@ -340,7 +369,8 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
         if 'index' not in forbidden_views:
             index_dict = view_dict_for_model.get('index', {})
             index_func = index_dict.get('view_func', None) or construct_index_view_function(
-                _model, index_query_creator=index_dict.get('query_constructor'))
+                _model,
+                index_query_creator=index_dict.get('query_constructor') or default_query_constructor)
             index_url = index_dict.get('url', None) or "/%s" % base_url
             app_or_bp.route(
                 index_url, methods=['GET'], endpoint='index_%s' % resource_name)(
@@ -349,7 +379,9 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
 
         if 'get' not in forbidden_views:
             get_dict = view_dict_for_model.get('get', {})
-            get_func = get_dict.get('view_func', None) or construct_get_view_function(_model)
+            get_func = get_dict.get('view_func', None) or construct_get_view_function(
+                _model,
+                get_query_creator=get_dict.get('query_constructor') or default_query_constructor)
             get_url = get_dict.get('url', None) or '/%s/<_id>' % base_url
             app_or_bp.route(
                 get_url, methods=['GET'], endpoint='get_%s' % resource_name)(
@@ -373,7 +405,8 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
             put_dict = view_dict_for_model.get('put', {})
             put_func = put_dict.get('view_func', None) or construct_put_view_function(
                 _model, put_dict.get('input_schema') or model_default_input_schema,
-                put_dict.get('pre_processors'))
+                put_dict.get('pre_processors'),
+                query_constructor=put_dict.get('query_constructor') or default_query_constructor)
             put_url = put_dict.get('url', None) or "/%s/<_id>" % base_url
             app_or_bp.route(
                 put_url, methods=['PUT'], endpoint='put_%s' % resource_name)(
@@ -386,7 +419,8 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
             batch_put_dict = view_dict_for_model.get('batch_put', {})
             batch_put_func = batch_put_dict.get('view_func', None) or construct_batch_put_view_function(
                 _model, batch_put_dict.get('input_schema') or model_default_input_schema,
-                batch_put_dict.get('pre_processors'))
+                batch_put_dict.get('pre_processors'),
+                query_constructor=batch_put_dict.get('query_constructor') or default_query_constructor)
             batch_put_url = batch_put_dict.get('url', None) or "/%s" % base_url
             app_or_bp.route(
                 batch_put_url, methods=['PUT'], endpoint='batch_put_%s' % resource_name)(
@@ -399,7 +433,8 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
             patch_dict = view_dict_for_model.get('patch', {})
             patch_func = patch_dict.get('view_func', None) or construct_patch_view_function(
                 _model, patch_dict.get('input_schema') or model_default_input_schema,
-                patch_dict.get('pre_processors'))
+                patch_dict.get('pre_processors'),
+                query_constructor=patch_dict.get('query_constructor') or default_query_constructor)
             patch_url = patch_dict.get('url', None) or "/%s/<_id>" % base_url
             app_or_bp.route(
                 patch_url, methods=['PATCH'], endpoint='patch_%s' % resource_name)(
@@ -409,7 +444,7 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
         if 'delete' not in forbidden_views:
             delete_dict = view_dict_for_model.get('delete', {})
             delete_func = delete_dict.get('view_func', None) or construct_delete_view_function(
-                _model)
+                _model, query_constructor=delete_dict.get('query_constructor') or default_query_constructor)
             delete_url = delete_dict.get('url', None) or "/%s/<_id>" % base_url
             app_or_bp.route(
                 delete_url, methods=['DELETE'], endpoint='delete_%s' % resource_name)(
