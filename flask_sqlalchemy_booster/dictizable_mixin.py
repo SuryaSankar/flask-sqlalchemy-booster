@@ -47,10 +47,7 @@ def _set_fields_for_col(col_name, col, schema, forbidden, required):
                 sqltypes.Text: (unicode, str),
                 sqltypes.Boolean: (bool,)
             }
-            try:
-                schema["fields"][col_name]["type"] = type_mapping[type(col.type)] + (NoneType, )
-            except:
-                print col_name
+            schema["fields"][col_name]["type"] = type_mapping[type(col.type)] + (NoneType, )
 
 
 def _set_fields_for_rel(rel_name, rel, schema, forbidden, required, seen_classes, show_rel_schema=True):
