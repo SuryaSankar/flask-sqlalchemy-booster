@@ -704,7 +704,7 @@ def as_obj(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         response = func(*args, **kwargs)
-        return process_args_and_render_json_obj(response)
+        return render_json_obj_with_requested_structure(response)
     return wrapper
 
 

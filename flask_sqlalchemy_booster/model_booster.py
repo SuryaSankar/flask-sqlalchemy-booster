@@ -90,3 +90,7 @@ class ModelBooster(Model, QueryableMixin, DictizableMixin):
             if assoc_proxy.value_attr in assoc_rel_class.__mapper__.relationships.keys():
                 result.append(k)
         return result
+
+    @classmethod
+    def subclass(cls, pm_identity):
+        return cls.__mapper__.polymorphic_map.get(pm_identity)
