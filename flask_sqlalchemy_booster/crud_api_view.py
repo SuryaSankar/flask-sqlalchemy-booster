@@ -370,7 +370,7 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
         if _model._input_data_schema_:
             model_default_input_schema = deepcopy(_model._input_data_schema_)
         else:
-            model_default_input_schema = _model.generate_input_data_schema(show_rel_schema=True)
+            model_default_input_schema = _model.generate_input_data_schema(show_rel_schema=False)
         if callable(registration_dict[_model].get('input_schema_modifier')):
             model_default_input_schema = registration_dict[_model]['input_schema_modifier'](model_default_input_schema)
 

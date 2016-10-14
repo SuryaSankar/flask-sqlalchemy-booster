@@ -3,6 +3,7 @@ from .query_booster import QueryBooster
 from .queryable_mixin import QueryableMixin
 from .dictizable_mixin import DictizableMixin
 from sqlalchemy.ext.associationproxy import AssociationProxy
+from sqlalchemy.orm import class_mapper
 
 
 class ModelBooster(Model, QueryableMixin, DictizableMixin):
@@ -93,4 +94,7 @@ class ModelBooster(Model, QueryableMixin, DictizableMixin):
 
     @classmethod
     def subclass(cls, pm_identity):
-        return cls.__mapper__.polymorphic_map.get(pm_identity)
+        mapper = class_mapper(cls).polymorphic_map.get(pm_identity)
+        if mapper is None:
+            return None
+        return mapper.class_
