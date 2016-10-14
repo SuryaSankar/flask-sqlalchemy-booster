@@ -16,7 +16,7 @@ from setuptools import setup
 
 setup(
     name='Flask-SQLAlchemy-Booster',
-    version='0.4.36',
+    version='0.4.37',
     description='Querying and JSON Response generation wrappers for Flask-SQLAlchemy',
     long_description='Allows querying on Model classes, supports several common query operations, allows JSONification of models and relations and provides a simple query language for dynamically fetching data',
     packages=['flask_sqlalchemy_booster'],
@@ -26,7 +26,7 @@ setup(
         "Flask>=0.10.1",
         "SQLAlchemy==1.0.9",
         "Flask-SQLAlchemy>=2.1",
-        "Schemalite>=0.1.17"
+        "Schemalite>=0.1.18"
     ],
     license='MIT',
     url='https://github.com/inkmonk/flask-sqlalchemy-booster',
