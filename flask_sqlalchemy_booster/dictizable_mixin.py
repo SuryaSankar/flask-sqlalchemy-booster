@@ -171,7 +171,9 @@ class DictizableMixin(object):
 
         polymorphic_attr = model_cls.__mapper__.polymorphic_on
 
-        subclasses = all_subclasses(model_cls)
+        subclasses = filter(
+            lambda sc: len(all_subclasses(sc)) == 0,
+            all_subclasses(model_cls))
 
         if polymorphic_attr is not None:
             if len(subclasses) == 0:
@@ -191,8 +193,9 @@ class DictizableMixin(object):
                         polymorphic_identity] = {"fields": {}}
                     cols_in_subcls = filter(
                         lambda col_item:
-                        col_item[1].table.name == subcls.__tablename__ and
-                        subcls.__tablename__ != model_cls.__tablename__ and
+                        # col_item[1].table.name == subcls.__tablename__ and
+                        # subcls.__tablename__ != model_cls.__tablename__ and
+                        col_item[1].table.name != model_cls.__tablename__ and
                         not col_item[1].primary_key,
                         subcls.__mapper__.columns.items())
                     for col_name, col in cols_in_subcls:
