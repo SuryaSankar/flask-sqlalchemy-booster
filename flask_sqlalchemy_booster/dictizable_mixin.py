@@ -9,7 +9,6 @@ from toolspy import deep_group
 import json
 from .json_encoder import json_encoder
 from sqlalchemy.sql import sqltypes
-from sqlalchemy.orm import class_mapper
 from decimal import Decimal
 from datetime import datetime, date
 from .json_columns import JSONEncodedStruct
@@ -154,8 +153,8 @@ class DictizableMixin(object):
                 return data.get(polymorphic_attr.key) == polymorphic_identity
             return _allowed
 
-        cols_in_class = class_mapper(model_cls).columns.items()
-        rels_in_class = class_mapper(model_cls).relationships.items()
+        cols_in_class = model_cls.__mapper__.columns.items()
+        rels_in_class = model_cls.__mapper__.relationships.items()
 
         for col_name, col in cols_in_class:
             _set_fields_for_col(col_name, col, schema, forbidden, required)
@@ -170,7 +169,7 @@ class DictizableMixin(object):
                 "allowed": True
             }
 
-        polymorphic_attr = class_mapper(model_cls).polymorphic_on
+        polymorphic_attr = model_cls.__mapper__.polymorphic_on
 
         subclasses = all_subclasses(model_cls)
 
@@ -195,7 +194,7 @@ class DictizableMixin(object):
                         col_item[1].table.name == subcls.__tablename__ and
                         subcls.__tablename__ != model_cls.__tablename__ and
                         not col_item[1].primary_key,
-                        class_mapper(subcls).columns.items())
+                        subcls.__mapper__.columns.items())
                     for col_name, col in cols_in_subcls:
                         _set_fields_for_col(
                             col_name, col,
@@ -204,7 +203,7 @@ class DictizableMixin(object):
                             forbidden, required)
                     rels_in_subcls = filter(
                         lambda rel_item: not hasattr(model_cls, rel_item[0]),
-                        class_mapper(subcls).relationships.items())
+                        subcls.__mapper__.relationships.items())
                     for rel_name, rel in rels_in_subcls:
                         _set_fields_for_rel(
                             rel_name, rel,
