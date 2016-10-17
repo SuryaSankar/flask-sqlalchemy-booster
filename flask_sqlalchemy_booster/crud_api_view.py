@@ -212,6 +212,10 @@ def construct_put_view_function(model_class, schema, pre_processors=None, query_
         if obj is None:
             return error_json(404, 'Resource not found')
         input_data = model_class.pre_validation_adapter(g.json, existing_instance=obj)
+        polymorphic_field = schema.get('polymorphic_on')
+        if polymorphic_field:
+            if polymorphic_field not in input_data:
+                input_data[polymorphic_field] = getattr(obj, polymorphic_field)
         is_valid, errors = validate_object(
             schema, input_data, allow_required_fields_to_be_skipped=True,
             context={"existing_instance": obj, "session": model_class.session})
@@ -240,6 +244,7 @@ def construct_batch_put_view_function(model_class, schema, pre_processors=None, 
         existing_instances = dict(zip(obj_ids, objs))
         all_success = True
         any_success = False
+        polymorphic_field = schema.get('polymorphic_on')
         input_data = model_class.pre_validation_adapter_for_mapped_collection(g.json, existing_instances)
         for obj_id, put_data_for_obj in input_data.items():
             output_key = obj_id
@@ -254,6 +259,9 @@ def construct_batch_put_view_function(model_class, schema, pre_processors=None, 
                 all_success = False
                 any_success = any_success or False
             else:
+                if polymorphic_field:
+                    if polymorphic_field not in put_data_for_obj:
+                        put_data_for_obj[polymorphic_field] = getattr(existing_instance, polymorphic_field)
                 is_valid, errors = validate_object(
                     schema, put_data_for_obj, allow_required_fields_to_be_skipped=True,
                     context={"existing_instance": existing_instance, "session": model_class.session})
@@ -297,6 +305,10 @@ def construct_patch_view_function(model_class, schema, pre_processors=None, quer
             obj = query_constructor(model_class.query).get(_id)
         else:
             obj = model_class.get(_id)
+        polymorphic_field = schema.get('polymorphic_on')
+        if polymorphic_field:
+            if polymorphic_field not in g.json:
+                g.json[polymorphic_field] = getattr(obj, polymorphic_field)
         is_valid, errors = validate_object(
             schema, g.json, allow_required_fields_to_be_skipped=True,
             context={"existing_instance": obj, "session": model_class.session})
