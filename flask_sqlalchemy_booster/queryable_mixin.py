@@ -1,5 +1,8 @@
 # from sqlalchemy import func
 from toolspy import subdict, remove_and_mark_duplicate_dicts, merge
+from sqlalchemy.ext.associationproxy import AssociationProxy
+from sqlalchemy.ext.orderinglist import OrderingList
+from sqlalchemy.orm import class_mapper
 
 
 class QueryableMixin(object):
@@ -52,6 +55,14 @@ class QueryableMixin(object):
         for key, value in kwargs.iteritems():
             if key not in self._no_overwrite_:
                 setattr(self, key, value)
+            cls = type(self)
+            if isinstance(getattr(self, key), OrderingList):
+                getattr(self, key).reorder()
+            elif isinstance(getattr(cls, key), AssociationProxy):
+                target_name = getattr(cls, key).target_collection
+                target_rel = getattr(self, target_name)
+                if isinstance(target_rel, OrderingList):
+                    target_rel.reorder()
         return self
 
     def commit(self):
@@ -123,11 +134,11 @@ class QueryableMixin(object):
             if cls.is_the_primary_key(attr) and cls._prevent_primary_key_initialization_:
                 del kwargs[attr]
                 continue
-            if cls.is_a_to_many_rel(attr):
+            if cls.is_a_to_many_rel(attr) and all(isinstance(v, dict) for v in val):
                 rel_cls = cls.mapped_rel_class(attr)
                 kwargs[attr] = rel_cls.update_or_new_all(
                     list_of_kwargs=val, keys=[rel_cls.primary_key_name()])
-            elif cls.is_a_to_one_rel(attr):
+            elif cls.is_a_to_one_rel(attr) and isinstance(val, dict):
                 rel_cls = cls.mapped_rel_class(attr)
                 kwargs[attr] = rel_cls.update_or_new(
                     **merge(val, {'keys': [rel_cls.primary_key_name()]}))
@@ -149,6 +160,14 @@ class QueryableMixin(object):
         for key, value in kwargs.iteritems():
             if key not in self._no_overwrite_:
                 setattr(self, key, value)
+            cls = type(self)
+            if isinstance(getattr(self, key), OrderingList):
+                getattr(self, key).reorder()
+            elif isinstance(getattr(cls, key), AssociationProxy):
+                target_name = getattr(cls, key).target_collection
+                target_rel = getattr(self, target_name)
+                if isinstance(target_rel, OrderingList):
+                    target_rel.reorder()
         try:
             self.session.commit()
             return self
@@ -532,7 +551,11 @@ class QueryableMixin(object):
         return cls.first(**subdict(kwargs, keys)) or cls.create(**kwargs)
 
     @classmethod
-    def get_updated_or_new_obj(cls, kwargs={}, filter_keys=[]):
+    def get_updated_or_new_obj(cls, kwargs=None, filter_keys=None):
+        if filter_keys is None:
+            filter_keys = []
+        if kwargs is None:
+            kwargs = {}
         filter_kwargs = subdict(kwargs, filter_keys)
         if filter_kwargs == {}:
             obj = None
