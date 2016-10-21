@@ -156,7 +156,7 @@ def construct_index_view_function(model_class, index_query_creator=None):
     return index
 
 
-def construct_post_view_function(model_class, schema, pre_processors=None):
+def construct_post_view_function(model_class, schema, pre_processors=None, schemas_registry=None):
 
     def post():
         if pre_processors is not None:
@@ -165,7 +165,9 @@ def construct_post_view_function(model_class, schema, pre_processors=None):
                     processor()
         if isinstance(g.json, list):
             input_data = model_class.pre_validation_adapter_for_list(g.json)
-            is_valid, errors = validate_list_of_objects(schema, input_data)
+            is_valid, errors = validate_list_of_objects(
+                schema, input_data, context={"model_class": model_class},
+                schemas_registry=schemas_registry)
             input_objs = input_data
             if not is_valid:
                 input_objs = [
@@ -191,7 +193,9 @@ def construct_post_view_function(model_class, schema, pre_processors=None):
                         for obj, error in zip(output_dict['result'], errors)]})
         else:
             input_data = model_class.pre_validation_adapter(g.json)
-            is_valid, errors = validate_object(schema, input_data)
+            is_valid, errors = validate_object(
+                schema, input_data, context={"model_class": model_class},
+                schemas_registry=schemas_registry)
             if not is_valid:
                 return error_json(400, errors)
             return render_json_obj_with_requested_structure(
@@ -199,7 +203,9 @@ def construct_post_view_function(model_class, schema, pre_processors=None):
     return post
 
 
-def construct_put_view_function(model_class, schema, pre_processors=None, query_constructor=None):
+def construct_put_view_function(
+        model_class, schema, pre_processors=None,
+        query_constructor=None, schemas_registry=None):
     def put(_id):
         if pre_processors is not None:
             for processor in pre_processors:
@@ -218,7 +224,9 @@ def construct_put_view_function(model_class, schema, pre_processors=None, query_
                 input_data[polymorphic_field] = getattr(obj, polymorphic_field)
         is_valid, errors = validate_object(
             schema, input_data, allow_required_fields_to_be_skipped=True,
-            context={"existing_instance": obj, "session": model_class.session})
+            context={"existing_instance": obj,
+                     "model_class": model_class},
+            schemas_registry=schemas_registry)
         if not is_valid:
             return error_json(400, errors)
         return render_json_obj_with_requested_structure(obj.update(**input_data))
@@ -226,7 +234,9 @@ def construct_put_view_function(model_class, schema, pre_processors=None, query_
     return put
 
 
-def construct_batch_put_view_function(model_class, schema, pre_processors=None, query_constructor=None):
+def construct_batch_put_view_function(
+        model_class, schema, pre_processors=None,
+        query_constructor=None, schemas_registry=None):
 
     def batch_put():
         if pre_processors is not None:
@@ -264,7 +274,10 @@ def construct_batch_put_view_function(model_class, schema, pre_processors=None, 
                         put_data_for_obj[polymorphic_field] = getattr(existing_instance, polymorphic_field)
                 is_valid, errors = validate_object(
                     schema, put_data_for_obj, allow_required_fields_to_be_skipped=True,
-                    context={"existing_instance": existing_instance, "session": model_class.session})
+                    context={
+                        "existing_instance": existing_instance,
+                        "model_class": model_class
+                    }, schemas_registry=schemas_registry)
                 if is_valid:
                     updated_object = existing_instance.update_without_commit(
                         **put_data_for_obj)
@@ -295,7 +308,8 @@ def construct_batch_put_view_function(model_class, schema, pre_processors=None, 
     return batch_put
 
 
-def construct_patch_view_function(model_class, schema, pre_processors=None, query_constructor=None):
+def construct_patch_view_function(model_class, schema, pre_processors=None,
+                                  query_constructor=None, schemas_registry=None):
     def patch(_id):
         if pre_processors is not None:
             for processor in pre_processors:
@@ -311,7 +325,9 @@ def construct_patch_view_function(model_class, schema, pre_processors=None, quer
                 g.json[polymorphic_field] = getattr(obj, polymorphic_field)
         is_valid, errors = validate_object(
             schema, g.json, allow_required_fields_to_be_skipped=True,
-            context={"existing_instance": obj, "session": model_class.session})
+            context={"existing_instance": obj,
+                     "model_class": model_class},
+            schemas_registry=schemas_registry)
         if not is_valid:
             return error_json(400, errors)
         return render_json_obj_with_requested_structure(obj.update(**g.json))
@@ -387,6 +403,7 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
             model_default_input_schema = registration_dict[_model]['input_schema_modifier'](model_default_input_schema)
 
         views = app_or_bp.registered_models_and_crud_routes["views"]
+        schemas_registry = {k: v.get('input_schema') for k, v in model_schemas.items()}
         if _model.__name__ not in views:
             views[_model.__name__] = {}
 
@@ -420,7 +437,7 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
                 post_input_schema = model_default_input_schema
             post_func = post_dict.get('view_func', None) or construct_post_view_function(
                 _model, post_input_schema,
-                post_dict.get('pre_processors'))
+                post_dict.get('pre_processors'), schemas_registry=schemas_registry)
             post_url = post_dict.get('url', None) or "/%s" % base_url
             app_or_bp.route(
                 post_url, methods=['POST'], endpoint='post_%s' % resource_name)(
@@ -439,7 +456,8 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
             put_func = put_dict.get('view_func', None) or construct_put_view_function(
                 _model, put_input_schema,
                 put_dict.get('pre_processors'),
-                query_constructor=put_dict.get('query_constructor') or default_query_constructor)
+                query_constructor=put_dict.get('query_constructor') or default_query_constructor,
+                schemas_registry=schemas_registry)
             put_url = put_dict.get('url', None) or "/%s/<_id>" % base_url
             app_or_bp.route(
                 put_url, methods=['PUT'], endpoint='put_%s' % resource_name)(
@@ -458,7 +476,8 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
             batch_put_func = batch_put_dict.get('view_func', None) or construct_batch_put_view_function(
                 _model, batch_put_input_schema,
                 batch_put_dict.get('pre_processors'),
-                query_constructor=batch_put_dict.get('query_constructor') or default_query_constructor)
+                query_constructor=batch_put_dict.get('query_constructor') or default_query_constructor,
+                schemas_registry=schemas_registry)
             batch_put_url = batch_put_dict.get('url', None) or "/%s" % base_url
             app_or_bp.route(
                 batch_put_url, methods=['PUT'], endpoint='batch_put_%s' % resource_name)(
@@ -477,7 +496,8 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
             patch_func = patch_dict.get('view_func', None) or construct_patch_view_function(
                 _model, patch_input_schema,
                 patch_dict.get('pre_processors'),
-                query_constructor=patch_dict.get('query_constructor') or default_query_constructor)
+                query_constructor=patch_dict.get('query_constructor') or default_query_constructor,
+                schemas_registry=schemas_registry)
             patch_url = patch_dict.get('url', None) or "/%s/<_id>" % base_url
             app_or_bp.route(
                 patch_url, methods=['PATCH'], endpoint='patch_%s' % resource_name)(
