@@ -49,14 +49,9 @@ def _set_fields_for_col(col_name, col, schema, forbidden, required):
             schema["fields"][col_name]["type"] = type_mapping[type(col.type)] + (NoneType, )
 
 
-def _set_fields_for_rel(rel_name, rel, schema, forbidden, required, seen_classes, show_rel_schema=True):
-    # print "Tree so far - %s" % seen_classes
-    # if rel.mapper.class_ in seen_classes:
-    #     print "SKIPPING %s" % rel_name
-    # else:
-    #     print "Adding %s" % rel_name
-    # print
-    if rel_name not in forbidden and rel.mapper.class_ not in seen_classes:
+def _set_fields_for_rel(rel_name, rel, schema, forbidden, required, seen_classes):
+    # if rel_name not in forbidden and rel.mapper.class_ not in seen_classes:
+    if rel_name not in forbidden:
         schema["fields"][rel_name] = {
             "required": rel_name in required,
             "type": list if rel.uselist else dict,
@@ -65,13 +60,13 @@ def _set_fields_for_rel(rel_name, rel, schema, forbidden, required, seen_classes
         }
         if rel.uselist:
             schema["fields"][rel_name]["list_item_type"] = dict
-            if show_rel_schema:
-                schema["fields"][rel_name]["list_item_schema"] = rel.mapper.class_.generate_input_data_schema(
-                    seen_classes=seen_classes)
-        else:
-            if show_rel_schema:
-                schema["fields"][rel_name]["dict_schema"] = rel.mapper.class_.generate_input_data_schema(
-                    seen_classes=seen_classes)
+            # if show_rel_schema:
+            #     schema["fields"][rel_name]["list_item_schema"] = rel.mapper.class_.generate_input_data_schema(
+            #         seen_classes=seen_classes)
+        # else:
+        #     if show_rel_schema:
+        #         schema["fields"][rel_name]["dict_schema"] = rel.mapper.class_.generate_input_data_schema(
+        #             seen_classes=seen_classes)
 
 
 class DictizableMixin(object):
@@ -124,16 +119,14 @@ class DictizableMixin(object):
 
     @classmethod
     def input_data_schema(cls, seen_classes=None, required=None,
-                          forbidden=None, post_processor=None,
-                          show_rel_schema=True):
+                          forbidden=None, post_processor=None):
         return cls._input_data_schema_ or cls.generate_input_data_schema(
             seen_classes=seen_classes, required=required, forbidden=forbidden,
-            post_processor=post_processor, show_rel_schema=show_rel_schema)
+            post_processor=post_processor)
 
     @classmethod
     def generate_input_data_schema(model_cls, seen_classes=None, required=None,
-                                   forbidden=None, post_processor=None,
-                                   show_rel_schema=True):
+                                   forbidden=None, post_processor=None):
         if seen_classes is None:
             seen_classes = []
         if required is None:
@@ -161,8 +154,7 @@ class DictizableMixin(object):
 
         for rel_name, rel in rels_in_class:
             _set_fields_for_rel(
-                rel_name, rel, schema, forbidden, required, seen_classes[0:],
-                show_rel_schema=show_rel_schema)
+                rel_name, rel, schema, forbidden, required, seen_classes[0:])
 
         for assoc_proxy_name in model_cls.association_proxy_keys():
             schema['fields'][assoc_proxy_name] = {
@@ -212,8 +204,7 @@ class DictizableMixin(object):
                             rel_name, rel,
                             schema["additional_schema_for_polymorphs"][
                                 polymorphic_identity],
-                            forbidden, required, seen_classes[0:],
-                            show_rel_schema=show_rel_schema)
+                            forbidden, required, seen_classes[0:])
 
                     for assoc_proxy_name in subcls.association_proxy_keys(
                             include_parent_classes=False):

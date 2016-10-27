@@ -365,7 +365,7 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
         if modelcls._input_data_schema_:
             input_schema = deepcopy(modelcls._input_data_schema_)
         else:
-            input_schema = modelcls.generate_input_data_schema(show_rel_schema=False)
+            input_schema = modelcls.generate_input_data_schema()
         if modelcls in registration_dict and callable(registration_dict[modelcls].get('input_schema_modifier')):
             input_schema = registration_dict[modelcls]['input_schema_modifier'](input_schema)
         model_schemas[modelcls.__name__] = {
@@ -398,7 +398,7 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
         if _model._input_data_schema_:
             model_default_input_schema = deepcopy(_model._input_data_schema_)
         else:
-            model_default_input_schema = _model.generate_input_data_schema(show_rel_schema=False)
+            model_default_input_schema = _model.generate_input_data_schema()
         if callable(registration_dict[_model].get('input_schema_modifier')):
             model_default_input_schema = registration_dict[_model]['input_schema_modifier'](model_default_input_schema)
 
