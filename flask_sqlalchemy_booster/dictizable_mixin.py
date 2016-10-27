@@ -49,7 +49,7 @@ def _set_fields_for_col(col_name, col, schema, forbidden, required):
             schema["fields"][col_name]["type"] = type_mapping[type(col.type)] + (NoneType, )
 
 
-def _set_fields_for_rel(rel_name, rel, schema, forbidden, required, seen_classes):
+def _set_fields_for_rel(rel_name, rel, schema, forbidden, required):
     # if rel_name not in forbidden and rel.mapper.class_ not in seen_classes:
     if rel_name not in forbidden:
         schema["fields"][rel_name] = {
@@ -118,22 +118,22 @@ class DictizableMixin(object):
         }
 
     @classmethod
-    def input_data_schema(cls, seen_classes=None, required=None,
+    def input_data_schema(cls, required=None,
                           forbidden=None, post_processor=None):
         return cls._input_data_schema_ or cls.generate_input_data_schema(
-            seen_classes=seen_classes, required=required, forbidden=forbidden,
+            required=required, forbidden=forbidden,
             post_processor=post_processor)
 
     @classmethod
-    def generate_input_data_schema(model_cls, seen_classes=None, required=None,
+    def generate_input_data_schema(model_cls, required=None,
                                    forbidden=None, post_processor=None):
-        if seen_classes is None:
-            seen_classes = []
+        # if seen_classes is None:
+        #     seen_classes = []
         if required is None:
             required = []
         if forbidden is None:
             forbidden = []
-        seen_classes.append(model_cls)
+        # seen_classes.append(model_cls)
 
         schema = {
             "fields": {
@@ -154,7 +154,9 @@ class DictizableMixin(object):
 
         for rel_name, rel in rels_in_class:
             _set_fields_for_rel(
-                rel_name, rel, schema, forbidden, required, seen_classes[0:])
+                rel_name, rel, schema, forbidden, required)
+            # _set_fields_for_rel(
+            #     rel_name, rel, schema, forbidden, required, seen_classes[0:])
 
         for assoc_proxy_name in model_cls.association_proxy_keys():
             schema['fields'][assoc_proxy_name] = {
@@ -204,7 +206,7 @@ class DictizableMixin(object):
                             rel_name, rel,
                             schema["additional_schema_for_polymorphs"][
                                 polymorphic_identity],
-                            forbidden, required, seen_classes[0:])
+                            forbidden, required)
 
                     for assoc_proxy_name in subcls.association_proxy_keys(
                             include_parent_classes=False):
