@@ -562,10 +562,14 @@ class QueryableMixin(object):
         else:
             obj = cls.first(**filter_kwargs)
         if obj is not None:
-            for key, value in kwargs.iteritems():
-                if (key not in filter_keys and
-                        key not in cls._no_overwrite_):
-                    setattr(obj, key, value)
+            update_kwargs = {
+                k: v for k, v in kwargs.iteritems()
+                if k not in filter_keys and k not in cls._no_overwrite_}
+            obj.update_without_commit(**update_kwargs)
+            # for key, value in kwargs.iteritems():
+            #     if (key not in filter_keys and
+            #             key not in cls._no_overwrite_):
+            #         setattr(obj, key, value)
         else:
             obj = cls.new(**kwargs)
         return obj
