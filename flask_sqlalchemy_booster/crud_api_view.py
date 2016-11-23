@@ -205,6 +205,7 @@ def construct_post_view_function(model_class, schema, pre_processors=None, schem
 
 def construct_put_view_function(
         model_class, schema, pre_processors=None,
+        post_processors=None,
         query_constructor=None, schemas_registry=None):
     def put(_id):
         if pre_processors is not None:
@@ -229,13 +230,19 @@ def construct_put_view_function(
             schemas_registry=schemas_registry)
         if not is_valid:
             return error_json(400, errors)
-        return render_json_obj_with_requested_structure(obj.update(**input_data))
+        updated_obj = obj.update(**input_data)
+        if post_processors is not None:
+            for processor in post_processors:
+                if callable(processor):
+                    processor(updated_obj, input_data)
+        return render_json_obj_with_requested_structure(updated_obj)
 
     return put
 
 
 def construct_batch_put_view_function(
         model_class, schema, pre_processors=None,
+        post_processors=None,
         query_constructor=None, schemas_registry=None):
 
     def batch_put():
@@ -256,6 +263,7 @@ def construct_batch_put_view_function(
         any_success = False
         polymorphic_field = schema.get('polymorphic_on')
         input_data = model_class.pre_validation_adapter_for_mapped_collection(g.json, existing_instances)
+        updated_objects = {}
         for obj_id, put_data_for_obj in input_data.items():
             output_key = obj_id
             if type(model_class.primary_key().type)==sqltypes.Integer:
@@ -281,6 +289,7 @@ def construct_batch_put_view_function(
                 if is_valid:
                     updated_object = existing_instance.update_without_commit(
                         **put_data_for_obj)
+                    updated_objects[updated_object.id] = updated_object
                     output[output_key] = {
                         "status": "success",
                         "result": serializable_obj(
@@ -295,6 +304,10 @@ def construct_batch_put_view_function(
                     }
                     all_success = False
                     any_success = any_success or False
+        if post_processors is not None:
+            for processor in post_processors:
+                if callable(processor):
+                    processor(updated_objects, input_data)
         final_status = "success"
         if not all_success:
             if any_success:
@@ -456,6 +469,7 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
             put_func = put_dict.get('view_func', None) or construct_put_view_function(
                 _model, put_input_schema,
                 put_dict.get('pre_processors'),
+                post_processors=put_dict.get('post_processors'),
                 query_constructor=put_dict.get('query_constructor') or default_query_constructor,
                 schemas_registry=schemas_registry)
             put_url = put_dict.get('url', None) or "/%s/<_id>" % base_url
@@ -476,6 +490,7 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
             batch_put_func = batch_put_dict.get('view_func', None) or construct_batch_put_view_function(
                 _model, batch_put_input_schema,
                 batch_put_dict.get('pre_processors'),
+                post_processors=batch_put_dict.get('post_processors'),
                 query_constructor=batch_put_dict.get('query_constructor') or default_query_constructor,
                 schemas_registry=schemas_registry)
             batch_put_url = batch_put_dict.get('url', None) or "/%s" % base_url
