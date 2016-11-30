@@ -134,14 +134,24 @@ class QueryableMixin(object):
             if cls.is_the_primary_key(attr) and cls._prevent_primary_key_initialization_:
                 del kwargs[attr]
                 continue
-            if cls.is_a_to_many_rel(attr) and all(isinstance(v, dict) for v in val):
-                rel_cls = cls.mapped_rel_class(attr)
-                kwargs[attr] = rel_cls.update_or_new_all(
-                    list_of_kwargs=val, keys=[rel_cls.primary_key_name()])
-            elif cls.is_a_to_one_rel(attr) and isinstance(val, dict):
-                rel_cls = cls.mapped_rel_class(attr)
-                kwargs[attr] = rel_cls.update_or_new(
-                    **merge(val, {'keys': [rel_cls.primary_key_name()]}))
+            if attr in class_mapper(cls).relationships:
+                rel = class_mapper(cls).relationships[attr]
+                if rel.uselist:
+                    if isinstance(val, list):
+                        if all(isinstance(v, dict) for v in val):
+                            rel_cls = cls.mapped_rel_class(attr)
+                            kwargs[attr] = rel_cls.update_or_new_all(
+                                list_of_kwargs=val, keys=[rel_cls.primary_key_name()])
+                    elif isinstance(val, dict):
+                        rel_cls = cls.mapped_rel_class(attr)
+                        mapping_col = rel.collection_class().keyfunc.name
+                        list_of_kwargs = [merge(v, {mapping_col: k}) for k, v in val.items()]
+                        kwargs[attr] = {getattr(obj, mapping_col): obj for obj in rel_cls.update_or_new_all(
+                            list_of_kwargs=list_of_kwargs, keys=[rel_cls.primary_key_name()])}
+                elif isinstance(val, dict):
+                    rel_cls = cls.mapped_rel_class(attr)
+                    kwargs[attr] = rel_cls.update_or_new(
+                        **merge(val, {'keys': [rel_cls.primary_key_name()]}))
         return kwargs
 
     def update(self, **kwargs):

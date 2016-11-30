@@ -54,12 +54,17 @@ def _set_fields_for_rel(rel_name, rel, schema, forbidden, required):
     if rel_name not in forbidden:
         schema["fields"][rel_name] = {
             "required": rel_name in required,
-            "type": list if rel.uselist else dict,
+            "type": dict,
             "allowed": rel_name not in forbidden,
             "is_a_relation_to": rel.mapper.class_
         }
         if rel.uselist:
             schema["fields"][rel_name]["list_item_type"] = dict
+            if rel.collection_class is None:
+                schema["fields"][rel_name]["type"] = list
+            else:
+                schema["fields"][rel_name]["type"] = dict
+                schema["fields"][rel_name]["is_mapped_collection"] = True
             # if show_rel_schema:
             #     schema["fields"][rel_name]["list_item_schema"] = rel.mapper.class_.generate_input_data_schema(
             #         seen_classes=seen_classes)
