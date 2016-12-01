@@ -830,6 +830,10 @@ class QueryableMixin(object):
         return [cls.new(**kwargs) for kwargs in list_of_kwargs]
 
     @classmethod
+    def find_or_new_all(cls, list_of_kwargs):
+        return [cls.first(**kwargs) or cls.new(**kwargs) for kwargs in list_of_kwargs]
+
+    @classmethod
     def build_all(cls, list_of_kwargs):
         """Similar to `create_all`. But transaction is not committed.
         """

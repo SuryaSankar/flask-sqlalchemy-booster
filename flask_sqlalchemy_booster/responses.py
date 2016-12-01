@@ -1,5 +1,5 @@
 from flask.json import _json
-from flask import Response, request, render_template
+from flask import Response, request, render_template, g
 from functools import wraps
 from toolspy import deep_group, merge, add_kv_to_dict, boolify
 import inspect
@@ -23,8 +23,9 @@ PER_PAGE_ITEMS_COUNT = 20
 
 OPERATORS = ['~', '=', '>', '<', '>=', '!', '<=']
 OPERATOR_FUNC = {
-    '~': 'ilike', '=': '__eq__', '>': '__ge__', '<': '__le__',
-    '>=': '__ge__', '<=': '__le__', '!': '__ne__'
+    '~': 'ilike', '=': '__eq__', '>': '__gt__', '<': '__lt__',
+    '>=': '__ge__', '<=': '__le__', '!': '__ne__', '!=': '__ne__',
+    'in': 'in_'
 }
 
 def json_dump(obj):
@@ -380,6 +381,19 @@ def as_list(func):
             **_serializable_params(request.args, check_groupby=True))
     return wrapper
 
+def type_coerce_value(column_type, value):
+    if column_type is sqltypes.Integer:
+        value = int(value)
+    elif column_type is sqltypes.Numeric:
+        value = Decimal(value)
+    elif column_type is sqltypes.Boolean:
+        value = boolify(value)
+    elif column_type is sqltypes.DateTime:
+        value = dateutil.parser.parse(value)
+    elif column_type is sqltypes.Date:
+        value = dateutil.parser.parse(value).date()
+    return value
+
 
 def filter_query_with_key(query, keyword, value, op):
     if '.' in keyword:
@@ -443,36 +457,43 @@ def filter_query_with_key(query, keyword, value, op):
                 _query = _query.join(getattr(prev_model_class, assoc_rel.key))
     if hasattr(model_class, attr_name):
         key = getattr(model_class, attr_name)
+        columns = getattr(
+            getattr(model_class, '__mapper__'),
+            'columns')
+        column_type = None
+        if attr_name in columns:
+            column_type = type(
+                columns[attr_name].type)
         if op == '~':
             value = "%{0}%".format(value)
-        if op in ['=', '>', '<', '>=', '<=', '!']:
-            columns = getattr(
-                getattr(model_class, '__mapper__'),
-                'columns')
+        if op in ['=', '>', '<', '>=', '<=', '!', '!=']:
             if attr_name in columns:
                 if value == 'none':
                     value = None
                 if value is not None:
-                    column_type = type(
-                        columns[attr_name].type)
-                    if column_type is sqltypes.Integer:
-                        value = int(value)
-                    elif column_type is sqltypes.Numeric:
-                        value = Decimal(value)
-                    elif column_type is sqltypes.Boolean:
-                        value = boolify(value)
-                    elif column_type is sqltypes.DateTime:
-                        value = dateutil.parser.parse(value)
-                    elif column_type is sqltypes.Date:
-                        value = dateutil.parser.parse(value).date()
+                    value = type_coerce_value(column_type, value)
+        elif op == 'in':
+            value = map(lambda v: type_coerce_value(column_type, v), value)
         return _query.filter(getattr(
             key, OPERATOR_FUNC[op])(value))
     else:
         return query
 
 
-def filter_query_using_filter_data_structure(query, filter_data_struct):
-    pass
+def filter_query_using_filters_list(result, filters):
+    """
+    filters = [
+        {"op": "=", "k": "layout_id", "v": 1},
+        {"op": ">=", "k": "created_at", "v": "2014-11-10T11:53:33"}
+    ]
+    """
+    if not (isinstance(result, Query) or isinstance(result, QueryBooster)):
+        result = result.query
+    for f in filters:
+        result = filter_query_with_key(
+            result, f["k"], f["v"], f["op"])
+    return result
+
 
 
 def filter_query_using_args(result, args_to_skip=[]):
@@ -612,6 +633,10 @@ def process_args_and_render_json_list(q):
 
     if isinstance(q, Response):
         return q
+
+    if '_f' in g.args:
+        filters = _json.loads(g.args['_f'])
+        q = filter_query_using_filters_list(q, filters)
 
     filtered_query = filter_query_using_args(q)
 
