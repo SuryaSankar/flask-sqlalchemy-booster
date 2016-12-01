@@ -634,8 +634,8 @@ def process_args_and_render_json_list(q):
     if isinstance(q, Response):
         return q
 
-    if '_f' in g.args:
-        filters = _json.loads(g.args['_f'])
+    if '_f' in request.args:
+        filters = _json.loads(request.args['_f'])
         q = filter_query_using_filters_list(q, filters)
 
     filtered_query = filter_query_using_args(q)
