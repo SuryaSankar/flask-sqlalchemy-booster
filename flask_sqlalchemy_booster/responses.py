@@ -210,6 +210,23 @@ def as_json(struct, status=200, wrap=True, meta=None, pre_render_callback=None):
             pre_render_callback=pre_render_callback),
         status, mimetype='application/json')
 
+def as_dict(o, attrs_to_serialize=None,
+            rels_to_expand=None,
+            rels_to_serialize=None,
+            group_listrels_by=None,
+            key_modifications=None,
+            dict_struct=None,
+            groupkeys=None,
+            meta=None):
+    return structured(serialized_obj(
+        o, attrs_to_serialize=attrs_to_serialize,
+        rels_to_expand=rels_to_expand,
+        rels_to_serialize=rels_to_serialize,
+        group_listrels_by=group_listrels_by,
+        dict_struct=dict_struct,
+        key_modifications=key_modifications),
+        meta=meta)
+
 
 def as_json_obj(o, attrs_to_serialize=None,
                 rels_to_expand=None,
@@ -666,10 +683,25 @@ def render_json_obj_with_requested_structure(obj):
         **_serializable_params(request.args))
 
 
+def serializable_obj_with_requested_structure(obj):
+    if isinstance(obj, Response):
+        return obj
+    return serializable_obj(
+        obj,
+        **_serializable_params(request.args))
+
 def render_json_list_with_requested_structure(obj, pre_render_callback=None):
     if isinstance(obj, Response):
         return obj
     return as_json_list(
+        obj,
+        **merge(_serializable_params(request.args), {'pre_render_callback': pre_render_callback}))
+
+
+def render_dict_list_with_requested_structure(obj, pre_render_callback=None):
+    if isinstance(obj, Response):
+        return obj
+    return as_dict_list(
         obj,
         **merge(_serializable_params(request.args), {'pre_render_callback': pre_render_callback}))
 
