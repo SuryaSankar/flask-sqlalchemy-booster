@@ -675,12 +675,16 @@ def process_args_and_render_json_list(q):
     return convert_result_to_response(result)
 
 
-def render_json_obj_with_requested_structure(obj):
+def render_json_obj_with_requested_structure(obj, **kwargs):
     if isinstance(obj, Response):
         return obj
     return as_json_obj(
         obj,
-        **_serializable_params(request.args))
+        **merge(
+            kwargs,
+            _serializable_params(request.args)
+        )
+    )
 
 
 def serializable_obj_with_requested_structure(obj):
@@ -690,20 +694,29 @@ def serializable_obj_with_requested_structure(obj):
         obj,
         **_serializable_params(request.args))
 
-def render_json_list_with_requested_structure(obj, pre_render_callback=None):
+
+def render_json_list_with_requested_structure(obj, **kwargs):
     if isinstance(obj, Response):
         return obj
     return as_json_list(
         obj,
-        **merge(_serializable_params(request.args), {'pre_render_callback': pre_render_callback}))
+        **merge(
+            kwargs,
+            _serializable_params(request.args)
+        )
+    )
 
 
-def render_dict_list_with_requested_structure(obj, pre_render_callback=None):
+def render_dict_list_with_requested_structure(obj, **kwargs):
     if isinstance(obj, Response):
         return obj
     return as_dict_list(
         obj,
-        **merge(_serializable_params(request.args), {'pre_render_callback': pre_render_callback}))
+        **merge(
+            kwargs,
+            _serializable_params(request.args)
+        )
+    )
 
 
 def as_processed_list(func):
