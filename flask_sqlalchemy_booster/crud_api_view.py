@@ -138,7 +138,7 @@ def construct_get_view_function(model_class, get_query_creator=None):
                 }
             )
         if get_query_creator:
-            obj = get_query_creator().get(_id)
+            obj = get_query_creator(model_class.query).get(_id)
         else:
             obj = model_class.get(_id)
         if obj is None:
