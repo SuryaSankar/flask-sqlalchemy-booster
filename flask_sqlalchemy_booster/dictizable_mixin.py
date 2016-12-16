@@ -504,7 +504,8 @@ class DictizableMixin(object):
             {'name': u'James Bond', 'email': u'007@mi.com'}
 
         """
-        return dict([(a, getattr(self, a)) for a in args if hasattr(self, a)])
+        return dict([(a, getattr(self, a)) for a in args])
+        # return dict([(a, getattr(self, a)) for a in args if hasattr(self, a)])
 
     def tojson(self, attrs_to_serialize=None,
                rels_to_expand=None,
