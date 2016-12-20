@@ -53,9 +53,11 @@ class QueryableMixin(object):
     def update_without_commit(self, **kwargs):
         kwargs = self._preprocess_params(kwargs)
         for key, value in kwargs.iteritems():
+            cls = type(self)
+            if isinstance(getattr(cls, key), property):
+                continue
             if key not in self._no_overwrite_:
                 setattr(self, key, value)
-            cls = type(self)
             if isinstance(getattr(self, key), OrderingList):
                 getattr(self, key).reorder()
             elif isinstance(getattr(cls, key), AssociationProxy):
@@ -168,9 +170,11 @@ class QueryableMixin(object):
         """
         kwargs = self._preprocess_params(kwargs)
         for key, value in kwargs.iteritems():
+            cls = type(self)
+            if isinstance(getattr(cls, key), property):
+                continue
             if key not in self._no_overwrite_:
                 setattr(self, key, value)
-            cls = type(self)
             if isinstance(getattr(self, key), OrderingList):
                 getattr(self, key).reorder()
             elif isinstance(getattr(cls, key), AssociationProxy):
