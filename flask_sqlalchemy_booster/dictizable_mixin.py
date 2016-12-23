@@ -44,7 +44,8 @@ def _set_fields_for_col(col_name, col, schema, forbidden, required):
                 sqltypes.UnicodeText: (unicode, str),
                 sqltypes.String: (unicode, str),
                 sqltypes.Text: (unicode, str),
-                sqltypes.Boolean: (bool,)
+                sqltypes.Boolean: (bool,),
+                sqltypes.Enum: (unicode, str)
             }
             schema["fields"][col_name]["type"] = type_mapping[type(col.type)] + (NoneType, )
 
