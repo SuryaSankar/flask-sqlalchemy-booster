@@ -22,7 +22,7 @@ setup(
     packages=['flask_sqlalchemy_booster'],
     include_package_data=True,
     install_requires=[
-        "toolspy>=0.1.",
+        "toolspy>=0.2.9",
         "Flask>=0.10.1",
         "SQLAlchemy==1.0.9",
         "Flask-SQLAlchemy>=2.1",
