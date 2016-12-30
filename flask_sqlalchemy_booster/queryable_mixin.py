@@ -50,8 +50,12 @@ class QueryableMixin(object):
             if r.key == attr)
         return mapped_rel.mapper.class_
 
+    def preprocess_kwargs_before_update(self, kwargs):
+        return kwargs
+
     def update_without_commit(self, **kwargs):
         kwargs = self._preprocess_params(kwargs)
+        kwargs = self.pre_process_kwargs_before_update(kwargs)
         for key, value in kwargs.iteritems():
             cls = type(self)
             if isinstance(getattr(cls, key), property):
@@ -169,6 +173,7 @@ class QueryableMixin(object):
 
         """
         kwargs = self._preprocess_params(kwargs)
+        kwargs = self.pre_process_kwargs_before_update(kwargs)
         for key, value in kwargs.iteritems():
             cls = type(self)
             if isinstance(getattr(cls, key), property):

@@ -13,103 +13,6 @@ from toolspy import all_subclasses
 from copy import deepcopy
 
 
-class CrudApiView(MethodView):
-
-    _model_class_ = None
-    _list_query_ = None
-    _id_key_ = 'id'
-    _schema_for_post_ = None
-    _schema_for_put_ = None
-
-    def get(self, _id):
-        list_query = self._list_query_ or self._model_class_.query
-        if _id is None:
-            return process_args_and_render_json_list(list_query)
-        else:
-            _id = _id.strip()
-            if _id.startswith('[') and _id.endswith(']'):
-                ids = [int(i) for i in json.loads(_id)]
-                resources = self._model_class_.get_all(ids)
-                if all(r is None for r in resources):
-                    return error_json(404, "No matching resources found")
-                return render_json_list_with_requested_structure(
-                    resources,
-                    pre_render_callback=lambda output_dict: {
-                        'status': 'partial_success' if None in resources else 'success',
-                        'result': [
-                            {'status': 'failure', 'error': 'Resource not found'}
-                            if obj is None
-                            else
-                            {'status': 'success', 'result': obj}
-                            for obj in output_dict['result']]})
-                return process_args_and_render_json_list(
-                    self._model_class_.query.filter(
-                        self._model_class_.primary_key().in_(ids)))
-            return render_json_obj_with_requested_structure(
-                self._model_class_.get(_id, key=self._id_key_))
-
-    def post(self):
-        if self._schema_for_post_:
-            try:
-                if isinstance(g.json, list):
-                    self._schema_for_post_.validate_list(g.json)
-                else:
-                    self._schema_for_post_.validate(g.json)
-            except SchemaError as e:
-                return error_json(400, e.value)
-            json_data = g.json
-            # json_data = self._schema_for_post_.adapt(g.json)
-        else:
-            json_data = g.json
-        if isinstance(g.json, list):
-            return render_json_list_with_requested_structure(
-                self._model_class_.create_all(json_data))
-        return render_json_obj_with_requested_structure(
-            self._model_class_.create(**json_data))
-
-    def put(self, _id):
-        obj = self._model_class_.get(_id, key=self._id_key_)
-        if self._schema_for_put_:
-            try:
-                self._schema_for_put_.validate(g.json)
-            except SchemaError as e:
-                return error_json(400, e.value)
-            json_data = self._schema_for_put_.adapt(g.json)
-        else:
-            json_data = g.json
-        return render_json_obj_with_requested_structure(obj.update(**json_data))
-
-    def patch(self, _id):
-        obj = self._model_class_.get(_id, key=self._id_key_)
-        json_data = g.json
-        return render_json_obj_with_requested_structure(obj.update(**json_data))
-
-    def delete(self, _id):
-        obj = self._model_class_.get(_id, key=self._id_key_)
-        obj.delete()
-        return success_json()
-
-
-def register_crud_api_view(view, bp_or_app, endpoint, url_slug):
-    bp_or_app.add_url_rule(
-        '/%s/' % url_slug, defaults={'_id': None},
-        view_func=view.as_view('%s__INDEX' % endpoint), methods=['GET', ])
-    bp_or_app.add_url_rule(
-        '/%s' % url_slug, view_func=view.as_view('%s__POST' % endpoint), methods=['POST', ])
-    bp_or_app.add_url_rule(
-        '/%s/<_id>' % url_slug, view_func=view.as_view('%s__GET' % endpoint),
-        methods=['GET'])
-    bp_or_app.add_url_rule(
-        '/%s/<_id>' % url_slug, view_func=view.as_view('%s__PUT' % endpoint),
-        methods=['PUT'])
-    bp_or_app.add_url_rule(
-        '/%s/<_id>' % url_slug, view_func=view.as_view('%s__PATCH' % endpoint),
-        methods=['PATCH'])
-    bp_or_app.add_url_rule(
-        '/%s/<_id>' % url_slug, view_func=view.as_view('%s__DELETE' % endpoint),
-        methods=['DELETE'])
-
-
 def construct_get_view_function(model_class, get_query_creator=None):
     def get(_id):
         _id = _id.strip()
@@ -156,7 +59,9 @@ def construct_index_view_function(model_class, index_query_creator=None):
     return index
 
 
-def construct_post_view_function(model_class, schema, pre_processors=None, schemas_registry=None):
+def construct_post_view_function(
+        model_class, schema, registration_dict, pre_processors=None,
+        dict_struct=None, schemas_registry=None):
 
     def post():
         if pre_processors is not None:
@@ -198,8 +103,19 @@ def construct_post_view_function(model_class, schema, pre_processors=None, schem
                 schemas_registry=schemas_registry)
             if not is_valid:
                 return error_json(400, errors)
-            return render_json_obj_with_requested_structure(
-                model_class.create(**input_data))
+            obj = model_class.create(**input_data)
+            if '_ret' in g.args:
+                rels = g.args['_ret'].split(".")
+                final_obj = obj
+                for rel in rels:
+                    final_obj = getattr(final_obj, rel)
+                final_obj_cls = type(final_obj)
+                final_obj_dict_struct = None
+                if final_obj_cls in registration_dict:
+                    print "found final obj cls in reg dict"
+                    final_obj_dict_struct = registration_dict[final_obj_cls].get('dict_struct')
+                return render_json_obj_with_requested_structure(final_obj, dict_struct=final_obj_dict_struct)
+            return render_json_obj_with_requested_structure(obj, dict_struct=dict_struct)
     return post
 
 
@@ -401,6 +317,7 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
         forbidden_views = _model_dict.get('forbidden_views', [])
         default_query_constructor = _model_dict.get('query_constructor')
         view_dict_for_model = _model_dict.get('views', {})
+        dict_struct_for_model = _model_dict.get('dict_struct')
         resource_name = _model.__tablename__
 
         if _model.__name__ not in app_or_bp.registered_models_and_crud_routes["models_registered_for_views"]:
@@ -449,8 +366,9 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
             else:
                 post_input_schema = model_default_input_schema
             post_func = post_dict.get('view_func', None) or construct_post_view_function(
-                _model, post_input_schema,
-                post_dict.get('pre_processors'), schemas_registry=schemas_registry)
+                _model, post_input_schema, registration_dict,
+                post_dict.get('pre_processors'), schemas_registry=schemas_registry,
+                dict_struct=post_dict.get('dict_struct') or dict_struct_for_model)
             post_url = post_dict.get('url', None) or "/%s" % base_url
             app_or_bp.route(
                 post_url, methods=['POST'], endpoint='post_%s' % resource_name)(
@@ -531,3 +449,104 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
                 delete_url, methods=['DELETE'], endpoint='delete_%s' % resource_name)(
                 delete_func)
             views[_model.__name__]['delete'] = {'url': delete_url}
+
+
+
+## TO BE DEPRECATED
+
+
+class CrudApiView(MethodView):
+
+    _model_class_ = None
+    _list_query_ = None
+    _id_key_ = 'id'
+    _schema_for_post_ = None
+    _schema_for_put_ = None
+
+    def get(self, _id):
+        list_query = self._list_query_ or self._model_class_.query
+        if _id is None:
+            return process_args_and_render_json_list(list_query)
+        else:
+            _id = _id.strip()
+            if _id.startswith('[') and _id.endswith(']'):
+                ids = [int(i) for i in json.loads(_id)]
+                resources = self._model_class_.get_all(ids)
+                if all(r is None for r in resources):
+                    return error_json(404, "No matching resources found")
+                return render_json_list_with_requested_structure(
+                    resources,
+                    pre_render_callback=lambda output_dict: {
+                        'status': 'partial_success' if None in resources else 'success',
+                        'result': [
+                            {'status': 'failure', 'error': 'Resource not found'}
+                            if obj is None
+                            else
+                            {'status': 'success', 'result': obj}
+                            for obj in output_dict['result']]})
+                return process_args_and_render_json_list(
+                    self._model_class_.query.filter(
+                        self._model_class_.primary_key().in_(ids)))
+            return render_json_obj_with_requested_structure(
+                self._model_class_.get(_id, key=self._id_key_))
+
+    def post(self):
+        if self._schema_for_post_:
+            try:
+                if isinstance(g.json, list):
+                    self._schema_for_post_.validate_list(g.json)
+                else:
+                    self._schema_for_post_.validate(g.json)
+            except SchemaError as e:
+                return error_json(400, e.value)
+            json_data = g.json
+            # json_data = self._schema_for_post_.adapt(g.json)
+        else:
+            json_data = g.json
+        if isinstance(g.json, list):
+            return render_json_list_with_requested_structure(
+                self._model_class_.create_all(json_data))
+        return render_json_obj_with_requested_structure(
+            self._model_class_.create(**json_data))
+
+    def put(self, _id):
+        obj = self._model_class_.get(_id, key=self._id_key_)
+        if self._schema_for_put_:
+            try:
+                self._schema_for_put_.validate(g.json)
+            except SchemaError as e:
+                return error_json(400, e.value)
+            json_data = self._schema_for_put_.adapt(g.json)
+        else:
+            json_data = g.json
+        return render_json_obj_with_requested_structure(obj.update(**json_data))
+
+    def patch(self, _id):
+        obj = self._model_class_.get(_id, key=self._id_key_)
+        json_data = g.json
+        return render_json_obj_with_requested_structure(obj.update(**json_data))
+
+    def delete(self, _id):
+        obj = self._model_class_.get(_id, key=self._id_key_)
+        obj.delete()
+        return success_json()
+
+
+def register_crud_api_view(view, bp_or_app, endpoint, url_slug):
+    bp_or_app.add_url_rule(
+        '/%s/' % url_slug, defaults={'_id': None},
+        view_func=view.as_view('%s__INDEX' % endpoint), methods=['GET', ])
+    bp_or_app.add_url_rule(
+        '/%s' % url_slug, view_func=view.as_view('%s__POST' % endpoint), methods=['POST', ])
+    bp_or_app.add_url_rule(
+        '/%s/<_id>' % url_slug, view_func=view.as_view('%s__GET' % endpoint),
+        methods=['GET'])
+    bp_or_app.add_url_rule(
+        '/%s/<_id>' % url_slug, view_func=view.as_view('%s__PUT' % endpoint),
+        methods=['PUT'])
+    bp_or_app.add_url_rule(
+        '/%s/<_id>' % url_slug, view_func=view.as_view('%s__PATCH' % endpoint),
+        methods=['PATCH'])
+    bp_or_app.add_url_rule(
+        '/%s/<_id>' % url_slug, view_func=view.as_view('%s__DELETE' % endpoint),
+        methods=['DELETE'])
