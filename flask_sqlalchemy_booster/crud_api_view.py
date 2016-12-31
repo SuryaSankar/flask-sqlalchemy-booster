@@ -112,7 +112,6 @@ def construct_post_view_function(
                 final_obj_cls = type(final_obj)
                 final_obj_dict_struct = None
                 if final_obj_cls in registration_dict:
-                    print "found final obj cls in reg dict"
                     final_obj_dict_struct = registration_dict[final_obj_cls].get('dict_struct')
                 return render_json_obj_with_requested_structure(final_obj, dict_struct=final_obj_dict_struct)
             return render_json_obj_with_requested_structure(obj, dict_struct=dict_struct)
@@ -124,16 +123,16 @@ def construct_put_view_function(
         post_processors=None,
         query_constructor=None, schemas_registry=None):
     def put(_id):
-        if pre_processors is not None:
-            for processor in pre_processors:
-                if callable(processor):
-                    processor()
         if callable(query_constructor):
             obj = query_constructor(model_class.query).get(_id)
         else:
             obj = model_class.get(_id)
         if obj is None:
             return error_json(404, 'Resource not found')
+        if pre_processors is not None:
+            for processor in pre_processors:
+                if callable(processor):
+                    processor(obj)
         input_data = model_class.pre_validation_adapter(g.json, existing_instance=obj)
         polymorphic_field = schema.get('polymorphic_on')
         if polymorphic_field:
