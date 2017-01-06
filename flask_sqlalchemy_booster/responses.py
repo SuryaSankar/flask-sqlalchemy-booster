@@ -616,8 +616,8 @@ def decide_status_code_for_response(obj):
     return status
 
 
-def convert_result_to_response(result, meta={}):
-    obj = convert_result_to_response_structure(result, meta=meta)
+def convert_result_to_response(result, **kwargs):
+    obj = convert_result_to_response_structure(result, **kwargs)
     return json_response(json_dump(obj), status=decide_status_code_for_response(obj))
 
 
@@ -646,7 +646,7 @@ def template_response_from_obj(
     return render_template(template, **merge(obj, merge_keyvals))
 
 
-def process_args_and_render_json_list(q):
+def process_args_and_render_json_list(q, **kwargs):
 
     if isinstance(q, Response):
         return q
@@ -672,7 +672,7 @@ def process_args_and_render_json_list(q):
             "total_pages": int(math.ceil(float(filtered_query.count()) / int(per_page)))
         }, status=404, wrap=False)
 
-    return convert_result_to_response(result)
+    return convert_result_to_response(result, **kwargs)
 
 
 def render_json_obj_with_requested_structure(obj, **kwargs):

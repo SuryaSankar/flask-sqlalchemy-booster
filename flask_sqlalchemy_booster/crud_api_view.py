@@ -13,7 +13,9 @@ from toolspy import all_subclasses
 from copy import deepcopy
 
 
-def construct_get_view_function(model_class, get_query_creator=None):
+def construct_get_view_function(
+        model_class, registration_dict,
+        dict_struct=None, schemas_registry=None, get_query_creator=None):
     def get(_id):
         _id = _id.strip()
         if _id.startswith('[') and _id.endswith(']'):
@@ -38,7 +40,8 @@ def construct_get_view_function(model_class, get_query_creator=None):
                         if obj is None
                         else {'status': 'success', 'result': obj}
                         for _id, obj in zip(ids, output_dict['result'])}
-                }
+                },
+                dict_struct=dict_struct
             )
         if get_query_creator:
             obj = get_query_creator(model_class.query).get(_id)
@@ -46,15 +49,18 @@ def construct_get_view_function(model_class, get_query_creator=None):
             obj = model_class.get(_id)
         if obj is None:
             return error_json(404, 'Resource not found')
-        return render_json_obj_with_requested_structure(obj)
+        return render_json_obj_with_requested_structure(obj, dict_struct=dict_struct)
     return get
 
 
-def construct_index_view_function(model_class, index_query_creator=None):
+def construct_index_view_function(
+        model_class, index_query_creator=None, dict_struct=None):
     def index():
         if callable(index_query_creator):
-            return process_args_and_render_json_list(index_query_creator(model_class.query))
-        return process_args_and_render_json_list(model_class)
+            return process_args_and_render_json_list(
+                index_query_creator(model_class.query),
+                dict_struct=dict_struct)
+        return process_args_and_render_json_list(model_class, dict_struct=dict_struct)
 
     return index
 
@@ -121,7 +127,8 @@ def construct_post_view_function(
 def construct_put_view_function(
         model_class, schema, pre_processors=None,
         post_processors=None,
-        query_constructor=None, schemas_registry=None):
+        query_constructor=None, schemas_registry=None,
+        dict_struct=None):
     def put(_id):
         if callable(query_constructor):
             obj = query_constructor(model_class.query).get(_id)
@@ -150,7 +157,9 @@ def construct_put_view_function(
             for processor in post_processors:
                 if callable(processor):
                     processor(updated_obj, input_data)
-        return render_json_obj_with_requested_structure(updated_obj)
+        return render_json_obj_with_requested_structure(
+            updated_obj,
+            dict_struct=dict_struct)
 
     return put
 
@@ -208,7 +217,8 @@ def construct_batch_put_view_function(
                     output[output_key] = {
                         "status": "success",
                         "result": serializable_obj(
-                            updated_object, **_serializable_params(request.args))
+                            updated_object,
+                            **_serializable_params(request.args))
                     }
                     all_success = all_success and True
                     any_success = True
@@ -340,7 +350,8 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
             index_dict = view_dict_for_model.get('index', {})
             index_func = index_dict.get('view_func', None) or construct_index_view_function(
                 _model,
-                index_query_creator=index_dict.get('query_constructor') or default_query_constructor)
+                index_query_creator=index_dict.get('query_constructor') or default_query_constructor,
+                dict_struct=index_dict.get('dict_struct') or dict_struct_for_model)
             index_url = index_dict.get('url', None) or "/%s" % base_url
             app_or_bp.route(
                 index_url, methods=['GET'], endpoint='index_%s' % resource_name)(
@@ -350,8 +361,9 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
         if 'get' not in forbidden_views:
             get_dict = view_dict_for_model.get('get', {})
             get_func = get_dict.get('view_func', None) or construct_get_view_function(
-                _model,
-                get_query_creator=get_dict.get('query_constructor') or default_query_constructor)
+                _model, registration_dict,
+                get_query_creator=get_dict.get('query_constructor') or default_query_constructor,
+                dict_struct=get_dict.get('dict_struct') or dict_struct_for_model)
             get_url = get_dict.get('url', None) or '/%s/<_id>' % base_url
             app_or_bp.route(
                 get_url, methods=['GET'], endpoint='get_%s' % resource_name)(
