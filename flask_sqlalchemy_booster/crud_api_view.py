@@ -67,6 +67,7 @@ def construct_index_view_function(
 
 def construct_post_view_function(
         model_class, schema, registration_dict, pre_processors=None,
+        post_processors=None,
         dict_struct=None, schemas_registry=None):
 
     def post():
@@ -85,6 +86,10 @@ def construct_post_view_function(
                     input_obj if error is None else None
                     for input_obj, error in zip(input_data, errors)]
             resources = model_class.create_all(input_objs)
+            if post_processors is not None:
+                for processor in post_processors:
+                    if callable(processor):
+                        processor(resources, input_data)
             if None in resources:
                 if all(r is None for r in resources):
                     status = "failure"
@@ -110,6 +115,10 @@ def construct_post_view_function(
             if not is_valid:
                 return error_json(400, errors)
             obj = model_class.create(**input_data)
+            if post_processors is not None:
+                for processor in post_processors:
+                    if callable(processor):
+                        processor(obj, input_data)
             if '_ret' in g.args:
                 rels = g.args['_ret'].split(".")
                 final_obj = obj
