@@ -387,7 +387,9 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
                 post_input_schema = model_default_input_schema
             post_func = post_dict.get('view_func', None) or construct_post_view_function(
                 _model, post_input_schema, registration_dict,
-                post_dict.get('pre_processors'), schemas_registry=schemas_registry,
+                post_dict.get('pre_processors'),
+                post_processors=post_dict.get('post_processors'),
+                schemas_registry=schemas_registry,
                 dict_struct=post_dict.get('dict_struct') or dict_struct_for_model)
             post_url = post_dict.get('url', None) or "/%s" % base_url
             app_or_bp.route(
