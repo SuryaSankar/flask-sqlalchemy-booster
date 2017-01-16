@@ -1,16 +1,17 @@
 from flask.views import MethodView
-from .responses import (
-    process_args_and_render_json_list, success_json, error_json,
-    render_json_obj_with_requested_structure,
-    render_json_list_with_requested_structure)
-from flask import g, request
-from flask_sqlalchemy_booster.responses import _serializable_params, serializable_obj, as_json
+from flask import g, request, Response
 from schemalite import SchemaError
 from schemalite.core import validate_object, validate_list_of_objects, json_encoder
 from sqlalchemy.sql import sqltypes
 import json
 from toolspy import all_subclasses
 from copy import deepcopy
+
+from .responses import (
+    process_args_and_render_json_list, success_json, error_json,
+    render_json_obj_with_requested_structure,
+    render_json_list_with_requested_structure,
+    _serializable_params, serializable_obj, as_json)
 
 
 def construct_get_view_function(
@@ -77,6 +78,8 @@ def construct_post_view_function(
                     processor()
         if isinstance(g.json, list):
             input_data = model_class.pre_validation_adapter_for_list(g.json)
+            if isinstance(input_data, Response):
+                return input_data
             is_valid, errors = validate_list_of_objects(
                 schema, input_data, context={"model_class": model_class},
                 schemas_registry=schemas_registry)
@@ -109,6 +112,8 @@ def construct_post_view_function(
                         for obj, error in zip(output_dict['result'], errors)]})
         else:
             input_data = model_class.pre_validation_adapter(g.json)
+            if isinstance(input_data, Response):
+                return input_data
             is_valid, errors = validate_object(
                 schema, input_data, context={"model_class": model_class},
                 schemas_registry=schemas_registry)
@@ -150,6 +155,8 @@ def construct_put_view_function(
                 if callable(processor):
                     processor(obj)
         input_data = model_class.pre_validation_adapter(g.json, existing_instance=obj)
+        if isinstance(input_data, Response):
+            return input_data
         polymorphic_field = schema.get('polymorphic_on')
         if polymorphic_field:
             if polymorphic_field not in input_data:
@@ -196,6 +203,8 @@ def construct_batch_put_view_function(
         any_success = False
         polymorphic_field = schema.get('polymorphic_on')
         input_data = model_class.pre_validation_adapter_for_mapped_collection(g.json, existing_instances)
+        if isinstance(input_data, Response):
+            return input_data
         updated_objects = {}
         for obj_id, put_data_for_obj in input_data.items():
             output_key = obj_id
