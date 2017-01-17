@@ -419,6 +419,7 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
                 _model, put_input_schema,
                 put_dict.get('pre_processors'),
                 post_processors=put_dict.get('post_processors'),
+                dict_struct=put_dict.get('dict_struct') or dict_struct_for_model,
                 query_constructor=put_dict.get('query_constructor') or default_query_constructor,
                 schemas_registry=schemas_registry)
             put_url = put_dict.get('url', None) or "/%s/<_id>" % base_url

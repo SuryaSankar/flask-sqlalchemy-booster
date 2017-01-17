@@ -832,15 +832,16 @@ class QueryableMixin(object):
 
     @classmethod
     def find_or_new(cls, **kwargs):
-        return cls.first(**kwargs) or cls.new(**kwargs)
+        keys = kwargs.pop('keys') if 'keys' in kwargs else []
+        return cls.first(**subdict(kwargs, keys)) or cls.new(**kwargs)
 
     @classmethod
     def new_all(cls, list_of_kwargs):
         return [cls.new(**kwargs) for kwargs in list_of_kwargs]
 
     @classmethod
-    def find_or_new_all(cls, list_of_kwargs):
-        return [cls.first(**kwargs) or cls.new(**kwargs) for kwargs in list_of_kwargs]
+    def find_or_new_all(cls, list_of_kwargs, keys=[]):
+        return [cls.first(**subdict(kwargs, keys)) or cls.new(**kwargs) for kwargs in list_of_kwargs]
 
     @classmethod
     def build_all(cls, list_of_kwargs):
