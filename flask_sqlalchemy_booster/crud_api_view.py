@@ -16,6 +16,7 @@ from .responses import (
 
 def construct_get_view_function(
         model_class, registration_dict,
+        permitted_object_getter=None,
         dict_struct=None, schemas_registry=None, get_query_creator=None):
     def get(_id):
         _id = _id.strip()
@@ -44,10 +45,13 @@ def construct_get_view_function(
                 },
                 dict_struct=dict_struct
             )
-        if get_query_creator:
-            obj = get_query_creator(model_class.query).get(_id)
+        if permitted_object_getter is not None:
+            obj = permitted_object_getter()
         else:
-            obj = model_class.get(_id)
+            if get_query_creator:
+                obj = get_query_creator(model_class.query).get(_id)
+            else:
+                obj = model_class.get(_id)
         if obj is None:
             return error_json(404, 'Resource not found')
         return render_json_obj_with_requested_structure(obj, dict_struct=dict_struct)
@@ -142,12 +146,16 @@ def construct_put_view_function(
         model_class, schema, pre_processors=None,
         post_processors=None,
         query_constructor=None, schemas_registry=None,
+        permitted_object_getter=None,
         dict_struct=None):
     def put(_id):
-        if callable(query_constructor):
-            obj = query_constructor(model_class.query).get(_id)
+        if permitted_object_getter is not None:
+            obj = permitted_object_getter()
         else:
-            obj = model_class.get(_id)
+            if callable(query_constructor):
+                obj = query_constructor(model_class.query).get(_id)
+            else:
+                obj = model_class.get(_id)
         if obj is None:
             return error_json(404, 'Resource not found')
         if pre_processors is not None:
@@ -380,6 +388,7 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
             get_dict = view_dict_for_model.get('get', {})
             get_func = get_dict.get('view_func', None) or construct_get_view_function(
                 _model, registration_dict,
+                permitted_object_getter=get_dict.get('permitted_object_getter') or _model_dict.get('permitted_object_getter'),
                 get_query_creator=get_dict.get('query_constructor') or default_query_constructor,
                 dict_struct=get_dict.get('dict_struct') or dict_struct_for_model)
             get_url = get_dict.get('url', None) or '/%s/<_id>' % base_url
@@ -417,7 +426,8 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
                 put_input_schema = model_default_input_schema
             put_func = put_dict.get('view_func', None) or construct_put_view_function(
                 _model, put_input_schema,
-                put_dict.get('pre_processors'),
+                permitted_object_getter=put_dict.get('permitted_object_getter') or _model_dict.get('permitted_object_getter'),
+                pre_processors=put_dict.get('pre_processors'),
                 post_processors=put_dict.get('post_processors'),
                 dict_struct=put_dict.get('dict_struct') or dict_struct_for_model,
                 query_constructor=put_dict.get('query_constructor') or default_query_constructor,
