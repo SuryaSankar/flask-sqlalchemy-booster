@@ -21,11 +21,15 @@ def construct_get_view_function(
     def get(_id):
         _id = _id.strip()
         if _id.startswith('[') and _id.endswith(']'):
-            ids = [int(i) for i in json.loads(_id)]
-            if get_query_creator:
-                resources = get_query_creator(model_class.query).get_all(ids)
+            if permitted_object_getter is not None:
+                resources = [permitted_object_getter()]
+                ids = [_id[1:-1]]
             else:
-                resources = model_class.get_all(ids)
+                ids = [int(i) for i in json.loads(_id)]
+                if get_query_creator:
+                    resources = get_query_creator(model_class.query).get_all(ids)
+                else:
+                    resources = model_class.get_all(ids)
             if None in resources:
                 if all(r is None for r in resources):
                     status = "failure"
