@@ -63,6 +63,10 @@ class ModelBooster(Model, QueryableMixin, DictizableMixin):
         return result
 
     @classmethod
+    def column_keys(cls):
+        return map(lambda c: c.key, class_mapper(cls).columns)
+
+    @classmethod
     def relationship_keys(cls):
         return map(lambda r: r.key, cls.__mapper__.relationships)
 

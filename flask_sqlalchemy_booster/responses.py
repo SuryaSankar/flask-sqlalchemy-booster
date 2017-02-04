@@ -1,7 +1,8 @@
 from flask.json import _json
+from flask_sqlalchemy import _BoundDeclarativeMeta
 from flask import Response, request, render_template, g
 from functools import wraps
-from toolspy import deep_group, merge, add_kv_to_dict, boolify
+from toolspy import deep_group, merge, add_kv_to_dict, boolify, all_subclasses
 import inspect
 from .json_encoder import json_encoder
 from .query_booster import QueryBooster
@@ -13,7 +14,9 @@ from flask_sqlalchemy import Pagination
 import traceback
 from schemalite.core import validate_object
 from schemalite.validators import is_a_type_of, is_a_list_of_types_of
+from sqlalchemy.orm import class_mapper
 from sqlalchemy.orm.query import Query
+from sqlalchemy import or_
 
 
 RESTRICTED = ['limit', 'sort', 'orderby', 'groupby', 'attrs',
@@ -456,6 +459,7 @@ def filter_query_with_key(query, keyword, value, op):
         attr_name = keyword
         _query = query
         counter = 0  # to prevent infinite loop by some mistake
+
         while attr_name in model_class.association_proxy_keys() and counter < 10:
             counter += 1
             assoc_proxy = getattr(model_class, attr_name)
@@ -472,28 +476,43 @@ def filter_query_with_key(query, keyword, value, op):
                 # Instead it is preferable to join by mentioning the relationshp
                 # itself.
                 _query = _query.join(getattr(prev_model_class, assoc_rel.key))
-    if hasattr(model_class, attr_name):
-        key = getattr(model_class, attr_name)
-        columns = getattr(
-            getattr(model_class, '__mapper__'),
-            'columns')
-        column_type = None
+
+    columns = getattr(
+        getattr(model_class, '__mapper__'),
+        'columns')
+    column_type = None
+    if attr_name in columns:
+        column_type = type(
+            columns[attr_name].type)
+    if op == '~':
+        value = "%{0}%".format(value)
+    if op in ['=', '>', '<', '>=', '<=', '!', '!=']:
         if attr_name in columns:
-            column_type = type(
-                columns[attr_name].type)
-        if op == '~':
-            value = "%{0}%".format(value)
-        if op in ['=', '>', '<', '>=', '<=', '!', '!=']:
-            if attr_name in columns:
-                if value == 'none':
-                    value = None
-                if value is not None:
-                    value = type_coerce_value(column_type, value)
-        elif op == 'in':
-            value = map(lambda v: type_coerce_value(column_type, v), value)
+            if value == 'none':
+                value = None
+            if value is not None:
+                value = type_coerce_value(column_type, value)
+    elif op == 'in':
+        value = map(lambda v: type_coerce_value(column_type, v), value)
+
+    if hasattr(model_class, attr_name):
         return _query.filter(getattr(
-            key, OPERATOR_FUNC[op])(value))
+            getattr(model_class, attr_name), OPERATOR_FUNC[op])(value))
     else:
+        subcls_filters = []
+        for subcls in all_subclasses(model_class):
+            if attr_name in subcls.column_keys():
+                if '.' in keyword:
+                    if not _query.is_joined_with(subcls):
+                        _query = _query.join(subcls)
+                subcls_filters.append(
+                    getattr(
+                        getattr(subcls, attr_name),
+                        OPERATOR_FUNC[op]
+                    )(value)
+                )
+        if len(subcls_filters) > 0:
+            return _query.filter(or_(*subcls_filters))
         return query
 
 
@@ -505,7 +524,11 @@ def filter_query_using_filters_list(result, filters):
     ]
     """
     if not (isinstance(result, Query) or isinstance(result, QueryBooster)):
-        result = result.query
+        if isinstance(result, _BoundDeclarativeMeta) and class_mapper(
+                result).polymorphic_on is not None:
+            result = result.query.with_polymorphic('*')
+        else:
+            result = result.query
     for f in filters:
         result = filter_query_with_key(
             result, f["k"], f["v"], f["op"])
@@ -515,7 +538,11 @@ def filter_query_using_filters_list(result, filters):
 
 def filter_query_using_args(result, args_to_skip=[]):
     if not (isinstance(result, Query) or isinstance(result, QueryBooster)):
-        result = result.query
+        if isinstance(result, _BoundDeclarativeMeta) and class_mapper(
+                result).polymorphic_on is not None:
+            result = result.query.with_polymorphic('*')
+        else:
+            result = result.query
     for kw in request.args:
         if kw not in args_to_skip:
             for op in OPERATORS:

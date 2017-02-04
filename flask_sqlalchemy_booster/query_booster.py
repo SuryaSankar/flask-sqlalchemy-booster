@@ -36,3 +36,6 @@ class QueryBooster(BaseQuery):
                 return self.filter(getattr(self.model_class, key) == keyval).first()
         else:
             return self.filter(getattr(self.model_class, key) == keyval).first()
+
+    def is_joined_with(self, model_class):
+        return model_class in [entity.class_ for entity in self._join_entities]
