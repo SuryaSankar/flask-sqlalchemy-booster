@@ -77,6 +77,7 @@ def construct_index_view_function(
 def construct_post_view_function(
         model_class, schema, registration_dict, pre_processors=None,
         post_processors=None,
+        allow_unknown_fields=False,
         dict_struct=None, schemas_registry=None):
 
     def post():
@@ -90,6 +91,7 @@ def construct_post_view_function(
                 return input_data
             is_valid, errors = validate_list_of_objects(
                 schema, input_data, context={"model_class": model_class},
+                allow_unknown_fields=allow_unknown_fields,
                 schemas_registry=schemas_registry)
             input_objs = input_data
             if not is_valid:
@@ -124,7 +126,8 @@ def construct_post_view_function(
                 return input_data
             is_valid, errors = validate_object(
                 schema, input_data, context={"model_class": model_class},
-                schemas_registry=schemas_registry)
+                schemas_registry=schemas_registry,
+                allow_unknown_fields=allow_unknown_fields)
             if not is_valid:
                 return error_json(400, errors)
             obj = model_class.create(**input_data)
@@ -151,7 +154,8 @@ def construct_put_view_function(
         post_processors=None,
         query_constructor=None, schemas_registry=None,
         permitted_object_getter=None,
-        dict_struct=None):
+        dict_struct=None,
+        allow_unknown_fields=False):
     def put(_id):
         if permitted_object_getter is not None:
             obj = permitted_object_getter()
@@ -175,6 +179,7 @@ def construct_put_view_function(
                 input_data[polymorphic_field] = getattr(obj, polymorphic_field)
         is_valid, errors = validate_object(
             schema, input_data, allow_required_fields_to_be_skipped=True,
+            allow_unknown_fields=allow_unknown_fields,
             context={"existing_instance": obj,
                      "model_class": model_class},
             schemas_registry=schemas_registry)
@@ -195,7 +200,8 @@ def construct_put_view_function(
 def construct_batch_put_view_function(
         model_class, schema, pre_processors=None,
         post_processors=None,
-        query_constructor=None, schemas_registry=None):
+        query_constructor=None, schemas_registry=None,
+        allow_unknown_fields=False):
 
     def batch_put():
         if pre_processors is not None:
@@ -236,6 +242,7 @@ def construct_batch_put_view_function(
                         put_data_for_obj[polymorphic_field] = getattr(existing_instance, polymorphic_field)
                 is_valid, errors = validate_object(
                     schema, put_data_for_obj, allow_required_fields_to_be_skipped=True,
+                    allow_unknown_fields=allow_unknown_fields,
                     context={
                         "existing_instance": existing_instance,
                         "model_class": model_class
@@ -316,7 +323,9 @@ def construct_delete_view_function(model_class, query_constructor=None):
     return delete
 
 
-def register_crud_routes_for_models(app_or_bp, registration_dict, register_schema_structure=True):
+def register_crud_routes_for_models(
+        app_or_bp, registration_dict, register_schema_structure=True,
+        allow_unknown_fields=False):
     if not hasattr(app_or_bp, "registered_models_and_crud_routes"):
         app_or_bp.registered_models_and_crud_routes = {
             "models_registered_for_views": [],
@@ -412,6 +421,7 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
                 post_dict.get('pre_processors'),
                 post_processors=post_dict.get('post_processors'),
                 schemas_registry=schemas_registry,
+                allow_unknown_fields=allow_unknown_fields,
                 dict_struct=post_dict.get('dict_struct') or dict_struct_for_model)
             post_url = post_dict.get('url', None) or "/%s" % base_url
             app_or_bp.route(
@@ -434,6 +444,7 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
                 pre_processors=put_dict.get('pre_processors'),
                 post_processors=put_dict.get('post_processors'),
                 dict_struct=put_dict.get('dict_struct') or dict_struct_for_model,
+                allow_unknown_fields=allow_unknown_fields,
                 query_constructor=put_dict.get('query_constructor') or default_query_constructor,
                 schemas_registry=schemas_registry)
             put_url = put_dict.get('url', None) or "/%s/<_id>" % base_url
@@ -455,6 +466,7 @@ def register_crud_routes_for_models(app_or_bp, registration_dict, register_schem
                 _model, batch_put_input_schema,
                 batch_put_dict.get('pre_processors'),
                 post_processors=batch_put_dict.get('post_processors'),
+                allow_unknown_fields=allow_unknown_fields,
                 query_constructor=batch_put_dict.get('query_constructor') or default_query_constructor,
                 schemas_registry=schemas_registry)
             batch_put_url = batch_put_dict.get('url', None) or "/%s" % base_url

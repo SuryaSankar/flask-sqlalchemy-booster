@@ -71,6 +71,10 @@ class ModelBooster(Model, QueryableMixin, DictizableMixin):
         return map(lambda r: r.key, cls.__mapper__.relationships)
 
     @classmethod
+    def all_settable_keys(cls):
+        return cls.column_keys() + cls.relationship_keys() + cls.association_proxy_keys()
+
+    @classmethod
     def col_assoc_proxy_keys(cls):
         result = []
         for k in cls.association_proxy_keys():

@@ -337,8 +337,12 @@ class QueryableMixin(object):
             discriminator_val = kwargs.get(discriminator_key)
             if discriminator_val is not None and discriminator_val in cls.__mapper__.polymorphic_map:
                 actual_cls = cls.__mapper__.polymorphic_map[discriminator_val].class_
-                return actual_cls(**actual_cls._preprocess_params(kwargs))
-        return cls(**cls._preprocess_params(kwargs))
+                return actual_cls(
+                    **subdict(
+                        actual_cls._preprocess_params(kwargs),
+                        cls.all_settable_keys())
+                )
+        return cls(**subdict(cls._preprocess_params(kwargs), cls.all_settable_keys()))
 
     @classmethod
     def add(cls, model, commit=True):
