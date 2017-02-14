@@ -340,7 +340,7 @@ class QueryableMixin(object):
                 return actual_cls(
                     **subdict(
                         actual_cls._preprocess_params(kwargs),
-                        cls.all_settable_keys())
+                        actual_cls.all_settable_keys())
                 )
         return cls(**subdict(cls._preprocess_params(kwargs), cls.all_settable_keys()))
 
