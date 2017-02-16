@@ -324,6 +324,8 @@ def _serializable_params(args, check_groupby=False):
     params = {}
     if '_ds' in args:
         params['dict_struct'] = _json.loads(args['_ds'])
+        if isinstance(params['dict_struct'], str) or isinstance(params['dict_struct'], unicode):
+            params['dict_struct'] = _json.loads(params['dict_struct'])
     if 'attrs' in args:
         attrs = args.get('attrs')
         if attrs.lower() == 'none':
