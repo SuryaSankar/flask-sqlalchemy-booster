@@ -58,6 +58,8 @@ class QueryableMixin(object):
         kwargs = self.preprocess_kwargs_before_update(kwargs)
         for key, value in kwargs.iteritems():
             cls = type(self)
+            if key not in cls.all_settable_keys():
+                continue
             if isinstance(getattr(cls, key), property):
                 continue
             if key not in self._no_overwrite_:
