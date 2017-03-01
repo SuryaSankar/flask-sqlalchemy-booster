@@ -102,7 +102,8 @@ def construct_post_view_function(
             if post_processors is not None:
                 for processor in post_processors:
                     if callable(processor):
-                        processor(resources, input_data)
+                        for resource, datum in zip(resources, input_data):
+                            processor(resource, datum)
             if None in resources:
                 if all(r is None for r in resources):
                     status = "failure"
