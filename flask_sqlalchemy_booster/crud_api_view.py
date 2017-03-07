@@ -4,7 +4,7 @@ from schemalite import SchemaError
 from schemalite.core import validate_object, validate_list_of_objects, json_encoder
 from sqlalchemy.sql import sqltypes
 import json
-from toolspy import all_subclasses
+from toolspy import all_subclasses, fetch_nested_key_from_dict
 from copy import deepcopy
 
 from .responses import (
@@ -102,8 +102,14 @@ def construct_post_view_function(
             if post_processors is not None:
                 for processor in post_processors:
                     if callable(processor):
+                        processed_resources = []
                         for resource, datum in zip(resources, input_data):
-                            processor(resource, datum)
+                            processed_resource = processor(resource, datum)
+                            if processed_resource is not None:
+                                processed_resources.append(processed_resource)
+                            else:
+                                processed_resources.append(resource)
+                        resources = processed_resources
             if None in resources:
                 if all(r is None for r in resources):
                     status = "failure"
@@ -135,7 +141,9 @@ def construct_post_view_function(
             if post_processors is not None:
                 for processor in post_processors:
                     if callable(processor):
-                        processor(obj, input_data)
+                        processed_obj = processor(obj, input_data)
+                        if processed_obj is not None:
+                            obj = processed_obj
             if '_ret' in g.args:
                 rels = g.args['_ret'].split(".")
                 final_obj = obj
@@ -144,14 +152,18 @@ def construct_post_view_function(
                 final_obj_cls = type(final_obj)
                 final_obj_dict_struct = None
                 if final_obj_cls in registration_dict:
-                    final_obj_dict_struct = registration_dict[final_obj_cls].get('dict_struct')
+                    final_obj_dict_struct = (fetch_nested_key_from_dict(
+                        registration_dict[final_obj_cls], 'views.get.dict_struct') or
+                        registration_dict[final_obj_cls].get('dict_struct'))
                 return render_json_obj_with_requested_structure(final_obj, dict_struct=final_obj_dict_struct)
             return render_json_obj_with_requested_structure(obj, dict_struct=dict_struct)
     return post
 
 
 def construct_put_view_function(
-        model_class, schema, pre_processors=None,
+        model_class, schema,
+        registration_dict=None,
+        pre_processors=None,
         post_processors=None,
         query_constructor=None, schemas_registry=None,
         permitted_object_getter=None,
@@ -190,7 +202,21 @@ def construct_put_view_function(
         if post_processors is not None:
             for processor in post_processors:
                 if callable(processor):
-                    processor(updated_obj, input_data)
+                    processed_updated_obj = processor(updated_obj, input_data)
+                    if processed_updated_obj is not None:
+                        updated_obj = processed_updated_obj
+        if '_ret' in g.args:
+            rels = g.args['_ret'].split(".")
+            final_obj = updated_obj
+            for rel in rels:
+                final_obj = getattr(final_obj, rel)
+            final_obj_cls = type(final_obj)
+            final_obj_dict_struct = None
+            if final_obj_cls in registration_dict:
+                final_obj_dict_struct = (fetch_nested_key_from_dict(
+                    registration_dict[final_obj_cls], 'views.get.dict_struct') or
+                    registration_dict[final_obj_cls].get('dict_struct'))
+            return render_json_obj_with_requested_structure(final_obj, dict_struct=final_obj_dict_struct)
         return render_json_obj_with_requested_structure(
             updated_obj,
             dict_struct=dict_struct)
@@ -199,7 +225,8 @@ def construct_put_view_function(
 
 
 def construct_batch_put_view_function(
-        model_class, schema, pre_processors=None,
+        model_class, schema, registration_dict=None,
+        pre_processors=None,
         post_processors=None,
         query_constructor=None, schemas_registry=None,
         allow_unknown_fields=False):
@@ -251,6 +278,12 @@ def construct_batch_put_view_function(
                 if is_valid:
                     updated_object = existing_instance.update_without_commit(
                         **put_data_for_obj)
+                    if post_processors is not None:
+                        for processor in post_processors:
+                            if callable(processor):
+                                processed_updated_object = processor(updated_object, put_data_for_obj)
+                                if processed_updated_object is not None:
+                                    updated_object = processed_updated_object
                     updated_objects[updated_object.id] = updated_object
                     output[output_key] = {
                         "status": "success",
@@ -267,10 +300,6 @@ def construct_batch_put_view_function(
                     }
                     all_success = False
                     any_success = any_success or False
-        if post_processors is not None:
-            for processor in post_processors:
-                if callable(processor):
-                    processor(updated_objects, input_data)
         final_status = "success"
         if not all_success:
             if any_success:
@@ -418,8 +447,9 @@ def register_crud_routes_for_models(
             else:
                 post_input_schema = model_default_input_schema
             post_func = post_dict.get('view_func', None) or construct_post_view_function(
-                _model, post_input_schema, registration_dict,
-                post_dict.get('pre_processors'),
+                _model, post_input_schema,
+                registration_dict=registration_dict,
+                pre_processors=post_dict.get('pre_processors'),
                 post_processors=post_dict.get('post_processors'),
                 schemas_registry=schemas_registry,
                 allow_unknown_fields=allow_unknown_fields,
@@ -441,6 +471,7 @@ def register_crud_routes_for_models(
                 put_input_schema = model_default_input_schema
             put_func = put_dict.get('view_func', None) or construct_put_view_function(
                 _model, put_input_schema,
+                registration_dict=registration_dict,
                 permitted_object_getter=put_dict.get('permitted_object_getter') or _model_dict.get('permitted_object_getter'),
                 pre_processors=put_dict.get('pre_processors'),
                 post_processors=put_dict.get('post_processors'),
@@ -465,7 +496,8 @@ def register_crud_routes_for_models(
                 batch_put_input_schema = model_default_input_schema
             batch_put_func = batch_put_dict.get('view_func', None) or construct_batch_put_view_function(
                 _model, batch_put_input_schema,
-                batch_put_dict.get('pre_processors'),
+                pre_processors=batch_put_dict.get('pre_processors'),
+                registration_dict=registration_dict,
                 post_processors=batch_put_dict.get('post_processors'),
                 allow_unknown_fields=allow_unknown_fields,
                 query_constructor=batch_put_dict.get('query_constructor') or default_query_constructor,

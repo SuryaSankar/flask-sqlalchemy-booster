@@ -682,6 +682,8 @@ def process_args_and_render_json_list(q, **kwargs):
 
     if '_f' in request.args:
         filters = _json.loads(request.args['_f'])
+        if isinstance(filters, str) or isinstance(filters, unicode):
+            filters = _json.loads(filters)
         q = filter_query_using_filters_list(q, filters)
 
     filtered_query = filter_query_using_args(q)
