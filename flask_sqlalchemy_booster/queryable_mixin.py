@@ -142,6 +142,13 @@ class QueryableMixin(object):
             if cls.is_the_primary_key(attr) and cls._prevent_primary_key_initialization_:
                 del kwargs[attr]
                 continue
+            if val == "":
+                # Making an assumption that there is no good usecase
+                # for setting an empty string. This will help prevent
+                # cases where empty string is sent because of client
+                # not clearing form fields to null
+                kwargs[attr] = None
+                continue
             if attr in class_mapper(cls).relationships:
                 rel = class_mapper(cls).relationships[attr]
                 if rel.uselist:
