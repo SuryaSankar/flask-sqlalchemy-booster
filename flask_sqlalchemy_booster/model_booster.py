@@ -106,3 +106,4 @@ class ModelBooster(Model, QueryableMixin, DictizableMixin):
         if mapper is None:
             return None
         return mapper.class_
+
