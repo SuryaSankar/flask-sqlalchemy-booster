@@ -172,6 +172,10 @@ class QueryableMixin(object):
                         **merge(val, {'keys': [rel_cls.primary_key_name()]}))
         return kwargs
 
+    @classmethod
+    def preprocess_kwargs_before_new(cls, kwargs):
+        return kwargs
+
     def update(self, **kwargs):
         """Updates an instance.
 
@@ -344,6 +348,7 @@ class QueryableMixin(object):
         """Returns a new, unsaved instance of the model class.
 
         """
+        kwargs = cls.preprocess_kwargs_before_new(kwargs)
         if cls.__mapper__.polymorphic_on is not None:
             discriminator_key = cls.__mapper__.polymorphic_on.name
             discriminator_val = kwargs.get(discriminator_key)
