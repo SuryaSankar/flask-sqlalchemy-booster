@@ -183,6 +183,9 @@ class DictizableMixin(object):
             all_subclasses(model_cls))
 
         if polymorphic_attr is not None:
+            schema['fields'][polymorphic_attr.name] = {
+                'allowed': True
+            }
             if len(subclasses) == 0:
                 del schema['fields'][polymorphic_attr.key]
             else:
