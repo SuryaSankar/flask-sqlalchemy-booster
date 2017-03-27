@@ -378,7 +378,7 @@ class QueryableMixin(object):
             hari@gmail.com
         """
         if not isinstance(model, cls):
-            raise ValueError('%s is not of type %s' (model, cls))
+            raise ValueError('%s is not of type %s' % (model, cls))
         cls.session.add(model)
         try:
             if commit:
