@@ -152,7 +152,7 @@ class QueryableMixin(object):
                 # not clearing form fields to null
                 kwargs[attr] = None
                 continue
-            if attr in class_mapper(cls).relationships:
+            if attr in class_mapper(cls).relationships and attr not in cls._no_overwrite_:
                 rel = class_mapper(cls).relationships[attr]
                 if rel.uselist:
                     if isinstance(val, list):
