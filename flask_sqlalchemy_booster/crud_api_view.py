@@ -4,7 +4,7 @@ from schemalite import SchemaError
 from schemalite.core import validate_object, validate_list_of_objects, json_encoder
 from sqlalchemy.sql import sqltypes
 import json
-from toolspy import all_subclasses, fetch_nested_key_from_dict
+from toolspy import all_subclasses, fetch_nested_key_from_dict, delete_dict_keys, union
 from copy import deepcopy
 
 from .responses import (
@@ -78,14 +78,21 @@ def construct_post_view_function(
         model_class, schema, registration_dict, pre_processors=None,
         post_processors=None,
         allow_unknown_fields=False,
-        dict_struct=None, schemas_registry=None):
+        dict_struct=None, schemas_registry=None,
+        fields_forbidden_from_being_set=None):
 
     def post():
         if pre_processors is not None:
             for processor in pre_processors:
                 if callable(processor):
                     processor()
+        fields_to_be_removed = union([
+            fields_forbidden_from_being_set or [],
+            model_class._fields_forbidden_from_being_set_ or []])
         if isinstance(g.json, list):
+            if len(fields_to_be_removed) > 0:
+                for dict_item in g.json:
+                    delete_dict_keys(dict_item, fields_to_be_removed)
             input_data = model_class.pre_validation_adapter_for_list(g.json)
             if isinstance(input_data, Response):
                 return input_data
@@ -128,6 +135,8 @@ def construct_post_view_function(
                         {'status': 'success', 'result': obj}
                         for obj, error in zip(output_dict['result'], errors)]})
         else:
+            if len(fields_to_be_removed) > 0:
+                delete_dict_keys(g.json, fields_to_be_removed)
             input_data = model_class.pre_validation_adapter(g.json)
             if isinstance(input_data, Response):
                 return input_data
@@ -168,7 +177,8 @@ def construct_put_view_function(
         query_constructor=None, schemas_registry=None,
         permitted_object_getter=None,
         dict_struct=None,
-        allow_unknown_fields=False):
+        allow_unknown_fields=False,
+        fields_forbidden_from_being_set=None):
     def put(_id):
         if permitted_object_getter is not None:
             obj = permitted_object_getter()
@@ -183,6 +193,11 @@ def construct_put_view_function(
             for processor in pre_processors:
                 if callable(processor):
                     processor(obj)
+        fields_to_be_removed = union([
+            fields_forbidden_from_being_set or [],
+            model_class._fields_forbidden_from_being_set_ or []])
+        if len(fields_to_be_removed) > 0:
+            delete_dict_keys(g.json, fields_to_be_removed)
         input_data = model_class.pre_validation_adapter(g.json, existing_instance=obj)
         if isinstance(input_data, Response):
             return input_data
@@ -229,13 +244,20 @@ def construct_batch_put_view_function(
         pre_processors=None,
         post_processors=None,
         query_constructor=None, schemas_registry=None,
-        allow_unknown_fields=False):
+        allow_unknown_fields=False,
+        fields_forbidden_from_being_set=None):
 
     def batch_put():
         if pre_processors is not None:
             for processor in pre_processors:
                 if callable(processor):
                     processor()
+        fields_to_be_removed = union([
+            fields_forbidden_from_being_set or [],
+            model_class._fields_forbidden_from_being_set_ or []])
+        if len(fields_to_be_removed) > 0:
+            for dict_item in g.json.values():
+                delete_dict_keys(dict_item, fields_to_be_removed)
         output = {}
         obj_ids = g.json.keys()
         if type(model_class.primary_key().type)==sqltypes.Integer:
@@ -433,6 +455,7 @@ def register_crud_routes_for_models(
         default_query_constructor = _model_dict.get('query_constructor')
         view_dict_for_model = _model_dict.get('views', {})
         dict_struct_for_model = _model_dict.get('dict_struct')
+        fields_forbidden_from_being_set_for_all_views = _model_dict.get('fields_forbidden_from_being_set', [])
         resource_name = _model.__tablename__
 
         if _model.__name__ not in app_or_bp.registered_models_and_crud_routes["models_registered_for_views"]:
@@ -490,7 +513,10 @@ def register_crud_routes_for_models(
                 post_processors=post_dict.get('post_processors'),
                 schemas_registry=schemas_registry,
                 allow_unknown_fields=allow_unknown_fields,
-                dict_struct=post_dict.get('dict_struct') or dict_struct_for_model)
+                dict_struct=post_dict.get('dict_struct') or dict_struct_for_model,
+                fields_forbidden_from_being_set=union([
+                    fields_forbidden_from_being_set_for_all_views,
+                    post_dict.get('fields_forbidden_from_being_set', [])]))
             post_url = post_dict.get('url', None) or "/%s" % base_url
             app_or_bp.route(
                 post_url, methods=['POST'], endpoint='post_%s' % resource_name)(
@@ -515,7 +541,10 @@ def register_crud_routes_for_models(
                 dict_struct=put_dict.get('dict_struct') or dict_struct_for_model,
                 allow_unknown_fields=allow_unknown_fields,
                 query_constructor=put_dict.get('query_constructor') or default_query_constructor,
-                schemas_registry=schemas_registry)
+                schemas_registry=schemas_registry,
+                fields_forbidden_from_being_set=union([
+                    fields_forbidden_from_being_set_for_all_views,
+                    put_dict.get('fields_forbidden_from_being_set', [])]))
             put_url = put_dict.get('url', None) or "/%s/<_id>" % base_url
             app_or_bp.route(
                 put_url, methods=['PUT'], endpoint='put_%s' % resource_name)(
@@ -538,7 +567,10 @@ def register_crud_routes_for_models(
                 post_processors=batch_put_dict.get('post_processors'),
                 allow_unknown_fields=allow_unknown_fields,
                 query_constructor=batch_put_dict.get('query_constructor') or default_query_constructor,
-                schemas_registry=schemas_registry)
+                schemas_registry=schemas_registry,
+                fields_forbidden_from_being_set=union([
+                    fields_forbidden_from_being_set_for_all_views,
+                    batch_put_dict.get('fields_forbidden_from_being_set', [])]))
             batch_put_url = batch_put_dict.get('url', None) or "/%s" % base_url
             app_or_bp.route(
                 batch_put_url, methods=['PUT'], endpoint='batch_put_%s' % resource_name)(

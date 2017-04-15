@@ -18,6 +18,7 @@ class QueryableMixin(object):
 
     _prevent_primary_key_initialization_ = True
     _prevent_primary_key_updation_ = True
+    _fields_forbidden_from_being_set_ = None
 
     @classmethod
     def is_a_to_many_rel(cls, attr):
