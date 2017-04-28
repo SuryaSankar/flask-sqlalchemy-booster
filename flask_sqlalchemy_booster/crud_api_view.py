@@ -1,12 +1,12 @@
 from flask.views import MethodView
-from flask import g, request, Response
+from flask import g, request, Response,url_for
 from schemalite import SchemaError
 from schemalite.core import validate_object, validate_list_of_objects, json_encoder
 from sqlalchemy.sql import sqltypes
 import json
 from toolspy import all_subclasses, fetch_nested_key_from_dict, delete_dict_keys, union
 from copy import deepcopy
-
+import inspect
 from .responses import (
     process_args_and_render_json_list, success_json, error_json,
     render_json_obj_with_requested_structure,
@@ -17,8 +17,11 @@ from .responses import (
 def construct_get_view_function(
         model_class, registration_dict,
         permitted_object_getter=None,
-        dict_struct=None, schemas_registry=None, get_query_creator=None):
+        dict_struct=None, schemas_registry=None, get_query_creator=None,
+        enable_caching=False, cache_handler=None, cache_key_determiner=None,
+        cache_timeout=None):
     def get(_id):
+        # print "Entering get function for %s" % request.path
         _id = _id.strip()
         if _id.startswith('[') and _id.endswith(']'):
             if permitted_object_getter is not None:
@@ -59,17 +62,35 @@ def construct_get_view_function(
         if obj is None:
             return error_json(404, 'Resource not found')
         return render_json_obj_with_requested_structure(obj, dict_struct=dict_struct)
+
+    if enable_caching and cache_handler is not None:
+        cached_get = cache_handler.memoize(timeout=cache_timeout)(get)
+        return cached_get
     return get
 
 
 def construct_index_view_function(
-        model_class, index_query_creator=None, dict_struct=None):
+        model_class, index_query_creator=None, dict_struct=None,
+        enable_caching=False, cache_handler=None, cache_key_determiner=None,
+        cache_timeout=None):
     def index():
+        # print "Entering index function for %s" % request.path
         if callable(index_query_creator):
             return process_args_and_render_json_list(
                 index_query_creator(model_class.query),
                 dict_struct=dict_struct)
         return process_args_and_render_json_list(model_class, dict_struct=dict_struct)
+
+    if enable_caching and cache_handler is not None:
+        if cache_key_determiner is None:
+            def make_key_prefix():
+                """Make a key that includes GET parameters."""
+                key = url_for(request.endpoint, **request.args)
+                # print "returning key prefix for index as %s" % key
+                return key
+            cache_key_determiner = make_key_prefix
+        return cache_handler.cached(
+            timeout=cache_timeout, key_prefix=cache_key_determiner)(index)
 
     return index
 
@@ -414,7 +435,7 @@ def construct_delete_view_function(
 
 def register_crud_routes_for_models(
         app_or_bp, registration_dict, register_schema_structure=True,
-        allow_unknown_fields=False):
+        allow_unknown_fields=False, cache_handler=None):
     if not hasattr(app_or_bp, "registered_models_and_crud_routes"):
         app_or_bp.registered_models_and_crud_routes = {
             "models_registered_for_views": [],
@@ -456,6 +477,8 @@ def register_crud_routes_for_models(
         view_dict_for_model = _model_dict.get('views', {})
         dict_struct_for_model = _model_dict.get('dict_struct')
         fields_forbidden_from_being_set_for_all_views = _model_dict.get('fields_forbidden_from_being_set', [])
+        enable_caching = _model_dict.get('enable_caching', False) and cache_handler is not None
+        cache_timeout = _model_dict.get('cache_timeout')
         resource_name = _model.__tablename__
 
         if _model.__name__ not in app_or_bp.registered_models_and_crud_routes["models_registered_for_views"]:
@@ -477,10 +500,17 @@ def register_crud_routes_for_models(
 
         if 'index' not in forbidden_views:
             index_dict = view_dict_for_model.get('index', {})
+            if 'enable_caching' in index_dict:
+                enable_caching = index_dict.get('enable_caching') and cache_handler is not None
+            cache_key_determiner = index_dict.get('cache_key_determiner')
+            cache_timeout = index_dict.get('cache_timeout') or cache_timeout
             index_func = index_dict.get('view_func', None) or construct_index_view_function(
                 _model,
                 index_query_creator=index_dict.get('query_constructor') or default_query_constructor,
-                dict_struct=index_dict.get('dict_struct') or dict_struct_for_model)
+                dict_struct=index_dict.get('dict_struct') or dict_struct_for_model,
+                enable_caching=enable_caching,
+                cache_handler=cache_handler, cache_key_determiner=cache_key_determiner,
+                cache_timeout=cache_timeout)
             index_url = index_dict.get('url', None) or "/%s" % base_url
             app_or_bp.route(
                 index_url, methods=['GET'], endpoint='index_%s' % resource_name)(
@@ -489,11 +519,18 @@ def register_crud_routes_for_models(
 
         if 'get' not in forbidden_views:
             get_dict = view_dict_for_model.get('get', {})
+            if 'enable_caching' in get_dict:
+                enable_caching = get_dict.get('enable_caching') and cache_handler is not None
+            cache_key_determiner = get_dict.get('cache_key_determiner')
+            cache_timeout = get_dict.get('cache_timeout') or cache_timeout
             get_func = get_dict.get('view_func', None) or construct_get_view_function(
                 _model, registration_dict,
                 permitted_object_getter=get_dict.get('permitted_object_getter') or _model_dict.get('permitted_object_getter'),
                 get_query_creator=get_dict.get('query_constructor') or default_query_constructor,
-                dict_struct=get_dict.get('dict_struct') or dict_struct_for_model)
+                dict_struct=get_dict.get('dict_struct') or dict_struct_for_model,
+                enable_caching=enable_caching,
+                cache_handler=cache_handler, cache_key_determiner=cache_key_determiner,
+                cache_timeout=cache_timeout)
             get_url = get_dict.get('url', None) or '/%s/<_id>' % base_url
             app_or_bp.route(
                 get_url, methods=['GET'], endpoint='get_%s' % resource_name)(
