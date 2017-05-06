@@ -350,6 +350,8 @@ class DictizableMixin(object):
                     result[rel] = rel_obj.todict_using_struct(
                         dict_struct=rel_dict_struct) if hasattr(
                         rel_obj, 'todict_using_struct') else rel_obj
+            else:
+                result[rel] = None
         return result
 
 
