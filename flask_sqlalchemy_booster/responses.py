@@ -368,14 +368,17 @@ def params_for_serialization(
         params['rels_to_expand'] = rels_to_expand
     if rels_to_serialize is not None and 'rels_to_serialize' not in params:
         params['rels_to_serialize'] = rels_to_serialize
-    if 'group_listrels_by' is not None and 'group_listrels_by' not in params:
+    if group_listrels_by is not None and 'group_listrels_by' not in params:
         params['group_listrels_by'] = group_listrels_by
-    if 'preserve_order' is not None and 'preserve_order' not in params:
+    if preserve_order is not None and 'preserve_order' not in params:
         params['preserve_order'] = preserve_order
-    if 'groupby' is not None and 'groupby' not in params:
+    if groupby is not None and 'groupby' not in params:
         params['groupby'] = groupby
-    if 'dict_struct' is not None and 'dict_struct' not in params:
-        params['dict_struct'] = dict_struct
+    if dict_struct is not None:
+        if 'dict_struct' not in params:
+            params['dict_struct'] = dict_struct
+        else:
+            params['dict_struct'] = merge(dict_struct, params['dict_struct'])
     return params
 
 
@@ -606,6 +609,8 @@ def convert_result_to_response_structure(
         dict_struct=dict_struct,
         preserve_order=preserve_order, groupby=groupby,
         check_groupby=True)
+    print "params to be serialized"
+    print params_to_be_serialized
     if isinstance(result, Pagination):
         page = int(request.args.get('page', 1))
         per_page = int(request.args.get('per_page', PER_PAGE_ITEMS_COUNT ))
@@ -705,17 +710,20 @@ def process_args_and_render_json_list(q, **kwargs):
 
     return convert_result_to_response(result, **kwargs)
 
+def merge_params_with_request_args_while_deep_merging_dict_struct(kwargs):
+    params_from_request_args = _serializable_params(request.args)
+    merged_params = merge(kwargs, params_from_request_args)
+    if kwargs.get('dict_struct') and params_from_request_args.get('dict_struct'):
+        merged_params['dict_struct'] = merge(
+            kwargs['dict_struct'], params_from_request_args.get('dict_struct'))
+    return merged_params
+
 
 def render_json_obj_with_requested_structure(obj, **kwargs):
     if isinstance(obj, Response):
         return obj
-    return as_json_obj(
-        obj,
-        **merge(
-            kwargs,
-            _serializable_params(request.args)
-        )
-    )
+    merged_params = merge_params_with_request_args_while_deep_merging_dict_struct(kwargs)
+    return as_json_obj(obj, **merged_params)
 
 
 def serializable_obj_with_requested_structure(obj):
@@ -729,25 +737,16 @@ def serializable_obj_with_requested_structure(obj):
 def render_json_list_with_requested_structure(obj, **kwargs):
     if isinstance(obj, Response):
         return obj
-    return as_json_list(
-        obj,
-        **merge(
-            kwargs,
-            _serializable_params(request.args)
-        )
-    )
+    merged_params = merge_params_with_request_args_while_deep_merging_dict_struct(kwargs)
+    return as_json_list(obj, **merged_params)
 
 
 def render_dict_list_with_requested_structure(obj, **kwargs):
     if isinstance(obj, Response):
         return obj
+
     return as_dict_list(
-        obj,
-        **merge(
-            kwargs,
-            _serializable_params(request.args)
-        )
-    )
+        obj, **merge_params_with_request_args_while_deep_merging_dict_struct(kwargs))
 
 
 def as_processed_list(func):
@@ -784,7 +783,6 @@ def as_processed_list(func):
         func_output = func(*args, **kwargs)
 
         return process_args_and_render_json_list(func_output)
-
 
     return wrapper
 
