@@ -609,8 +609,6 @@ def convert_result_to_response_structure(
         dict_struct=dict_struct,
         preserve_order=preserve_order, groupby=groupby,
         check_groupby=True)
-    print "params to be serialized"
-    print params_to_be_serialized
     if isinstance(result, Pagination):
         page = int(request.args.get('page', 1))
         per_page = int(request.args.get('per_page', PER_PAGE_ITEMS_COUNT ))
