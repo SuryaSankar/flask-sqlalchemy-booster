@@ -531,7 +531,7 @@ def filter_query_using_filters_list(result, filters):
     if not (isinstance(result, Query) or isinstance(result, QueryBooster)):
         if isinstance(result, _BoundDeclarativeMeta) and class_mapper(
                 result).polymorphic_on is not None:
-            result = result.query.with_polymorphic('*')
+            result = result.query.with_polymorphic(result.all_subclasses_with_separate_tables())
         else:
             result = result.query
     for f in filters:
@@ -545,7 +545,7 @@ def filter_query_using_args(result, args_to_skip=[]):
     if not (isinstance(result, Query) or isinstance(result, QueryBooster)):
         if isinstance(result, _BoundDeclarativeMeta) and class_mapper(
                 result).polymorphic_on is not None:
-            result = result.query.with_polymorphic('*')
+            result = result.query.with_polymorphic(result.all_subclasses_with_separate_tables())
         else:
             result = result.query
     for kw in request.args:

@@ -4,6 +4,7 @@ from .queryable_mixin import QueryableMixin
 from .dictizable_mixin import DictizableMixin
 from sqlalchemy.ext.associationproxy import AssociationProxy
 from sqlalchemy.orm import class_mapper
+from toolspy import all_subclasses
 
 
 class ModelBooster(Model, QueryableMixin, DictizableMixin):
@@ -106,4 +107,16 @@ class ModelBooster(Model, QueryableMixin, DictizableMixin):
         if mapper is None:
             return None
         return mapper.class_
+
+    @classmethod
+    def all_subclasses_with_separate_tables(cls):
+        subcls = []
+        all_scs = [cls] + all_subclasses(cls)
+        seen_tables = []
+
+        for sc in all_scs:
+            if sc.__tablename__ not in seen_tables:
+                seen_tables.append(sc.__tablename__)
+                subcls.append(sc)
+        return subcls
 

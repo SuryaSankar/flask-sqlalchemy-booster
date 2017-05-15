@@ -5,6 +5,7 @@ A wrapper over Flask-SQLAlchemy
 """
 
 from .core import FlaskSQLAlchemyBooster
+from .model_booster import ModelBooster
 from .query_booster import QueryBooster
 import responses
 import utils
