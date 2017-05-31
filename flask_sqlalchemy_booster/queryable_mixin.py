@@ -177,6 +177,29 @@ class QueryableMixin(object):
     def preprocess_kwargs_before_new(cls, kwargs):
         return kwargs
 
+    def clone(self, dict_struct=None, commit=True):
+        def remove_primary_keys_from_dict_struct(klass, ds):
+            pk = klass.primary_key_name()
+            if "attrs" not in ds:
+                ds['attrs'] = class_mapper(klass).columns.keys()
+            if 'attrs' in ds and pk in ds['attrs']:
+                ds['attrs'].remove(pk)
+            if 'rels' in ds:
+                for rel_name in ds['rels']:
+                    mapped_rel = next(
+                        r for r in class_mapper(klass).relationships
+                        if r.key == rel_name)
+                    rel_class = mapped_rel.mapper.class_
+                    ds['rels'][rel_name] = remove_primary_keys_from_dict_struct(
+                        rel_class, ds['rels'][rel_name])
+            return ds
+        cls = self.__class__
+        if dict_struct is None:
+            dict_struct = {}
+        dict_struct = remove_primary_keys_from_dict_struct(cls, dict_struct)
+        return cls.add(
+            cls.new(**self.todict(dict_struct=dict_struct)), commit=commit)
+
     def update(self, **kwargs):
         """Updates an instance.
 
