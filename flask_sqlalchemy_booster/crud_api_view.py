@@ -12,6 +12,7 @@ from .responses import (
     render_json_obj_with_requested_structure,
     render_json_list_with_requested_structure,
     _serializable_params, serializable_obj, as_json)
+import urllib
 
 
 def construct_get_view_function(
@@ -85,7 +86,11 @@ def construct_index_view_function(
         if cache_key_determiner is None:
             def make_key_prefix():
                 """Make a key that includes GET parameters."""
-                key = url_for(request.endpoint, **request.args)
+                args = request.args
+                key = request.path + '?' + urllib.urlencode([
+                    (k, v) for k in sorted(args) for v in sorted(args.getlist(k))
+                ])
+                # key = url_for(request.endpoint, **request.args)
                 # print "returning key prefix for index as %s" % key
                 return key
             cache_key_determiner = make_key_prefix
