@@ -108,90 +108,93 @@ def construct_post_view_function(
         fields_forbidden_from_being_set=None):
 
     def post():
-        if pre_processors is not None:
-            for processor in pre_processors:
-                if callable(processor):
-                    processor()
-        fields_to_be_removed = union([
-            fields_forbidden_from_being_set or [],
-            model_class._fields_forbidden_from_being_set_ or []])
-        if isinstance(g.json, list):
-            if len(fields_to_be_removed) > 0:
-                for dict_item in g.json:
-                    delete_dict_keys(dict_item, fields_to_be_removed)
-            input_data = model_class.pre_validation_adapter_for_list(g.json)
-            if isinstance(input_data, Response):
-                return input_data
-            is_valid, errors = validate_list_of_objects(
-                schema, input_data, context={"model_class": model_class},
-                allow_unknown_fields=allow_unknown_fields,
-                schemas_registry=schemas_registry)
-            input_objs = input_data
-            if not is_valid:
-                input_objs = [
-                    input_obj if error is None else None
-                    for input_obj, error in zip(input_data, errors)]
-            resources = model_class.create_all(input_objs)
-            if post_processors is not None:
-                for processor in post_processors:
+        try:
+            if pre_processors is not None:
+                for processor in pre_processors:
                     if callable(processor):
-                        processed_resources = []
-                        for resource, datum in zip(resources, input_data):
-                            processed_resource = processor(resource, datum)
-                            if processed_resource is not None:
-                                processed_resources.append(processed_resource)
-                            else:
-                                processed_resources.append(resource)
-                        resources = processed_resources
-            if None in resources:
-                if all(r is None for r in resources):
-                    status = "failure"
+                        processor()
+            fields_to_be_removed = union([
+                fields_forbidden_from_being_set or [],
+                model_class._fields_forbidden_from_being_set_ or []])
+            if isinstance(g.json, list):
+                if len(fields_to_be_removed) > 0:
+                    for dict_item in g.json:
+                        delete_dict_keys(dict_item, fields_to_be_removed)
+                input_data = model_class.pre_validation_adapter_for_list(g.json)
+                if isinstance(input_data, Response):
+                    return input_data
+                is_valid, errors = validate_list_of_objects(
+                    schema, input_data, context={"model_class": model_class},
+                    allow_unknown_fields=allow_unknown_fields,
+                    schemas_registry=schemas_registry)
+                input_objs = input_data
+                if not is_valid:
+                    input_objs = [
+                        input_obj if error is None else None
+                        for input_obj, error in zip(input_data, errors)]
+                resources = model_class.create_all(input_objs)
+                if post_processors is not None:
+                    for processor in post_processors:
+                        if callable(processor):
+                            processed_resources = []
+                            for resource, datum in zip(resources, input_data):
+                                processed_resource = processor(resource, datum)
+                                if processed_resource is not None:
+                                    processed_resources.append(processed_resource)
+                                else:
+                                    processed_resources.append(resource)
+                            resources = processed_resources
+                if None in resources:
+                    if all(r is None for r in resources):
+                        status = "failure"
+                    else:
+                        status = "partial_success"
                 else:
-                    status = "partial_success"
+                    status = "success"
+                return render_json_list_with_requested_structure(
+                    resources,
+                    pre_render_callback=lambda output_dict: {
+                        'status': status,
+                        'result': [
+                            {'status': 'failure', 'error': error}
+                            if obj is None
+                            else
+                            {'status': 'success', 'result': obj}
+                            for obj, error in zip(output_dict['result'], errors)]})
             else:
-                status = "success"
-            return render_json_list_with_requested_structure(
-                resources,
-                pre_render_callback=lambda output_dict: {
-                    'status': status,
-                    'result': [
-                        {'status': 'failure', 'error': error}
-                        if obj is None
-                        else
-                        {'status': 'success', 'result': obj}
-                        for obj, error in zip(output_dict['result'], errors)]})
-        else:
-            if len(fields_to_be_removed) > 0:
-                delete_dict_keys(g.json, fields_to_be_removed)
-            input_data = model_class.pre_validation_adapter(g.json)
-            if isinstance(input_data, Response):
-                return input_data
-            is_valid, errors = validate_object(
-                schema, input_data, context={"model_class": model_class},
-                schemas_registry=schemas_registry,
-                allow_unknown_fields=allow_unknown_fields)
-            if not is_valid:
-                return error_json(400, errors)
-            obj = model_class.create(**input_data)
-            if post_processors is not None:
-                for processor in post_processors:
-                    if callable(processor):
-                        processed_obj = processor(obj, input_data)
-                        if processed_obj is not None:
-                            obj = processed_obj
-            if '_ret' in g.args:
-                rels = g.args['_ret'].split(".")
-                final_obj = obj
-                for rel in rels:
-                    final_obj = getattr(final_obj, rel)
-                final_obj_cls = type(final_obj)
-                final_obj_dict_struct = None
-                if final_obj_cls in registration_dict:
-                    final_obj_dict_struct = (fetch_nested_key_from_dict(
-                        registration_dict[final_obj_cls], 'views.get.dict_struct') or
-                        registration_dict[final_obj_cls].get('dict_struct'))
-                return render_json_obj_with_requested_structure(final_obj, dict_struct=final_obj_dict_struct)
-            return render_json_obj_with_requested_structure(obj, dict_struct=dict_struct)
+                if len(fields_to_be_removed) > 0:
+                    delete_dict_keys(g.json, fields_to_be_removed)
+                input_data = model_class.pre_validation_adapter(g.json)
+                if isinstance(input_data, Response):
+                    return input_data
+                is_valid, errors = validate_object(
+                    schema, input_data, context={"model_class": model_class},
+                    schemas_registry=schemas_registry,
+                    allow_unknown_fields=allow_unknown_fields)
+                if not is_valid:
+                    return error_json(400, errors)
+                obj = model_class.create(**input_data)
+                if post_processors is not None:
+                    for processor in post_processors:
+                        if callable(processor):
+                            processed_obj = processor(obj, input_data)
+                            if processed_obj is not None:
+                                obj = processed_obj
+                if '_ret' in g.args:
+                    rels = g.args['_ret'].split(".")
+                    final_obj = obj
+                    for rel in rels:
+                        final_obj = getattr(final_obj, rel)
+                    final_obj_cls = type(final_obj)
+                    final_obj_dict_struct = None
+                    if final_obj_cls in registration_dict:
+                        final_obj_dict_struct = (fetch_nested_key_from_dict(
+                            registration_dict[final_obj_cls], 'views.get.dict_struct') or
+                            registration_dict[final_obj_cls].get('dict_struct'))
+                    return render_json_obj_with_requested_structure(final_obj, dict_struct=final_obj_dict_struct)
+                return render_json_obj_with_requested_structure(obj, dict_struct=dict_struct)
+        except Exception as e:
+            return error_json(400, e.message)
     return post
 
 
@@ -206,61 +209,64 @@ def construct_put_view_function(
         allow_unknown_fields=False,
         fields_forbidden_from_being_set=None):
     def put(_id):
-        if permitted_object_getter is not None:
-            obj = permitted_object_getter()
-        else:
-            if callable(query_constructor):
-                obj = query_constructor(model_class.query).get(_id)
+        try:
+            if permitted_object_getter is not None:
+                obj = permitted_object_getter()
             else:
-                obj = model_class.get(_id)
-        if obj is None:
-            return error_json(404, 'Resource not found')
-        if pre_processors is not None:
-            for processor in pre_processors:
-                if callable(processor):
-                    processor(obj)
-        fields_to_be_removed = union([
-            fields_forbidden_from_being_set or [],
-            model_class._fields_forbidden_from_being_set_ or []])
-        if len(fields_to_be_removed) > 0:
-            delete_dict_keys(g.json, fields_to_be_removed)
-        input_data = model_class.pre_validation_adapter(g.json, existing_instance=obj)
-        if isinstance(input_data, Response):
-            return input_data
-        polymorphic_field = schema.get('polymorphic_on')
-        if polymorphic_field:
-            if polymorphic_field not in input_data:
-                input_data[polymorphic_field] = getattr(obj, polymorphic_field)
-        is_valid, errors = validate_object(
-            schema, input_data, allow_required_fields_to_be_skipped=True,
-            allow_unknown_fields=allow_unknown_fields,
-            context={"existing_instance": obj,
-                     "model_class": model_class},
-            schemas_registry=schemas_registry)
-        if not is_valid:
-            return error_json(400, errors)
-        updated_obj = obj.update(**input_data)
-        if post_processors is not None:
-            for processor in post_processors:
-                if callable(processor):
-                    processed_updated_obj = processor(updated_obj, input_data)
-                    if processed_updated_obj is not None:
-                        updated_obj = processed_updated_obj
-        if '_ret' in g.args:
-            rels = g.args['_ret'].split(".")
-            final_obj = updated_obj
-            for rel in rels:
-                final_obj = getattr(final_obj, rel)
-            final_obj_cls = type(final_obj)
-            final_obj_dict_struct = None
-            if final_obj_cls in registration_dict:
-                final_obj_dict_struct = (fetch_nested_key_from_dict(
-                    registration_dict[final_obj_cls], 'views.get.dict_struct') or
-                    registration_dict[final_obj_cls].get('dict_struct'))
-            return render_json_obj_with_requested_structure(final_obj, dict_struct=final_obj_dict_struct)
-        return render_json_obj_with_requested_structure(
-            updated_obj,
-            dict_struct=dict_struct)
+                if callable(query_constructor):
+                    obj = query_constructor(model_class.query).get(_id)
+                else:
+                    obj = model_class.get(_id)
+            if obj is None:
+                return error_json(404, 'Resource not found')
+            if pre_processors is not None:
+                for processor in pre_processors:
+                    if callable(processor):
+                        processor(obj)
+            fields_to_be_removed = union([
+                fields_forbidden_from_being_set or [],
+                model_class._fields_forbidden_from_being_set_ or []])
+            if len(fields_to_be_removed) > 0:
+                delete_dict_keys(g.json, fields_to_be_removed)
+            input_data = model_class.pre_validation_adapter(g.json, existing_instance=obj)
+            if isinstance(input_data, Response):
+                return input_data
+            polymorphic_field = schema.get('polymorphic_on')
+            if polymorphic_field:
+                if polymorphic_field not in input_data:
+                    input_data[polymorphic_field] = getattr(obj, polymorphic_field)
+            is_valid, errors = validate_object(
+                schema, input_data, allow_required_fields_to_be_skipped=True,
+                allow_unknown_fields=allow_unknown_fields,
+                context={"existing_instance": obj,
+                         "model_class": model_class},
+                schemas_registry=schemas_registry)
+            if not is_valid:
+                return error_json(400, errors)
+            updated_obj = obj.update(**input_data)
+            if post_processors is not None:
+                for processor in post_processors:
+                    if callable(processor):
+                        processed_updated_obj = processor(updated_obj, input_data)
+                        if processed_updated_obj is not None:
+                            updated_obj = processed_updated_obj
+            if '_ret' in g.args:
+                rels = g.args['_ret'].split(".")
+                final_obj = updated_obj
+                for rel in rels:
+                    final_obj = getattr(final_obj, rel)
+                final_obj_cls = type(final_obj)
+                final_obj_dict_struct = None
+                if final_obj_cls in registration_dict:
+                    final_obj_dict_struct = (fetch_nested_key_from_dict(
+                        registration_dict[final_obj_cls], 'views.get.dict_struct') or
+                        registration_dict[final_obj_cls].get('dict_struct'))
+                return render_json_obj_with_requested_structure(final_obj, dict_struct=final_obj_dict_struct)
+            return render_json_obj_with_requested_structure(
+                updated_obj,
+                dict_struct=dict_struct)
+        except Exception as e:
+            return error_json(400, e.message)
 
     return put
 
@@ -396,45 +402,48 @@ def construct_delete_view_function(
         query_constructor=None,
         permitted_object_getter=None):
     def delete(_id):
-        if callable(query_constructor):
-            obj = query_constructor(model_class.query).get(_id)
-        else:
-            obj = model_class.get(_id)
-        if obj is None:
-            return error_json(404, 'Resource not found')
-        if pre_processors is not None:
-            for processor in pre_processors:
-                if callable(processor):
-                    processor(obj)
-        obj_data = obj.todict()
+        try:
+            if callable(query_constructor):
+                obj = query_constructor(model_class.query).get(_id)
+            else:
+                obj = model_class.get(_id)
+            if obj is None:
+                return error_json(404, 'Resource not found')
+            if pre_processors is not None:
+                for processor in pre_processors:
+                    if callable(processor):
+                        processor(obj)
+            obj_data = obj.todict()
 
-        rel_obj_requested_in_return = None
-        if '_ret' in g.args:
-            rels = g.args['_ret'].split(".")
-            if len(rels) > 0:
-                rel_obj_requested_in_return = obj
-                for rel in rels:
-                    rel_obj_requested_in_return = getattr(rel_obj_requested_in_return, rel)
+            rel_obj_requested_in_return = None
+            if '_ret' in g.args:
+                rels = g.args['_ret'].split(".")
+                if len(rels) > 0:
+                    rel_obj_requested_in_return = obj
+                    for rel in rels:
+                        rel_obj_requested_in_return = getattr(rel_obj_requested_in_return, rel)
 
-        obj.delete()
-        if post_processors is not None:
-            for processor in post_processors:
-                if callable(processor):
-                    processor(obj_data)
+            obj.delete()
+            if post_processors is not None:
+                for processor in post_processors:
+                    if callable(processor):
+                        processor(obj_data)
 
-        if rel_obj_requested_in_return is not None:
-            cls_of_rel_obj_requested_in_return = type(rel_obj_requested_in_return)
-            rel_obj_dict_struct = None
-            refetched_rel_obj = cls_of_rel_obj_requested_in_return.get(
-                rel_obj_requested_in_return.primary_key_value())
-            if cls_of_rel_obj_requested_in_return in registration_dict:
-                rel_obj_dict_struct = (fetch_nested_key_from_dict(
-                    registration_dict[cls_of_rel_obj_requested_in_return], 'views.get.dict_struct') or
-                    registration_dict[cls_of_rel_obj_requested_in_return].get('dict_struct'))
-            return render_json_obj_with_requested_structure(
-                refetched_rel_obj, dict_struct=rel_obj_dict_struct)
+            if rel_obj_requested_in_return is not None:
+                cls_of_rel_obj_requested_in_return = type(rel_obj_requested_in_return)
+                rel_obj_dict_struct = None
+                refetched_rel_obj = cls_of_rel_obj_requested_in_return.get(
+                    rel_obj_requested_in_return.primary_key_value())
+                if cls_of_rel_obj_requested_in_return in registration_dict:
+                    rel_obj_dict_struct = (fetch_nested_key_from_dict(
+                        registration_dict[cls_of_rel_obj_requested_in_return], 'views.get.dict_struct') or
+                        registration_dict[cls_of_rel_obj_requested_in_return].get('dict_struct'))
+                return render_json_obj_with_requested_structure(
+                    refetched_rel_obj, dict_struct=rel_obj_dict_struct)
 
-        return success_json()
+            return success_json()
+        except Exception as e:
+            return error_json(400, e.message)
     return delete
 
 
