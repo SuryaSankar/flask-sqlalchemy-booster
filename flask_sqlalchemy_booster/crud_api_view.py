@@ -20,7 +20,7 @@ def construct_get_view_function(
         permitted_object_getter=None,
         dict_struct=None, schemas_registry=None, get_query_creator=None,
         enable_caching=False, cache_handler=None, cache_key_determiner=None,
-        cache_timeout=None):
+        cache_timeout=None, exception_handler=None):
     def get(_id):
         # print "Entering get function for %s" % request.path
         try:
@@ -66,6 +66,8 @@ def construct_get_view_function(
             return render_json_obj_with_requested_structure(obj, dict_struct=dict_struct)
 
         except Exception as e:
+            if exception_handler:
+                exception_handler(e)
             return error_json(400, e.message)
 
     if enable_caching and cache_handler is not None:
@@ -77,7 +79,7 @@ def construct_get_view_function(
 def construct_index_view_function(
         model_class, index_query_creator=None, dict_struct=None,
         enable_caching=False, cache_handler=None, cache_key_determiner=None,
-        cache_timeout=None):
+        cache_timeout=None, exception_handler=None):
     def index():
         try:
             if callable(index_query_creator):
@@ -86,6 +88,8 @@ def construct_index_view_function(
                     dict_struct=dict_struct)
             return process_args_and_render_json_list(model_class, dict_struct=dict_struct)
         except Exception as e:
+            if exception_handler:
+                exception_handler(e)
             return error_json(400, e.message)
 
     if enable_caching and cache_handler is not None:
@@ -111,7 +115,7 @@ def construct_post_view_function(
         post_processors=None,
         allow_unknown_fields=False,
         dict_struct=None, schemas_registry=None,
-        fields_forbidden_from_being_set=None):
+        fields_forbidden_from_being_set=None, exception_handler=None):
 
     def post():
         try:
@@ -200,6 +204,8 @@ def construct_post_view_function(
                     return render_json_obj_with_requested_structure(final_obj, dict_struct=final_obj_dict_struct)
                 return render_json_obj_with_requested_structure(obj, dict_struct=dict_struct)
         except Exception as e:
+            if exception_handler:
+                exception_handler(e)
             return error_json(400, e.message)
     return post
 
@@ -213,7 +219,7 @@ def construct_put_view_function(
         permitted_object_getter=None,
         dict_struct=None,
         allow_unknown_fields=False,
-        fields_forbidden_from_being_set=None):
+        fields_forbidden_from_being_set=None, exception_handler=None):
     def put(_id):
         try:
             if permitted_object_getter is not None:
@@ -272,6 +278,8 @@ def construct_put_view_function(
                 updated_obj,
                 dict_struct=dict_struct)
         except Exception as e:
+            if exception_handler:
+                exception_handler(e)
             return error_json(400, e.message)
 
     return put
@@ -283,7 +291,8 @@ def construct_batch_put_view_function(
         post_processors=None,
         query_constructor=None, schemas_registry=None,
         allow_unknown_fields=False,
-        fields_forbidden_from_being_set=None):
+        fields_forbidden_from_being_set=None,
+        exception_handler=None):
 
     def batch_put():
         try:
@@ -372,12 +381,15 @@ def construct_batch_put_view_function(
                 "result": output
             }, wrap=False)
         except Exception as e:
+            if exception_handler:
+                exception_handler(e)
             return error_json(400, e.message)
     return batch_put
 
 
 def construct_patch_view_function(model_class, schema, pre_processors=None,
-                                  query_constructor=None, schemas_registry=None):
+                                  query_constructor=None, schemas_registry=None,
+                                  exception_handler=None):
     def patch(_id):
         try:
             if pre_processors is not None:
@@ -401,6 +413,8 @@ def construct_patch_view_function(model_class, schema, pre_processors=None,
                 return error_json(400, errors)
             return render_json_obj_with_requested_structure(obj.update(**g.json))
         except Exception as e:
+            if exception_handler:
+                exception_handler(e)
             return error_json(400, e.message)
 
     return patch
@@ -412,7 +426,7 @@ def construct_delete_view_function(
         pre_processors=None,
         post_processors=None,
         query_constructor=None,
-        permitted_object_getter=None):
+        permitted_object_getter=None, exception_handler=None):
     def delete(_id):
         try:
             if callable(query_constructor):
@@ -455,13 +469,15 @@ def construct_delete_view_function(
 
             return success_json()
         except Exception as e:
+            if exception_handler:
+                exception_handler(e)
             return error_json(400, e.message)
     return delete
 
 
 def register_crud_routes_for_models(
         app_or_bp, registration_dict, register_schema_structure=True,
-        allow_unknown_fields=False, cache_handler=None):
+        allow_unknown_fields=False, cache_handler=None, exception_handler=None):
     if not hasattr(app_or_bp, "registered_models_and_crud_routes"):
         app_or_bp.registered_models_and_crud_routes = {
             "models_registered_for_views": [],
@@ -536,7 +552,7 @@ def register_crud_routes_for_models(
                 dict_struct=index_dict.get('dict_struct') or dict_struct_for_model,
                 enable_caching=enable_caching,
                 cache_handler=cache_handler, cache_key_determiner=cache_key_determiner,
-                cache_timeout=cache_timeout)
+                cache_timeout=cache_timeout, exception_handler=exception_handler)
             index_url = index_dict.get('url', None) or "/%s" % base_url
             app_or_bp.route(
                 index_url, methods=['GET'], endpoint='index_%s' % resource_name)(
@@ -556,7 +572,7 @@ def register_crud_routes_for_models(
                 dict_struct=get_dict.get('dict_struct') or dict_struct_for_model,
                 enable_caching=enable_caching,
                 cache_handler=cache_handler, cache_key_determiner=cache_key_determiner,
-                cache_timeout=cache_timeout)
+                cache_timeout=cache_timeout, exception_handler=exception_handler)
             get_url = get_dict.get('url', None) or '/%s/<_id>' % base_url
             app_or_bp.route(
                 get_url, methods=['GET'], endpoint='get_%s' % resource_name)(
@@ -577,6 +593,7 @@ def register_crud_routes_for_models(
                 schemas_registry=schemas_registry,
                 allow_unknown_fields=allow_unknown_fields,
                 dict_struct=post_dict.get('dict_struct') or dict_struct_for_model,
+                exception_handler=exception_handler,
                 fields_forbidden_from_being_set=union([
                     fields_forbidden_from_being_set_for_all_views,
                     post_dict.get('fields_forbidden_from_being_set', [])]))
@@ -605,6 +622,7 @@ def register_crud_routes_for_models(
                 allow_unknown_fields=allow_unknown_fields,
                 query_constructor=put_dict.get('query_constructor') or default_query_constructor,
                 schemas_registry=schemas_registry,
+                exception_handler=exception_handler,
                 fields_forbidden_from_being_set=union([
                     fields_forbidden_from_being_set_for_all_views,
                     put_dict.get('fields_forbidden_from_being_set', [])]))
@@ -631,6 +649,7 @@ def register_crud_routes_for_models(
                 allow_unknown_fields=allow_unknown_fields,
                 query_constructor=batch_put_dict.get('query_constructor') or default_query_constructor,
                 schemas_registry=schemas_registry,
+                exception_handler=exception_handler,
                 fields_forbidden_from_being_set=union([
                     fields_forbidden_from_being_set_for_all_views,
                     batch_put_dict.get('fields_forbidden_from_being_set', [])]))
@@ -653,7 +672,7 @@ def register_crud_routes_for_models(
                 _model, patch_input_schema,
                 patch_dict.get('pre_processors'),
                 query_constructor=patch_dict.get('query_constructor') or default_query_constructor,
-                schemas_registry=schemas_registry)
+                schemas_registry=schemas_registry, exception_handler=exception_handler)
             patch_url = patch_dict.get('url', None) or "/%s/<_id>" % base_url
             app_or_bp.route(
                 patch_url, methods=['PATCH'], endpoint='patch_%s' % resource_name)(
@@ -670,7 +689,7 @@ def register_crud_routes_for_models(
                 query_constructor=delete_dict.get('query_constructor') or default_query_constructor,
                 pre_processors=delete_dict.get('pre_processors'),
                 registration_dict=registration_dict,
-                post_processors=delete_dict.get('post_processors'))
+                post_processors=delete_dict.get('post_processors'), exception_handler=exception_handler)
             delete_url = delete_dict.get('url', None) or "/%s/<_id>" % base_url
             app_or_bp.route(
                 delete_url, methods=['DELETE'], endpoint='delete_%s' % resource_name)(
