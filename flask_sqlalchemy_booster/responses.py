@@ -356,6 +356,7 @@ def _serializable_params(args, check_groupby=False):
             params['preserve_order'] = boolify(request.args.get('preserve_order'))
     return params
 
+
 def params_for_serialization(
         attrs_to_serialize=None, rels_to_expand=None,
         rels_to_serialize=None, group_listrels_by=None,
@@ -406,7 +407,13 @@ def as_list(func):
             **_serializable_params(request.args, check_groupby=True))
     return wrapper
 
+
 def type_coerce_value(column_type, value):
+    if value is None:
+        return None
+    if isinstance(value, unicode) or isinstance(value, str):
+        if value.lower() == 'none' or value.lower() == 'null' or value.strip() == '':
+            return None
     if column_type is sqltypes.Integer:
         value = int(value)
     elif column_type is sqltypes.Numeric:
@@ -493,10 +500,11 @@ def filter_query_with_key(query, keyword, value, op):
         value = "%{0}%".format(value)
     if op in ['=', '>', '<', '>=', '<=', '!', '!=']:
         if attr_name in columns:
-            if value.lower() == 'none' or value.lower() == 'null' or value.strip() == '':
-                value = None
             if value is not None:
-                value = type_coerce_value(column_type, value)
+                if value.lower() == 'none' or value.lower() == 'null' or value.strip() == '':
+                    value = None
+                else:
+                    value = type_coerce_value(column_type, value)
     elif op == 'in':
         value = map(lambda v: type_coerce_value(column_type, v), value)
 
@@ -538,7 +546,6 @@ def filter_query_using_filters_list(result, filters):
         result = filter_query_with_key(
             result, f["k"], f["v"], f["op"])
     return result
-
 
 
 def filter_query_using_args(result, args_to_skip=[]):
