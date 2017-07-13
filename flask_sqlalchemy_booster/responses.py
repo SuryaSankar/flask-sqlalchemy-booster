@@ -493,7 +493,7 @@ def filter_query_with_key(query, keyword, value, op):
         value = "%{0}%".format(value)
     if op in ['=', '>', '<', '>=', '<=', '!', '!=']:
         if attr_name in columns:
-            if value == 'none' or value == 'null':
+            if value.lower() == 'none' or value.lower() == 'null' or value.strip() == '':
                 value = None
             if value is not None:
                 value = type_coerce_value(column_type, value)
@@ -564,7 +564,7 @@ def filter_query_using_args(result, args_to_skip=[]):
                 # anywhere? Turns out it is here.
                 if kw not in RESTRICTED:
                     value = request.args.get(kw)
-                    if value.lower() == 'none' or value.lower() == 'null':
+                    if value.lower() == 'none' or value.lower() == 'null' or value.strip() == '':
                         value = None
                     result = filter_query_with_key(result, kw, value, '=')
     return result
