@@ -531,12 +531,20 @@ class DictizableMixin(object):
         """
         # return dict([(a, getattr(self, a)) for a in args])
         cls = type(self)
-        return {
-            a: getattr(self, a)
-            for a in args
-            if hasattr(cls, a) and
-            a not in cls.attrs_forbidden_for_serialization()
-        }
+        result = {}
+        # result = {
+        #     a: getattr(self, a)
+        #     for a in args
+        #     if hasattr(cls, a) and
+        #     a not in cls.attrs_forbidden_for_serialization()
+        # }
+        for a in args:
+            if hasattr(cls, a) and a not in cls.attrs_forbidden_for_serialization():
+                val = getattr(self, a)
+                if is_list_like(val):
+                    val = list(val)
+                result[a] = val
+        return result
         # return dict([(a, getattr(self, a)) for a in args if hasattr(cls, a) and a not in cls.attrs_forbidden_for_serialization()])
 
 
