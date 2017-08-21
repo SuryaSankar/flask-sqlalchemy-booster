@@ -389,17 +389,20 @@ def construct_batch_put_view_function(
 
 def construct_patch_view_function(model_class, schema, pre_processors=None,
                                   query_constructor=None, schemas_registry=None,
-                                  exception_handler=None):
+                                  exception_handler=None, permitted_object_getter=None):
     def patch(_id):
         try:
+            if permitted_object_getter is not None:
+                obj = permitted_object_getter()
+            else:
+                if callable(query_constructor):
+                    obj = query_constructor(model_class.query).get(_id)
+                else:
+                    obj = model_class.get(_id)
             if pre_processors is not None:
                 for processor in pre_processors:
                     if callable(processor):
-                        processor()
-            if callable(query_constructor):
-                obj = query_constructor(model_class.query).get(_id)
-            else:
-                obj = model_class.get(_id)
+                        processor(obj)
             polymorphic_field = schema.get('polymorphic_on')
             if polymorphic_field:
                 if polymorphic_field not in g.json:
@@ -429,10 +432,13 @@ def construct_delete_view_function(
         permitted_object_getter=None, exception_handler=None):
     def delete(_id):
         try:
-            if callable(query_constructor):
-                obj = query_constructor(model_class.query).get(_id)
+            if permitted_object_getter is not None:
+                obj = permitted_object_getter()
             else:
-                obj = model_class.get(_id)
+                if callable(query_constructor):
+                    obj = query_constructor(model_class.query).get(_id)
+                else:
+                    obj = model_class.get(_id)
             if obj is None:
                 return error_json(404, 'Resource not found')
             if pre_processors is not None:
@@ -672,6 +678,7 @@ def register_crud_routes_for_models(
                 _model, patch_input_schema,
                 patch_dict.get('pre_processors'),
                 query_constructor=patch_dict.get('query_constructor') or default_query_constructor,
+                permitted_object_getter=patch_dict.get('permitted_object_getter') or _model_dict.get('permitted_object_getter'),
                 schemas_registry=schemas_registry, exception_handler=exception_handler)
             patch_url = patch_dict.get('url', None) or "/%s/<_id>" % base_url
             app_or_bp.route(
@@ -689,6 +696,7 @@ def register_crud_routes_for_models(
                 query_constructor=delete_dict.get('query_constructor') or default_query_constructor,
                 pre_processors=delete_dict.get('pre_processors'),
                 registration_dict=registration_dict,
+                permitted_object_getter=delete_dict.get('permitted_object_getter') or _model_dict.get('permitted_object_getter'),
                 post_processors=delete_dict.get('post_processors'), exception_handler=exception_handler)
             delete_url = delete_dict.get('url', None) or "/%s/<_id>" % base_url
             app_or_bp.route(
