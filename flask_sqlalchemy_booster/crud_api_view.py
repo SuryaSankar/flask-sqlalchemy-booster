@@ -389,7 +389,8 @@ def construct_batch_put_view_function(
 
 def construct_patch_view_function(model_class, schema, pre_processors=None,
                                   query_constructor=None, schemas_registry=None,
-                                  exception_handler=None, permitted_object_getter=None):
+                                  exception_handler=None, permitted_object_getter=None,
+                                  processors=None, post_processors=None):
     def patch(_id):
         try:
             if permitted_object_getter is not None:
@@ -403,18 +404,35 @@ def construct_patch_view_function(model_class, schema, pre_processors=None,
                 for processor in pre_processors:
                     if callable(processor):
                         processor(obj)
-            polymorphic_field = schema.get('polymorphic_on')
-            if polymorphic_field:
-                if polymorphic_field not in g.json:
-                    g.json[polymorphic_field] = getattr(obj, polymorphic_field)
-            is_valid, errors = validate_object(
-                schema, g.json, allow_required_fields_to_be_skipped=True,
-                context={"existing_instance": obj,
-                         "model_class": model_class},
-                schemas_registry=schemas_registry)
-            if not is_valid:
-                return error_json(400, errors)
-            return render_json_obj_with_requested_structure(obj.update(**g.json))
+            if processors:
+                updated_obj = obj
+                for processor in processors:
+                    if callable(processor):
+                        updated_obj = processor(updated_obj, g.json)
+                        if isinstance(updated_obj, Response):
+                            return updated_obj
+
+            else:
+                polymorphic_field = schema.get('polymorphic_on')
+                if polymorphic_field:
+                    if polymorphic_field not in g.json:
+                        g.json[polymorphic_field] = getattr(obj, polymorphic_field)
+                is_valid, errors = validate_object(
+                    schema, g.json, allow_required_fields_to_be_skipped=True,
+                    context={"existing_instance": obj,
+                             "model_class": model_class},
+                    schemas_registry=schemas_registry)
+                if not is_valid:
+                    return error_json(400, errors)
+                updated_obj = obj.update(**g.json)
+
+            if post_processors is not None:
+                for processor in post_processors:
+                    if callable(processor):
+                        processed_updated_obj = processor(updated_obj, g.json)
+                        if processed_updated_obj is not None:
+                            updated_obj = processed_updated_obj
+            return render_json_obj_with_requested_structure(updated_obj)
         except Exception as e:
             if exception_handler:
                 exception_handler(e)
@@ -676,7 +694,9 @@ def register_crud_routes_for_models(
                 patch_input_schema = model_default_input_schema
             patch_func = patch_dict.get('view_func', None) or construct_patch_view_function(
                 _model, patch_input_schema,
-                patch_dict.get('pre_processors'),
+                pre_processors=patch_dict.get('pre_processors'),
+                processors=patch_dict.get('processors'),
+                post_processors=patch_dict.get('post_processors'),
                 query_constructor=patch_dict.get('query_constructor') or default_query_constructor,
                 permitted_object_getter=patch_dict.get('permitted_object_getter') or _model_dict.get('permitted_object_getter'),
                 schemas_registry=schemas_registry, exception_handler=exception_handler)
