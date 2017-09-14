@@ -67,7 +67,7 @@ def construct_get_view_function(
 
         except Exception as e:
             if exception_handler:
-                exception_handler(e)
+                return exception_handler(e)
             return error_json(400, e.message)
 
     if enable_caching and cache_handler is not None:
@@ -89,7 +89,7 @@ def construct_index_view_function(
             return process_args_and_render_json_list(model_class, dict_struct=dict_struct)
         except Exception as e:
             if exception_handler:
-                exception_handler(e)
+                return exception_handler(e)
             return error_json(400, e.message)
 
     if enable_caching and cache_handler is not None:
@@ -205,7 +205,7 @@ def construct_post_view_function(
                 return render_json_obj_with_requested_structure(obj, dict_struct=dict_struct)
         except Exception as e:
             if exception_handler:
-                exception_handler(e)
+                return exception_handler(e)
             return error_json(400, e.message)
     return post
 
@@ -279,7 +279,7 @@ def construct_put_view_function(
                 dict_struct=dict_struct)
         except Exception as e:
             if exception_handler:
-                exception_handler(e)
+                return exception_handler(e)
             return error_json(400, e.message)
 
     return put
@@ -382,7 +382,7 @@ def construct_batch_put_view_function(
             }, wrap=False)
         except Exception as e:
             if exception_handler:
-                exception_handler(e)
+                return exception_handler(e)
             return error_json(400, e.message)
     return batch_put
 
@@ -435,7 +435,7 @@ def construct_patch_view_function(model_class, schema, pre_processors=None,
             return render_json_obj_with_requested_structure(updated_obj)
         except Exception as e:
             if exception_handler:
-                exception_handler(e)
+                return exception_handler(e)
             return error_json(400, e.message)
 
     return patch
@@ -494,7 +494,7 @@ def construct_delete_view_function(
             return success_json()
         except Exception as e:
             if exception_handler:
-                exception_handler(e)
+                return exception_handler(e)
             return error_json(400, e.message)
     return delete
 
