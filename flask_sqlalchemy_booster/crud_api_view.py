@@ -20,7 +20,7 @@ def construct_get_view_function(
         permitted_object_getter=None,
         dict_struct=None, schemas_registry=None, get_query_creator=None,
         enable_caching=False, cache_handler=None, cache_key_determiner=None,
-        cache_timeout=None, exception_handler=None):
+        cache_timeout=None, exception_handler=None, access_checker=None):
     def get(_id):
         # print "Entering get function for %s" % request.path
         try:
@@ -35,6 +35,9 @@ def construct_get_view_function(
                         resources = get_query_creator(model_class.query).get_all(ids)
                     else:
                         resources = model_class.get_all(ids)
+                if callable(access_checker):
+                    resources = [r if access_checker(r)[0]
+                                 else None for r in resources]
                 if None in resources:
                     if all(r is None for r in resources):
                         status = "failure"
@@ -63,6 +66,11 @@ def construct_get_view_function(
                     obj = model_class.get(_id)
             if obj is None:
                 return error_json(404, 'Resource not found')
+
+            if callable(access_checker):
+                allowed, message = access_checker(obj)
+                if not allowed:
+                    return error_json(401, message)
             return render_json_obj_with_requested_structure(obj, dict_struct=dict_struct)
 
         except Exception as e:
@@ -79,9 +87,13 @@ def construct_get_view_function(
 def construct_index_view_function(
         model_class, index_query_creator=None, dict_struct=None,
         enable_caching=False, cache_handler=None, cache_key_determiner=None,
-        cache_timeout=None, exception_handler=None):
+        cache_timeout=None, exception_handler=None, access_checker=None):
     def index():
         try:
+            if callable(access_checker):
+                allowed, message = access_checker()
+                if not allowed:
+                    return error_json(401, message)
             if callable(index_query_creator):
                 return process_args_and_render_json_list(
                     index_query_creator(model_class.query),
@@ -115,10 +127,15 @@ def construct_post_view_function(
         post_processors=None,
         allow_unknown_fields=False,
         dict_struct=None, schemas_registry=None,
-        fields_forbidden_from_being_set=None, exception_handler=None):
+        fields_forbidden_from_being_set=None, exception_handler=None,
+        access_checker=None):
 
     def post():
         try:
+            if callable(access_checker):
+                allowed, message = access_checker()
+                if not allowed:
+                    return error_json(401, message)
             if pre_processors is not None:
                 for processor in pre_processors:
                     if callable(processor):
@@ -219,6 +236,7 @@ def construct_put_view_function(
         permitted_object_getter=None,
         dict_struct=None,
         allow_unknown_fields=False,
+        access_checker=None,
         fields_forbidden_from_being_set=None, exception_handler=None):
     def put(_id):
         try:
@@ -231,6 +249,10 @@ def construct_put_view_function(
                     obj = model_class.get(_id)
             if obj is None:
                 return error_json(404, 'Resource not found')
+            if callable(access_checker):
+                allowed, message = access_checker(obj)
+                if not allowed:
+                    return error_json(401, message)
             if pre_processors is not None:
                 for processor in pre_processors:
                     if callable(processor):
@@ -390,7 +412,7 @@ def construct_batch_put_view_function(
 def construct_patch_view_function(model_class, schema, pre_processors=None,
                                   query_constructor=None, schemas_registry=None,
                                   exception_handler=None, permitted_object_getter=None,
-                                  processors=None, post_processors=None):
+                                  processors=None, post_processors=None, access_checker=None):
     def patch(_id):
         try:
             if permitted_object_getter is not None:
@@ -400,6 +422,10 @@ def construct_patch_view_function(model_class, schema, pre_processors=None,
                     obj = query_constructor(model_class.query).get(_id)
                 else:
                     obj = model_class.get(_id)
+            if callable(access_checker):
+                allowed, message = access_checker(obj)
+                if not allowed:
+                    return error_json(401, message)
             if pre_processors is not None:
                 for processor in pre_processors:
                     if callable(processor):
@@ -447,7 +473,8 @@ def construct_delete_view_function(
         pre_processors=None,
         post_processors=None,
         query_constructor=None,
-        permitted_object_getter=None, exception_handler=None):
+        permitted_object_getter=None, exception_handler=None,
+        access_checker=None):
     def delete(_id):
         try:
             if permitted_object_getter is not None:
@@ -459,6 +486,10 @@ def construct_delete_view_function(
                     obj = model_class.get(_id)
             if obj is None:
                 return error_json(404, 'Resource not found')
+            if callable(access_checker):
+                allowed, message = access_checker(obj)
+                if not allowed:
+                    return error_json(401, message)
             if pre_processors is not None:
                 for processor in pre_processors:
                     if callable(processor):
@@ -540,6 +571,7 @@ def register_crud_routes_for_models(
         base_url = _model_dict.get('url_slug')
         forbidden_views = _model_dict.get('forbidden_views', [])
         default_query_constructor = _model_dict.get('query_constructor')
+        default_access_checker = _model_dict.get('access_checker')
         view_dict_for_model = _model_dict.get('views', {})
         dict_struct_for_model = _model_dict.get('dict_struct')
         fields_forbidden_from_being_set_for_all_views = _model_dict.get('fields_forbidden_from_being_set', [])
@@ -576,7 +608,8 @@ def register_crud_routes_for_models(
                 dict_struct=index_dict.get('dict_struct') or dict_struct_for_model,
                 enable_caching=enable_caching,
                 cache_handler=cache_handler, cache_key_determiner=cache_key_determiner,
-                cache_timeout=cache_timeout, exception_handler=exception_handler)
+                cache_timeout=cache_timeout, exception_handler=exception_handler,
+                access_checker=index_dict.get('access_checker') or default_access_checker)
             index_url = index_dict.get('url', None) or "/%s" % base_url
             app_or_bp.route(
                 index_url, methods=['GET'], endpoint='index_%s' % resource_name)(
@@ -596,7 +629,8 @@ def register_crud_routes_for_models(
                 dict_struct=get_dict.get('dict_struct') or dict_struct_for_model,
                 enable_caching=enable_caching,
                 cache_handler=cache_handler, cache_key_determiner=cache_key_determiner,
-                cache_timeout=cache_timeout, exception_handler=exception_handler)
+                cache_timeout=cache_timeout, exception_handler=exception_handler,
+                access_checker=get_dict.get('access_checker') or default_access_checker)
             get_url = get_dict.get('url', None) or '/%s/<_id>' % base_url
             app_or_bp.route(
                 get_url, methods=['GET'], endpoint='get_%s' % resource_name)(
@@ -618,6 +652,7 @@ def register_crud_routes_for_models(
                 allow_unknown_fields=allow_unknown_fields,
                 dict_struct=post_dict.get('dict_struct') or dict_struct_for_model,
                 exception_handler=exception_handler,
+                access_checker=post_dict.get('access_checker') or default_access_checker,
                 fields_forbidden_from_being_set=union([
                     fields_forbidden_from_being_set_for_all_views,
                     post_dict.get('fields_forbidden_from_being_set', [])]))
@@ -647,6 +682,7 @@ def register_crud_routes_for_models(
                 query_constructor=put_dict.get('query_constructor') or default_query_constructor,
                 schemas_registry=schemas_registry,
                 exception_handler=exception_handler,
+                access_checker=put_dict.get('access_checker') or default_access_checker,
                 fields_forbidden_from_being_set=union([
                     fields_forbidden_from_being_set_for_all_views,
                     put_dict.get('fields_forbidden_from_being_set', [])]))
@@ -699,7 +735,8 @@ def register_crud_routes_for_models(
                 post_processors=patch_dict.get('post_processors'),
                 query_constructor=patch_dict.get('query_constructor') or default_query_constructor,
                 permitted_object_getter=patch_dict.get('permitted_object_getter') or _model_dict.get('permitted_object_getter'),
-                schemas_registry=schemas_registry, exception_handler=exception_handler)
+                schemas_registry=schemas_registry, exception_handler=exception_handler,
+                access_checker=patch_dict.get('access_checker') or default_access_checker)
             patch_url = patch_dict.get('url', None) or "/%s/<_id>" % base_url
             app_or_bp.route(
                 patch_url, methods=['PATCH'], endpoint='patch_%s' % resource_name)(
@@ -717,7 +754,8 @@ def register_crud_routes_for_models(
                 pre_processors=delete_dict.get('pre_processors'),
                 registration_dict=registration_dict,
                 permitted_object_getter=delete_dict.get('permitted_object_getter') or _model_dict.get('permitted_object_getter'),
-                post_processors=delete_dict.get('post_processors'), exception_handler=exception_handler)
+                post_processors=delete_dict.get('post_processors'), exception_handler=exception_handler,
+                access_checker=delete_dict.get('access_checker') or default_access_checker)
             delete_url = delete_dict.get('url', None) or "/%s/<_id>" % base_url
             app_or_bp.route(
                 delete_url, methods=['DELETE'], endpoint='delete_%s' % resource_name)(
