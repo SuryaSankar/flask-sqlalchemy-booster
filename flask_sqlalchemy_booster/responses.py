@@ -16,7 +16,7 @@ from schemalite.core import validate_object
 from schemalite.validators import is_a_type_of, is_a_list_of_types_of
 from sqlalchemy.orm import class_mapper
 from sqlalchemy.orm.query import Query
-from sqlalchemy import or_
+from sqlalchemy import or_, and_
 
 
 RESTRICTED = ['limit', 'sort', 'orderby', 'groupby', 'attrs',
@@ -427,7 +427,7 @@ def type_coerce_value(column_type, value):
     return value
 
 
-def filter_query_with_key(query, keyword, value, op):
+def modify_query_and_get_filter_function(query, keyword, value, op):
     if '.' in keyword:
         kw_split_arr = keyword.split('.')
         prefix_names = kw_split_arr[:-1]
@@ -437,7 +437,7 @@ def filter_query_with_key(query, keyword, value, op):
         if prefix_names[0] in query.model_class._decl_class_registry:
             for class_name in prefix_names:
                 if class_name not in query.model_class._decl_class_registry:
-                    return query
+                    return (query, None)
                 model_class = query.model_class._decl_class_registry[
                     class_name]
                 if model_class not in [entity.class_ for entity in _query._join_entities]:
@@ -500,7 +500,7 @@ def filter_query_with_key(query, keyword, value, op):
         value = "%{0}%".format(value)
     if op in ['=', '>', '<', '>=', '<=', '!', '!=']:
         if attr_name in columns:
-            if value is not None:
+            if value is not None and not isinstance(value, bool):
                 if value.lower() == 'none' or value.lower() == 'null' or value.strip() == '':
                     value = None
                 else:
@@ -509,7 +509,7 @@ def filter_query_with_key(query, keyword, value, op):
         value = map(lambda v: type_coerce_value(column_type, v), value)
 
     if hasattr(model_class, attr_name):
-        return _query.filter(getattr(
+        return (_query, getattr(
             getattr(model_class, attr_name), OPERATOR_FUNC[op])(value))
     else:
         subcls_filters = []
@@ -525,16 +525,71 @@ def filter_query_with_key(query, keyword, value, op):
                     )(value)
                 )
         if len(subcls_filters) > 0:
-            return _query.filter(or_(*subcls_filters))
-        return query
+            return (_query, or_(*subcls_filters))
+            # return _query.filter(or_(*subcls_filters))
+        return (query, None)
 
 
-def filter_query_using_filters_list(result, filters):
+def filter_query_with_key(query, keyword, value, op):
+    _query, filter_func = modify_query_and_get_filter_function(
+        query, keyword, value, op)
+    if filter_func is not None:
+        return _query.filter(filter_func)
+    return query
+
+
+def convert_filters_to_sqlalchemy_filter(query, filters, connector):
+    sqfilters = []
+    for f in filters:
+        if "c" in f:
+            sub_sq_filter = convert_filters_to_sqlalchemy_filter(
+                query, f['f'], f['c'])
+            if sub_sq_filter is not None:
+                sqfilters.append(sub_sq_filter)
+        else:
+            query, sqfilter = modify_query_and_get_filter_function(
+                query, f["k"], f["v"], f["op"])
+            sqfilters.append(sqfilter)
+    if len(sqfilters) > 0:
+        if connector == 'AND':
+            return and_(*sqfilters)
+        if connector == 'OR':
+            return or_(*sqfilters)
+    return None
+
+
+def filter_query_using_filters_list(result, filters_dict):
     """
-    filters = [
-        {"op": "=", "k": "layout_id", "v": 1},
-        {"op": ">=", "k": "created_at", "v": "2014-11-10T11:53:33"}
-    ]
+    filters = {
+        "c": "AND",
+        "f": [
+            {
+                "k": "layout_id",
+                "op": "=",
+                "v": 1
+            },
+            {
+                "k": "created_at",
+                "op": ">=",
+                "v": "2014-11-10T11:53:33"
+            },
+            {
+                "c": "OR",
+                "f": [
+                    {
+                        "k": "accepted",
+                        "op": "=",
+                        "v": true
+                    },
+                    {
+                        "k": "accepted",
+                        "op": "=",
+                        "v": null
+                    }
+                ]
+            }
+        ]
+    }
     """
     if not (isinstance(result, Query) or isinstance(result, QueryBooster)):
         if isinstance(result, _BoundDeclarativeMeta) and class_mapper(
@@ -542,10 +597,20 @@ def filter_query_using_filters_list(result, filters):
             result = result.query.with_polymorphic('*')
         else:
             result = result.query
-    for f in filters:
-        result = filter_query_with_key(
-            result, f["k"], f["v"], f["op"])
+    filters = filters_dict['f']
+    connector = filters_dict.get('c') or 'AND'
+    sqfilter = convert_filters_to_sqlalchemy_filter(result, filters, connector)
+    if sqfilter is not None:
+        return result.filter(sqfilter)
     return result
+    # for f in filters:
+    #     if "c" in f:
+    #         if f['c'] == 'AND':
+    #             subfilters = f['f']
+    #     else:
+    #         result = filter_query_with_key(
+    #             result, f["k"], f["v"], f["op"])
+    # return result
 
 
 def filter_query_using_args(result, args_to_skip=[]):
@@ -691,6 +756,7 @@ def process_args_and_render_json_list(q, **kwargs):
         return q
 
     if '_f' in request.args:
+        print request.args['_f']
         filters = _json.loads(request.args['_f'])
         if isinstance(filters, str) or isinstance(filters, unicode):
             filters = _json.loads(filters)

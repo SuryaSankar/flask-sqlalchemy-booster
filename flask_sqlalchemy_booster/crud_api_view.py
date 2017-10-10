@@ -277,8 +277,11 @@ def construct_put_view_function(
                 schemas_registry=schemas_registry)
             if not is_valid:
                 return error_json(400, errors)
+            print "about to call obj.update"
             updated_obj = obj.update(**input_data)
+            print "finished updating obj"
             if post_processors is not None:
+                print "calling post processors"
                 for processor in post_processors:
                     if callable(processor):
                         processed_updated_obj = processor(updated_obj, input_data)
