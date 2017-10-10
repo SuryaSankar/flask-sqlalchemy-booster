@@ -756,7 +756,6 @@ def process_args_and_render_json_list(q, **kwargs):
         return q
 
     if '_f' in request.args:
-        print request.args['_f']
         filters = _json.loads(request.args['_f'])
         if isinstance(filters, str) or isinstance(filters, unicode):
             filters = _json.loads(filters)
