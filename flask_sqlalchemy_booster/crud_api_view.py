@@ -425,6 +425,8 @@ def construct_patch_view_function(model_class, schema, pre_processors=None,
                     obj = query_constructor(model_class.query).get(_id)
                 else:
                     obj = model_class.get(_id)
+            if obj is None:
+                return error_json(404, 'Resource not found')
             if callable(access_checker):
                 allowed, message = access_checker(obj)
                 if not allowed:
