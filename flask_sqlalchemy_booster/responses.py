@@ -501,10 +501,10 @@ def modify_query_and_get_filter_function(query, keyword, value, op):
     if op in ['=', '>', '<', '>=', '<=', '!', '!=']:
         if attr_name in columns:
             if value is not None and not isinstance(value, bool):
-                if value.lower() == 'none' or value.lower() == 'null' or value.strip() == '':
-                    value = None
-                else:
-                    value = type_coerce_value(column_type, value)
+                # if value.lower() == 'none' or value.lower() == 'null' or value.strip() == '':
+                #     value = None
+                # else:
+                value = type_coerce_value(column_type, value)
     elif op == 'in':
         value = map(lambda v: type_coerce_value(column_type, v), value)
 
@@ -601,7 +601,7 @@ def filter_query_using_filters_list(result, filters_dict):
     connector = filters_dict.get('c') or 'AND'
     sqfilter = convert_filters_to_sqlalchemy_filter(result, filters, connector)
     if sqfilter is not None:
-        return result.filter(sqfilter)
+        result = result.filter(sqfilter)
     return result
     # for f in filters:
     #     if "c" in f:
