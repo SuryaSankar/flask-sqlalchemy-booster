@@ -651,6 +651,23 @@ class QueryableMixin(object):
         return objs
 
     @classmethod
+    def update_or_build(cls, **kwargs):
+        keys = kwargs.pop('keys') if 'keys' in kwargs else []
+        filter_kwargs = subdict(kwargs, keys)
+        if filter_kwargs == {}:
+            obj = None
+        else:
+            obj = cls.first(**filter_kwargs)
+        if obj is not None:
+            for key, value in kwargs.iteritems():
+                if (key not in keys and
+                        key not in cls._no_overwrite_):
+                    setattr(obj, key, value)
+        else:
+            obj = cls.build(**kwargs)
+        return obj
+
+    @classmethod
     def update_or_create(cls, **kwargs):
         """Checks if an instance already exists by filtering with the
         kwargs. If yes, updates the instance with new kwargs and
