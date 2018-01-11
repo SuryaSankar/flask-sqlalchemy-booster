@@ -20,9 +20,11 @@ def construct_get_view_function(
         permitted_object_getter=None,
         dict_struct=None, schemas_registry=None, get_query_creator=None,
         enable_caching=False, cache_handler=None, cache_key_determiner=None,
-        cache_timeout=None, exception_handler=None, access_checker=None):
+        cache_timeout=None, exception_handler=None, access_checker=None,
+        dict_post_processors=None):
     def get(_id):
         # print "Entering get function for %s" % request.path
+        print "Received dict_post_processors as ", dict_post_processors
         try:
             _id = _id.strip()
             if _id.startswith('[') and _id.endswith(']'):
@@ -55,7 +57,8 @@ def construct_get_view_function(
                             else {'status': 'success', 'result': obj}
                             for _id, obj in zip(ids, output_dict['result'])}
                     },
-                    dict_struct=dict_struct
+                    dict_struct=dict_struct,
+                    dict_post_processors=dict_post_processors
                 )
             if permitted_object_getter is not None:
                 obj = permitted_object_getter()
@@ -71,7 +74,9 @@ def construct_get_view_function(
                 allowed, message = access_checker(obj)
                 if not allowed:
                     return error_json(401, message)
-            return render_json_obj_with_requested_structure(obj, dict_struct=dict_struct)
+            return render_json_obj_with_requested_structure(
+                obj, dict_struct=dict_struct,
+                dict_post_processors=dict_post_processors)
 
         except Exception as e:
             if exception_handler:
@@ -577,6 +582,7 @@ def register_crud_routes_for_models(
         forbidden_views = _model_dict.get('forbidden_views', [])
         default_query_constructor = _model_dict.get('query_constructor')
         default_access_checker = _model_dict.get('access_checker')
+        default_dict_post_processors = _model_dict.get('dict_post_processors')
         view_dict_for_model = _model_dict.get('views', {})
         dict_struct_for_model = _model_dict.get('dict_struct')
         fields_forbidden_from_being_set_for_all_views = _model_dict.get('fields_forbidden_from_being_set', [])
@@ -635,7 +641,8 @@ def register_crud_routes_for_models(
                 enable_caching=enable_caching,
                 cache_handler=cache_handler, cache_key_determiner=cache_key_determiner,
                 cache_timeout=cache_timeout, exception_handler=exception_handler,
-                access_checker=get_dict.get('access_checker') or default_access_checker)
+                access_checker=get_dict.get('access_checker') or default_access_checker,
+                dict_post_processors=get_dict.get('dict_post_processors') or default_dict_post_processors)
             get_url = get_dict.get('url', None) or '/%s/<_id>' % base_url
             app_or_bp.route(
                 get_url, methods=['GET'], endpoint='get_%s' % resource_name)(

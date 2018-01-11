@@ -31,10 +31,12 @@ OPERATOR_FUNC = {
     'in': 'in_'
 }
 
+
 def json_dump(obj):
     return _json.dumps(
         obj,
         default=json_encoder)
+
 
 def json_response(json_string, status=200):
     return Response(json_string, status, mimetype='application/json')
@@ -43,7 +45,8 @@ def json_response(json_string, status=200):
 def serializable_obj(
         obj, attrs_to_serialize=None, rels_to_expand=None,
         group_listrels_by=None, rels_to_serialize=None,
-        key_modifications=None, dict_struct=None):
+        key_modifications=None, dict_struct=None,
+        dict_post_processors=None):
     if obj:
         if hasattr(obj, 'todict'):
             return obj.todict(
@@ -52,7 +55,8 @@ def serializable_obj(
                 group_listrels_by=group_listrels_by,
                 rels_to_serialize=rels_to_serialize,
                 key_modifications=key_modifications,
-                dict_struct=dict_struct)
+                dict_struct=dict_struct,
+                dict_post_processors=dict_post_processors)
         return str(obj)
     return None
 
@@ -62,17 +66,24 @@ def serialized_obj(obj, attrs_to_serialize=None,
                    group_listrels_by=None,
                    rels_to_serialize=None,
                    key_modifications=None,
-                   dict_struct=None):
+                   dict_struct=None,
+                   dict_post_processors=None):
     return serializable_obj(
-        obj, attrs_to_serialize, rels_to_expand, group_listrels_by,
-        rels_to_serialize, key_modifications, dict_struct)
+        obj,
+        attrs_to_serialize=attrs_to_serialize,
+        rels_to_expand=rels_to_expand, 
+        group_listrels_by=group_listrels_by,
+        rels_to_serialize=rels_to_serialize,
+        key_modifications=key_modifications,
+        dict_struct=dict_struct,
+        dict_post_processors=dict_post_processors)
 
 
 def serializable_list(
         olist, attrs_to_serialize=None, rels_to_expand=None,
         group_listrels_by=None, rels_to_serialize=None,
         key_modifications=None, groupby=None, keyvals_to_merge=None,
-        preserve_order=False, dict_struct=None):
+        preserve_order=False, dict_struct=None, dict_post_processors=None):
     """
     Converts a list of model instances to a list of dictionaries
     using their `todict` method.
@@ -108,7 +119,8 @@ def serializable_list(
                     'attrs_to_serialize': attrs_to_serialize,
                     'group_listrels_by': group_listrels_by,
                     'key_modifications': key_modifications,
-                    'dict_struct': dict_struct
+                    'dict_struct': dict_struct,
+                    'dict_post_processors': dict_post_processors
                 }))
         else:
             result = deep_group(
@@ -120,7 +132,8 @@ def serializable_list(
                     'attrs_to_serialize': attrs_to_serialize,
                     'group_listrels_by': group_listrels_by,
                     'key_modifications': key_modifications,
-                    'dict_struct': dict_struct
+                    'dict_struct': dict_struct,
+                    'dict_post_processors': dict_post_processors
                 })
         return result
     else:
@@ -131,7 +144,8 @@ def serializable_list(
                 group_listrels_by=group_listrels_by,
                 rels_to_serialize=rels_to_serialize,
                 key_modifications=key_modifications,
-                dict_struct=dict_struct),
+                dict_struct=dict_struct,
+                dict_post_processors=dict_post_processors),
             olist)
         if keyvals_to_merge:
             result_list = [merge(obj_dict, kvdict)
@@ -238,15 +252,19 @@ def as_json_obj(o, attrs_to_serialize=None,
                 key_modifications=None,
                 dict_struct=None,
                 groupkeys=None,
+                dict_post_processors=None,
                 meta=None):
-    return as_json(serialized_obj(
+    print "in as_json_obj received dict_post_processors as ", dict_post_processors
+    s_obj = serialized_obj(
         o, attrs_to_serialize=attrs_to_serialize,
         rels_to_expand=rels_to_expand,
         rels_to_serialize=rels_to_serialize,
         group_listrels_by=group_listrels_by,
         dict_struct=dict_struct,
-        key_modifications=key_modifications),
-        meta=meta)
+        key_modifications=key_modifications,
+        dict_post_processors=dict_post_processors)
+    return as_json(s_obj, meta=meta)
+
 
 def as_dict_list(olist, attrs_to_serialize=None,
                  rels_to_expand=None,
@@ -277,6 +295,7 @@ def as_json_list(olist, attrs_to_serialize=None,
                  groupby=None,
                  preserve_order=False,
                  keyvals_to_merge=None,
+                 dict_post_processors=None,
                  meta=None, pre_render_callback=None):
     return as_json(serializable_list(
         olist, attrs_to_serialize=attrs_to_serialize,
@@ -285,7 +304,8 @@ def as_json_list(olist, attrs_to_serialize=None,
         key_modifications=key_modifications,
         groupby=groupby, keyvals_to_merge=keyvals_to_merge,
         dict_struct=dict_struct,
-        preserve_order=preserve_order), meta=meta, pre_render_callback=pre_render_callback)
+        preserve_order=preserve_order,
+        dict_post_processors=dict_post_processors), meta=meta, pre_render_callback=pre_render_callback)
 
 
 def appropriate_json(olist, **kwargs):
