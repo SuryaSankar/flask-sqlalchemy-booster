@@ -23,8 +23,6 @@ def construct_get_view_function(
         cache_timeout=None, exception_handler=None, access_checker=None,
         dict_post_processors=None):
     def get(_id):
-        # print "Entering get function for %s" % request.path
-        print "Received dict_post_processors as ", dict_post_processors
         try:
             _id = _id.strip()
             if _id.startswith('[') and _id.endswith(']'):
@@ -118,7 +116,6 @@ def construct_index_view_function(
                     (k, v) for k in sorted(args) for v in sorted(args.getlist(k))
                 ])
                 # key = url_for(request.endpoint, **request.args)
-                # print "returning key prefix for index as %s" % key
                 return key
             cache_key_determiner = make_key_prefix
         return cache_handler.cached(
@@ -282,11 +279,8 @@ def construct_put_view_function(
                 schemas_registry=schemas_registry)
             if not is_valid:
                 return error_json(400, errors)
-            print "about to call obj.update"
             updated_obj = obj.update(**input_data)
-            print "finished updating obj"
             if post_processors is not None:
-                print "calling post processors"
                 for processor in post_processors:
                     if callable(processor):
                         processed_updated_obj = processor(updated_obj, input_data)

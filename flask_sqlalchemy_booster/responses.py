@@ -254,7 +254,6 @@ def as_json_obj(o, attrs_to_serialize=None,
                 groupkeys=None,
                 dict_post_processors=None,
                 meta=None):
-    print "in as_json_obj received dict_post_processors as ", dict_post_processors
     s_obj = serialized_obj(
         o, attrs_to_serialize=attrs_to_serialize,
         rels_to_expand=rels_to_expand,
