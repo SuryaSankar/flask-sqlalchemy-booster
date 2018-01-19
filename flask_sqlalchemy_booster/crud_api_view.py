@@ -82,7 +82,19 @@ def construct_get_view_function(
             return error_json(400, e.message)
 
     if enable_caching and cache_handler is not None:
-        cached_get = cache_handler.memoize(timeout=cache_timeout)(get)
+        if cache_key_determiner is None:
+            def make_key_prefix(func_name):
+                """Make a key that includes GET parameters."""
+                args = request.args
+                key = request.path + '?' + urllib.urlencode([
+                    (k, v) for k in sorted(args) for v in sorted(args.getlist(k))
+                ])
+                # key = url_for(request.endpoint, **request.args)
+                return key
+            cache_key_determiner = make_key_prefix
+        cached_get = cache_handler.memoize(
+            timeout=cache_timeout,
+            make_name=cache_key_determiner)(get)
         return cached_get
     return get
 
