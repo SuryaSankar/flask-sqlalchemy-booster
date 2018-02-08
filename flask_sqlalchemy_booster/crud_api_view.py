@@ -102,7 +102,9 @@ def construct_get_view_function(
 def construct_index_view_function(
         model_class, index_query_creator=None, dict_struct=None,
         enable_caching=False, cache_handler=None, cache_key_determiner=None,
-        cache_timeout=None, exception_handler=None, access_checker=None):
+        cache_timeout=None, exception_handler=None, access_checker=None,
+        default_limit=None, default_sort=None, default_orderby=None,
+        default_offset=None, default_page=None, default_per_page=None):
     def index():
         try:
             if callable(access_checker):
@@ -112,8 +114,22 @@ def construct_index_view_function(
             if callable(index_query_creator):
                 return process_args_and_render_json_list(
                     index_query_creator(model_class.query),
-                    dict_struct=dict_struct)
-            return process_args_and_render_json_list(model_class, dict_struct=dict_struct)
+                    dict_struct=dict_struct,
+                    default_limit=default_limit,
+                    default_sort=default_sort,
+                    default_orderby=default_orderby,
+                    default_offset=default_offset,
+                    default_page=default_page,
+                    default_per_page=default_per_page)
+            return process_args_and_render_json_list(
+                model_class,
+                dict_struct=dict_struct,
+                default_limit=default_limit,
+                default_sort=default_sort,
+                default_orderby=default_orderby,
+                default_offset=default_offset,
+                default_page=default_page,
+                default_per_page=default_per_page)
         except Exception as e:
             if exception_handler:
                 return exception_handler(e)
@@ -626,7 +642,13 @@ def register_crud_routes_for_models(
                 enable_caching=enable_caching,
                 cache_handler=cache_handler, cache_key_determiner=cache_key_determiner,
                 cache_timeout=cache_timeout, exception_handler=exception_handler,
-                access_checker=index_dict.get('access_checker') or default_access_checker)
+                access_checker=index_dict.get('access_checker') or default_access_checker,
+                default_limit=index_dict.get('default_limit'),
+                default_sort=index_dict.get('default_sort'),
+                default_orderby=index_dict.get('default_orderby'),
+                default_offset=index_dict.get('default_offset'),
+                default_page=index_dict.get('default_page'),
+                default_per_page=index_dict.get('default_per_page'))
             index_url = index_dict.get('url', None) or "/%s" % base_url
             app_or_bp.route(
                 index_url, methods=['GET'], endpoint='index_%s' % resource_name)(

@@ -661,13 +661,15 @@ def filter_query_using_args(result, args_to_skip=[]):
     return result
 
 
-def fetch_results_in_requested_format(result):
-    limit = request.args.get('limit', None)
-    sort = request.args.get('sort', None)
-    orderby = request.args.get('orderby', 'id')
-    offset = request.args.get('offset', None)
-    page = request.args.get('page', None)
-    per_page = request.args.get('per_page', PER_PAGE_ITEMS_COUNT)
+def fetch_results_in_requested_format(
+        result, default_limit=None, default_sort=None, default_orderby=None,
+        default_offset=None, default_page=None, default_per_page=None):
+    limit = request.args.get('limit', default_limit)
+    sort = request.args.get('sort', default_sort)
+    orderby = request.args.get('orderby') or default_orderby or 'id'
+    offset = request.args.get('offset', None) or default_offset
+    page = request.args.get('page', None) or default_page
+    per_page = request.args.get('per_page') or default_per_page or PER_PAGE_ITEMS_COUNT
     if sort:
         if sort == 'asc':
             result = result.asc(orderby)
@@ -787,7 +789,14 @@ def process_args_and_render_json_list(q, **kwargs):
         return as_json(filtered_query.count())
 
     try:
-        result = fetch_results_in_requested_format(filtered_query)
+        result = fetch_results_in_requested_format(
+            filtered_query,
+            default_limit=kwargs.pop('default_limit', None),
+            default_sort=kwargs.pop('default_sort', None),
+            default_orderby=kwargs.pop('default_orderby', None),
+            default_offset=kwargs.pop('default_offset', None),
+            default_page=kwargs.pop('default_page', None),
+            default_per_page=kwargs.pop('default_per_page', None))
     except:
         traceback.print_exc()
         per_page = request.args.get('per_page', PER_PAGE_ITEMS_COUNT)
