@@ -771,6 +771,37 @@ def template_response_from_obj(
     return render_template(template, **merge(obj, merge_keyvals))
 
 
+def process_args_and_fetch_rows(
+        q, default_limit=None, default_sort=None, default_orderby=None,
+        default_offset=None, default_page=None, default_per_page=None):
+
+    if isinstance(q, Response):
+        return q
+
+    if '_f' in request.args:
+        filters = _json.loads(request.args['_f'])
+        if isinstance(filters, str) or isinstance(filters, unicode):
+            filters = _json.loads(filters)
+        q = filter_query_using_filters_list(q, filters)
+
+    filtered_query = filter_query_using_args(q)
+
+    count_only = boolify(request.args.get('count_only', 'false'))
+    if count_only:
+        return as_json(filtered_query.count())
+
+    result = fetch_results_in_requested_format(
+        filtered_query,
+        default_limit=default_limit,
+        default_sort=default_sort,
+        default_orderby=default_orderby,
+        default_offset=default_offset,
+        default_page=default_page,
+        default_per_page=default_per_page
+    )
+    return result
+
+
 def process_args_and_render_json_list(q, **kwargs):
 
     if isinstance(q, Response):
@@ -807,6 +838,7 @@ def process_args_and_render_json_list(q, **kwargs):
         }, status=404, wrap=False)
 
     return convert_result_to_response(result, **kwargs)
+
 
 def merge_params_with_request_args_while_deep_merging_dict_struct(kwargs):
     params_from_request_args = _serializable_params(request.args)

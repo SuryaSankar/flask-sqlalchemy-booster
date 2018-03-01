@@ -11,8 +11,10 @@ from .responses import (
     process_args_and_render_json_list, success_json, error_json,
     render_json_obj_with_requested_structure,
     render_json_list_with_requested_structure,
-    _serializable_params, serializable_obj, as_json)
+    _serializable_params, serializable_obj, as_json,
+    process_args_and_fetch_rows, convert_result_to_response)
 import urllib
+import functools
 
 
 def construct_get_view_function(
@@ -22,6 +24,7 @@ def construct_get_view_function(
         enable_caching=False, cache_handler=None, cache_key_determiner=None,
         cache_timeout=None, exception_handler=None, access_checker=None,
         dict_post_processors=None):
+
     def get(_id):
         try:
             _id = _id.strip()
@@ -90,6 +93,7 @@ def construct_get_view_function(
                     (k, v) for k in sorted(args) for v in sorted(args.getlist(k))
                 ])
                 # key = url_for(request.endpoint, **request.args)
+                print "cache key ", key
                 return key
             cache_key_determiner = make_key_prefix
         cached_get = cache_handler.memoize(
@@ -102,6 +106,7 @@ def construct_get_view_function(
 def construct_index_view_function(
         model_class, index_query_creator=None, dict_struct=None,
         enable_caching=False, cache_handler=None, cache_key_determiner=None,
+        custom_response_creator=None,
         cache_timeout=None, exception_handler=None, access_checker=None,
         default_limit=None, default_sort=None, default_orderby=None,
         default_offset=None, default_page=None, default_per_page=None):
@@ -111,25 +116,23 @@ def construct_index_view_function(
                 allowed, message = access_checker()
                 if not allowed:
                     return error_json(401, message)
+            query_obj = model_class
             if callable(index_query_creator):
-                return process_args_and_render_json_list(
-                    index_query_creator(model_class.query),
-                    dict_struct=dict_struct,
-                    default_limit=default_limit,
-                    default_sort=default_sort,
-                    default_orderby=default_orderby,
-                    default_offset=default_offset,
-                    default_page=default_page,
-                    default_per_page=default_per_page)
-            return process_args_and_render_json_list(
-                model_class,
-                dict_struct=dict_struct,
+                query_obj = index_query_creator(model_class.query)
+            result_rows = process_args_and_fetch_rows(
+                query_obj,
                 default_limit=default_limit,
                 default_sort=default_sort,
                 default_orderby=default_orderby,
                 default_offset=default_offset,
                 default_page=default_page,
                 default_per_page=default_per_page)
+            if custom_response_creator:
+                response = custom_response_creator(result_rows)
+                if isinstance(response, Response):
+                    return response
+            return convert_result_to_response(result_rows, dict_struct=dict_struct)
+
         except Exception as e:
             if exception_handler:
                 return exception_handler(e)
@@ -639,6 +642,7 @@ def register_crud_routes_for_models(
                 _model,
                 index_query_creator=index_dict.get('query_constructor') or default_query_constructor,
                 dict_struct=index_dict.get('dict_struct') or dict_struct_for_model,
+                custom_response_creator=index_dict.get('custom_response_creator'),
                 enable_caching=enable_caching,
                 cache_handler=cache_handler, cache_key_determiner=cache_key_determiner,
                 cache_timeout=cache_timeout, exception_handler=exception_handler,
