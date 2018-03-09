@@ -347,8 +347,7 @@ def construct_batch_put_view_function(
         query_constructor=None, schemas_registry=None,
         allow_unknown_fields=False,
         fields_forbidden_from_being_set=None,
-        exception_handler=None,
-        dict_struct=None):
+        exception_handler=None):
 
     def batch_put():
         try:
@@ -411,14 +410,11 @@ def construct_batch_put_view_function(
                                     if processed_updated_object is not None:
                                         updated_object = processed_updated_object
                         updated_objects[updated_object.id] = updated_object
-                        params = _serializable_params(request.args)
-                        if 'dict_struct' not in params and dict_struct is not None:
-                            params['dict_struct'] = dict_struct
                         output[output_key] = {
                             "status": "success",
                             "result": serializable_obj(
                                 updated_object,
-                                **params)
+                                **_serializable_params(request.args))
                         }
                         all_success = all_success and True
                         any_success = True
@@ -449,7 +445,8 @@ def construct_batch_put_view_function(
 def construct_patch_view_function(model_class, schema, pre_processors=None,
                                   query_constructor=None, schemas_registry=None,
                                   exception_handler=None, permitted_object_getter=None,
-                                  processors=None, post_processors=None, access_checker=None):
+                                  processors=None, post_processors=None, access_checker=None,
+                                  dict_struct=None):
     def patch(_id):
         try:
             if permitted_object_getter is not None:
@@ -497,7 +494,7 @@ def construct_patch_view_function(model_class, schema, pre_processors=None,
                         processed_updated_obj = processor(updated_obj, g.json)
                         if processed_updated_obj is not None:
                             updated_obj = processed_updated_obj
-            return render_json_obj_with_requested_structure(updated_obj)
+            return render_json_obj_with_requested_structure(updated_obj, dict_struct=dict_struct)
         except Exception as e:
             if exception_handler:
                 return exception_handler(e)
@@ -784,7 +781,8 @@ def register_crud_routes_for_models(
                 query_constructor=patch_dict.get('query_constructor') or default_query_constructor,
                 permitted_object_getter=patch_dict.get('permitted_object_getter') or _model_dict.get('permitted_object_getter'),
                 schemas_registry=schemas_registry, exception_handler=exception_handler,
-                access_checker=patch_dict.get('access_checker') or default_access_checker)
+                access_checker=patch_dict.get('access_checker') or default_access_checker,
+                dict_struct=patch_dict.get('dict_struct') or dict_struct_for_model)
             patch_url = patch_dict.get('url', None) or "/%s/<_id>" % base_url
             app_or_bp.route(
                 patch_url, methods=['PATCH'], endpoint='patch_%s' % resource_name)(
