@@ -347,7 +347,8 @@ def construct_batch_put_view_function(
         query_constructor=None, schemas_registry=None,
         allow_unknown_fields=False,
         fields_forbidden_from_being_set=None,
-        exception_handler=None):
+        exception_handler=None,
+        dict_struct=None):
 
     def batch_put():
         try:
@@ -410,11 +411,14 @@ def construct_batch_put_view_function(
                                     if processed_updated_object is not None:
                                         updated_object = processed_updated_object
                         updated_objects[updated_object.id] = updated_object
+                        params = _serializable_params(request.args)
+                        if 'dict_struct' not in params and dict_struct is not None:
+                            params['dict_struct'] = dict_struct
                         output[output_key] = {
                             "status": "success",
                             "result": serializable_obj(
                                 updated_object,
-                                **_serializable_params(request.args))
+                                **params)
                         }
                         all_success = all_success and True
                         any_success = True
