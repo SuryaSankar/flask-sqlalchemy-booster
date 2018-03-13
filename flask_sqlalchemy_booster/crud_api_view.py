@@ -310,11 +310,12 @@ def construct_put_view_function(
                 schemas_registry=schemas_registry)
             if not is_valid:
                 return error_json(400, errors)
+            pre_modification_data = obj.todict(dict_struct={"rels": {}})
             updated_obj = obj.update(**input_data)
             if post_processors is not None:
                 for processor in post_processors:
                     if callable(processor):
-                        processed_updated_obj = processor(updated_obj, input_data)
+                        processed_updated_obj = processor(updated_obj, input_data, pre_modification_data)
                         if processed_updated_obj is not None:
                             updated_obj = processed_updated_obj
             if '_ret' in g.args:
