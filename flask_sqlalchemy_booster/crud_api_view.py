@@ -315,7 +315,7 @@ def construct_put_view_function(
             if post_processors is not None:
                 for processor in post_processors:
                     if callable(processor):
-                        processed_updated_obj = processor(updated_obj, input_data, pre_modification_data)
+                        processed_updated_obj = processor(updated_obj, input_data, pre_modification_data=pre_modification_data)
                         if processed_updated_obj is not None:
                             updated_obj = processed_updated_obj
             if '_ret' in g.args:
