@@ -173,7 +173,7 @@ def construct_post_view_function(
                 for processor in pre_processors:
                     if callable(processor):
                         process_result = processor()
-                        if isinstance(process_result, Response):
+                        if process_result and isinstance(process_result, Response):
                             return process_result
             fields_to_be_removed = union([
                 fields_forbidden_from_being_set or [],
@@ -292,7 +292,7 @@ def construct_put_view_function(
                 for processor in pre_processors:
                     if callable(processor):
                         process_result = processor(obj)
-                        if isinstance(process_result, Response):
+                        if process_result and isinstance(process_result, Response):
                             return process_result
             fields_to_be_removed = union([
                 fields_forbidden_from_being_set or [],
