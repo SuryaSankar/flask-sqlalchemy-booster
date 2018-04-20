@@ -586,14 +586,16 @@ def register_crud_routes_for_models(
         }
     model_schemas = app_or_bp.registered_models_and_crud_routes["model_schemas"]
 
-    def populate_model_schema(modelcls):
+    def populate_model_schema(modelcls, modelcls_key=None):
+        if modelcls_key is None:
+            modelcls_key = modelcls.__name__
         if modelcls._input_data_schema_:
             input_schema = deepcopy(modelcls._input_data_schema_)
         else:
             input_schema = modelcls.generate_input_data_schema()
         if modelcls in registration_dict and callable(registration_dict[modelcls].get('input_schema_modifier')):
             input_schema = registration_dict[modelcls]['input_schema_modifier'](input_schema)
-        model_schemas[modelcls.__name__] = {
+        model_schemas[modelcls_key] = {
             "input_schema": input_schema,
             "output_schema": modelcls.output_data_schema(),
             "accepted_data_structure": modelcls.max_permissible_dict_structure()
@@ -608,7 +610,13 @@ def register_crud_routes_for_models(
             if rel.mapper.class_.__name__ not in model_schemas:
                 populate_model_schema(rel.mapper.class_)
 
-    for _model, _model_dict in registration_dict.items():
+    for _model_key, _model_dict in registration_dict.items():
+        if isinstance(_model_key, str):
+            _model = _model_dict['model_class']
+            _model_name = _model_key
+        else:
+            _model = _model_key
+            _model_name = _model.__name__
         base_url = _model_dict.get('url_slug')
         forbidden_views = _model_dict.get('forbidden_views', [])
         default_query_constructor = _model_dict.get('query_constructor')
@@ -619,12 +627,12 @@ def register_crud_routes_for_models(
         fields_forbidden_from_being_set_for_all_views = _model_dict.get('fields_forbidden_from_being_set', [])
         enable_caching = _model_dict.get('enable_caching', False) and cache_handler is not None
         cache_timeout = _model_dict.get('cache_timeout')
-        resource_name = _model.__tablename__
+        resource_name = _model_dict.get('resource_name') or _model.__tablename__
 
-        if _model.__name__ not in app_or_bp.registered_models_and_crud_routes["models_registered_for_views"]:
-            app_or_bp.registered_models_and_crud_routes["models_registered_for_views"].append(_model.__name__)
-        if _model.__name__ not in model_schemas:
-            populate_model_schema(_model)
+        if _model_name not in app_or_bp.registered_models_and_crud_routes["models_registered_for_views"]:
+            app_or_bp.registered_models_and_crud_routes["models_registered_for_views"].append(_model_name)
+        if _model_name not in model_schemas:
+            populate_model_schema(_model, modelcls_key=_model_name)
 
         if _model._input_data_schema_:
             model_default_input_schema = deepcopy(_model._input_data_schema_)
@@ -635,8 +643,8 @@ def register_crud_routes_for_models(
 
         views = app_or_bp.registered_models_and_crud_routes["views"]
         schemas_registry = {k: v.get('input_schema') for k, v in model_schemas.items()}
-        if _model.__name__ not in views:
-            views[_model.__name__] = {}
+        if _model_name not in views:
+            views[_model_name] = {}
 
         if 'index' not in forbidden_views:
             index_dict = view_dict_for_model.get('index', {})
@@ -663,7 +671,7 @@ def register_crud_routes_for_models(
             app_or_bp.route(
                 index_url, methods=['GET'], endpoint='index_%s' % resource_name)(
                 index_func)
-            views[_model.__name__]['index'] = {'url': index_url}
+            views[_model_name]['index'] = {'url': index_url}
 
         if 'get' not in forbidden_views:
             get_dict = view_dict_for_model.get('get', {})
@@ -685,7 +693,7 @@ def register_crud_routes_for_models(
             app_or_bp.route(
                 get_url, methods=['GET'], endpoint='get_%s' % resource_name)(
                 get_func)
-            views[_model.__name__]['get'] = {'url': get_url}
+            views[_model_name]['get'] = {'url': get_url}
 
         if 'post' not in forbidden_views:
             post_dict = view_dict_for_model.get('post', {})
@@ -710,9 +718,9 @@ def register_crud_routes_for_models(
             app_or_bp.route(
                 post_url, methods=['POST'], endpoint='post_%s' % resource_name)(
                 post_func)
-            views[_model.__name__]['post'] = {'url': post_url}
+            views[_model_name]['post'] = {'url': post_url}
             if 'input_schema_modifier' in post_dict:
-                views[_model.__name__]['post']['input_schema'] = post_dict['input_schema_modifier'](
+                views[_model_name]['post']['input_schema'] = post_dict['input_schema_modifier'](
                     deepcopy(model_schemas[_model.__name__]['input_schema']))
 
         if 'put' not in forbidden_views:
@@ -740,9 +748,9 @@ def register_crud_routes_for_models(
             app_or_bp.route(
                 put_url, methods=['PUT'], endpoint='put_%s' % resource_name)(
                 put_func)
-            views[_model.__name__]['put'] = {'url': put_url}
+            views[_model_name]['put'] = {'url': put_url}
             if 'input_schema_modifier' in put_dict:
-                views[_model.__name__]['put']['input_schema'] = put_dict['input_schema_modifier'](
+                views[_model_name]['put']['input_schema'] = put_dict['input_schema_modifier'](
                     deepcopy(model_schemas[_model.__name__]['input_schema']))
 
         if 'batch_put' not in forbidden_views:
@@ -767,9 +775,9 @@ def register_crud_routes_for_models(
             app_or_bp.route(
                 batch_put_url, methods=['PUT'], endpoint='batch_put_%s' % resource_name)(
                 batch_put_func)
-            views[_model.__name__]['batch_put'] = {'url': batch_put_url}
+            views[_model_name]['batch_put'] = {'url': batch_put_url}
             if 'input_schema_modifier' in batch_put_dict:
-                views[_model.__name__]['batch_put']['input_schema'] = batch_put_dict['input_schema_modifier'](
+                views[_model_name]['batch_put']['input_schema'] = batch_put_dict['input_schema_modifier'](
                     deepcopy(model_schemas[_model.__name__]['input_schema']))
 
         if 'patch' not in forbidden_views:
@@ -792,9 +800,9 @@ def register_crud_routes_for_models(
             app_or_bp.route(
                 patch_url, methods=['PATCH'], endpoint='patch_%s' % resource_name)(
                 patch_func)
-            views[_model.__name__]['patch'] = {'url': patch_url}
+            views[_model_name]['patch'] = {'url': patch_url}
             if 'input_schema_modifier' in patch_dict:
-                views[_model.__name__]['patch']['input_schema'] = patch_dict['input_schema_modifier'](
+                views[_model_name]['patch']['input_schema'] = patch_dict['input_schema_modifier'](
                     deepcopy(model_schemas[_model.__name__]['input_schema']))
 
         if 'delete' not in forbidden_views:
@@ -811,7 +819,7 @@ def register_crud_routes_for_models(
             app_or_bp.route(
                 delete_url, methods=['DELETE'], endpoint='delete_%s' % resource_name)(
                 delete_func)
-            views[_model.__name__]['delete'] = {'url': delete_url}
+            views[_model_name]['delete'] = {'url': delete_url}
 
 
 
