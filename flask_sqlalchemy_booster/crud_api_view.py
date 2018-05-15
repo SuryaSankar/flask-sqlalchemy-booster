@@ -570,6 +570,114 @@ def construct_delete_view_function(
             return error_json(400, e.message)
     return delete
 
+def get_result_dict_from_response(rsp):
+    response = rsp.response
+    if isinstance(response, list) and len(response) > 0:
+        return json.loads(response[0])
+    return None
+
+
+def construct_batch_save_view_function(
+        model_class, schema,
+        registration_dict=None,
+        pre_processors=None,
+        post_processors=None,
+        query_constructor=None, schemas_registry=None,
+        dict_struct=None,
+        allow_unknown_fields=False,
+        access_checker=None,
+        fields_forbidden_from_being_set=None, exception_handler=None):
+    def batch_save():
+        input_data = g.json
+
+
+        fields_to_be_removed = union([
+            fields_forbidden_from_being_set or [],
+            model_class._fields_forbidden_from_being_set_ or []])
+        if len(fields_to_be_removed) > 0:
+            for dict_item in input_data:
+                delete_dict_keys(dict_item, fields_to_be_removed)
+
+        primary_key_name = model_class.primary_key_name()
+        obj_ids = [obj.get(primary_key_name) for obj in input_data]
+        existing_instances = model_class.get_all(obj_ids)
+
+        if callable(access_checker):
+            allowed, message = access_checker()
+            if not allowed:
+                return error_json(401, message)
+
+        output_objs = []
+        errors = []
+
+        responses = []
+
+        for input_row, existing_instance in zip(input_data, existing_instances):
+            if existing_instance:
+                allowed, message = access_checker(existing_instance)
+                if not allowed:
+                    responses.append({
+                        "status": "failure",
+                        "code": 401,
+                        "error": message
+                    })
+                    continue
+
+            if pre_processors is not None:
+                for pre_processor in pre_processors:
+                    if callable(pre_processor):
+                        process_result = pre_processor(existing_instance)
+                        if process_result and isinstance(process_result, Response):
+                            response = get_result_dict_from_response(process_result)
+                            if response:
+                                responses.append(response)
+                                continue
+
+            modified_input_row = model_class.pre_validation_adapter(input_row, existing_instance)
+            if isinstance(modified_input_row, Response):
+                response = get_result_dict_from_response(modified_input_row)
+                if response:
+                    responses.append(response)
+                    continue
+            input_row = modified_input_row
+
+            polymorphic_field = schema.get('polymorphic_on')
+            if polymorphic_field:
+                if polymorphic_field not in input_row:
+                    input_row[polymorphic_field] = getattr(existing_instance, polymorphic_field)
+            is_valid, errors = validate_object(
+                schema, input_row, allow_required_fields_to_be_skipped=True,
+                allow_unknown_fields=allow_unknown_fields,
+                context={"existing_instance": existing_instance,
+                         "model_class": model_class},
+                schemas_registry=schemas_registry)
+            if not is_valid:
+                responses.append({
+                        "status": "failure",
+                        "code": 401,
+                        "error": errors
+                    })
+                continue
+            pre_modification_data = existing_instance.todict(dict_struct={"rels": {}})
+            updated_obj = existing_instance.update(**input_row)
+            if post_processors is not None:
+                for processor in post_processors:
+                    if callable(processor):
+                        processed_updated_obj = processor(updated_obj, input_row, pre_modification_data=pre_modification_data)
+                        if processed_updated_obj is not None:
+                            updated_obj = processed_updated_obj
+            responses.append(render_dict_with_requested_structure(updated_obj, dict_struct=dict_struct))
+
+        status = "success"
+
+        consolidated_result = {
+            "status": status,
+            "result": responses
+        }
+        return as_json(consolidated_result, wrap=False)
+
+    return batch_save
+
 
 def register_crud_routes_for_models(
         app_or_bp, registration_dict, register_schema_structure=True,
@@ -820,6 +928,34 @@ def register_crud_routes_for_models(
                 delete_url, methods=['DELETE'], endpoint='delete_%s' % resource_name)(
                 delete_func)
             views[_model_name]['delete'] = {'url': delete_url}
+
+        if 'batch_save' not in forbidden_views:
+            batch_save_dict = view_dict_for_model.get('batch_save', {})
+            if callable(batch_save_dict.get('input_schema_modifier')):
+                batch_save_input_schema = batch_save_dict['input_schema_modifier'](deepcopy(model_default_input_schema))
+            else:
+                batch_save_input_schema = model_default_input_schema
+            batch_save_func = batch_save_dict.get('view_func', None) or construct_batch_save_view_function(
+                _model, batch_save_input_schema,
+                pre_processors=batch_save_dict.get('pre_processors'),
+                registration_dict=registration_dict,
+                post_processors=batch_save_dict.get('post_processors'),
+                dict_struct=batch_save_dict.get('dict_struct') or dict_struct_for_model,
+                allow_unknown_fields=allow_unknown_fields,
+                query_constructor=batch_save_dict.get('query_constructor') or default_query_constructor,
+                schemas_registry=schemas_registry,
+                exception_handler=exception_handler,
+                fields_forbidden_from_being_set=union([
+                    fields_forbidden_from_being_set_for_all_views,
+                    batch_save_dict.get('fields_forbidden_from_being_set', [])]))
+            batch_save_url = batch_save_dict.get('url', None) or "/batch/%s" % base_url
+            app_or_bp.route(
+                batch_save_url, methods=['PUT'], endpoint='batch_save_%s' % resource_name)(
+                batch_save_func)
+            views[_model_name]['batch_save'] = {'url': batch_save_url}
+            if 'input_schema_modifier' in batch_save_dict:
+                views[_model_name]['batch_save']['input_schema'] = batch_save_dict['input_schema_modifier'](
+                    deepcopy(model_schemas[_model.__name__]['input_schema']))
 
 
 

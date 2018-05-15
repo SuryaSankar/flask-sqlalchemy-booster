@@ -855,6 +855,12 @@ def render_json_obj_with_requested_structure(obj, **kwargs):
     merged_params = merge_params_with_request_args_while_deep_merging_dict_struct(kwargs)
     return as_json_obj(obj, **merged_params)
 
+def render_dict_with_requested_structure(obj, **kwargs):
+    if isinstance(obj, Response):
+        return obj
+    merged_params = merge_params_with_request_args_while_deep_merging_dict_struct(kwargs)
+    return as_dict(obj, **merged_params)
+
 
 def serializable_obj_with_requested_structure(obj):
     if isinstance(obj, Response):
