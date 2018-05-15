@@ -11,6 +11,7 @@ from .responses import (
     process_args_and_render_json_list, success_json, error_json,
     render_json_obj_with_requested_structure,
     render_json_list_with_requested_structure,
+    render_dict_with_requested_structure,
     _serializable_params, serializable_obj, as_json,
     process_args_and_fetch_rows, convert_result_to_response)
 import urllib
@@ -580,14 +581,16 @@ def get_result_dict_from_response(rsp):
 def construct_batch_save_view_function(
         model_class, schema,
         registration_dict=None,
-        pre_processors=None,
-        post_processors=None,
+        pre_processors_for_post=None, pre_processors_for_put=None,
+        post_processors_for_post=None, post_processors_for_put=None,
         query_constructor=None, schemas_registry=None,
         dict_struct=None,
         allow_unknown_fields=False,
         access_checker=None,
         fields_forbidden_from_being_set=None, exception_handler=None):
     def batch_save():
+        print "in batch save function"
+        print request.headers
         input_data = g.json
 
 
@@ -613,7 +616,7 @@ def construct_batch_save_view_function(
         responses = []
 
         for input_row, existing_instance in zip(input_data, existing_instances):
-            if existing_instance:
+            if existing_instance and callable(access_checker):
                 allowed, message = access_checker(existing_instance)
                 if not allowed:
                     responses.append({
@@ -623,6 +626,7 @@ def construct_batch_save_view_function(
                     })
                     continue
 
+            pre_processors = pre_processors_for_put if existing_instance else pre_processors_for_post
             if pre_processors is not None:
                 for pre_processor in pre_processors:
                     if callable(pre_processor):
@@ -658,15 +662,18 @@ def construct_batch_save_view_function(
                         "error": errors
                     })
                 continue
-            pre_modification_data = existing_instance.todict(dict_struct={"rels": {}})
-            updated_obj = existing_instance.update(**input_row)
+            pre_modification_data = existing_instance.todict(dict_struct={"rels": {}}) if existing_instance else None
+            obj = existing_instance.update(**input_row) if existing_instance else model_class.create(**input_row)
+
+            post_processors = post_processors_for_put if existing_instance else post_processors_for_post
             if post_processors is not None:
                 for processor in post_processors:
                     if callable(processor):
-                        processed_updated_obj = processor(updated_obj, input_row, pre_modification_data=pre_modification_data)
-                        if processed_updated_obj is not None:
-                            updated_obj = processed_updated_obj
-            responses.append(render_dict_with_requested_structure(updated_obj, dict_struct=dict_struct))
+                        processed_obj = processor(obj, input_row, pre_modification_data=pre_modification_data)
+                        if processed_obj is not None:
+                            obj = processed_obj
+
+            responses.append(render_dict_with_requested_structure(obj, dict_struct=dict_struct))
 
         status = "success"
 
@@ -937,9 +944,11 @@ def register_crud_routes_for_models(
                 batch_save_input_schema = model_default_input_schema
             batch_save_func = batch_save_dict.get('view_func', None) or construct_batch_save_view_function(
                 _model, batch_save_input_schema,
-                pre_processors=batch_save_dict.get('pre_processors'),
                 registration_dict=registration_dict,
-                post_processors=batch_save_dict.get('post_processors'),
+                pre_processors_for_post=fetch_nested_key_from_dict(view_dict_for_model, 'post.pre_processors'),
+                pre_processors_for_put=fetch_nested_key_from_dict(view_dict_for_model, 'put.pre_processors'),
+                post_processors_for_post=fetch_nested_key_from_dict(view_dict_for_model, 'post.post_processors'),
+                post_processors_for_put=fetch_nested_key_from_dict(view_dict_for_model, 'put.post_processors'),
                 dict_struct=batch_save_dict.get('dict_struct') or dict_struct_for_model,
                 allow_unknown_fields=allow_unknown_fields,
                 query_constructor=batch_save_dict.get('query_constructor') or default_query_constructor,
@@ -950,7 +959,7 @@ def register_crud_routes_for_models(
                     batch_save_dict.get('fields_forbidden_from_being_set', [])]))
             batch_save_url = batch_save_dict.get('url', None) or "/batch/%s" % base_url
             app_or_bp.route(
-                batch_save_url, methods=['PUT'], endpoint='batch_save_%s' % resource_name)(
+                batch_save_url, methods=['POST'], endpoint='batch_save_%s' % resource_name)(
                 batch_save_func)
             views[_model_name]['batch_save'] = {'url': batch_save_url}
             if 'input_schema_modifier' in batch_save_dict:
