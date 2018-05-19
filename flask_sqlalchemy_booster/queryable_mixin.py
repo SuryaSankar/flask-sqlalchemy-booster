@@ -971,3 +971,7 @@ class QueryableMixin(object):
         for k, v in cls._preprocess_params(kwargs).items():
             setattr(model, k, v)
         return model
+
+    @classmethod
+    def buckets(cls, bucket_size=None):
+    	return cls.query.buckets(bucket_size=bucket_size)
