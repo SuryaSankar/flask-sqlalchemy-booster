@@ -26,7 +26,7 @@ setup(
         "Flask>=0.10.1",
         "SQLAlchemy>=1.1.11",
         "Flask-SQLAlchemy==2.1",
-        "Schemalite>=0.1.21"
+        "Schemalite>=0.1.22"
     ],
     license='MIT',
     url='https://github.com/inkmonk/flask-sqlalchemy-booster',
