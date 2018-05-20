@@ -4,7 +4,9 @@ from schemalite import SchemaError
 from schemalite.core import validate_object, validate_list_of_objects, json_encoder
 from sqlalchemy.sql import sqltypes
 import json
-from toolspy import all_subclasses, fetch_nested_key_from_dict, delete_dict_keys, union
+from toolspy import (
+    all_subclasses, fetch_nested_key_from_dict,
+    delete_dict_keys, union)
 from copy import deepcopy
 import inspect
 from .responses import (
@@ -16,6 +18,8 @@ from .responses import (
     process_args_and_fetch_rows, convert_result_to_response)
 import urllib
 import functools
+from .utils import nullify_empty_values_in_dict, save_file_from_request
+import csv
 
 
 def construct_get_view_function(
@@ -587,11 +591,23 @@ def construct_batch_save_view_function(
         dict_struct=None,
         allow_unknown_fields=False,
         access_checker=None,
-        fields_forbidden_from_being_set=None, exception_handler=None):
+        fields_forbidden_from_being_set=None, exception_handler=None,
+        tmp_folder_path="/tmp"):
     def batch_save():
         print "in batch save function"
         print request.headers
-        input_data = g.json
+        if request.headers['Content-Type'].startswith("multipart/form-data"):
+            print "Received file upload"
+            csv_file_path = save_file_from_request(
+                request.files['file'], location=tmp_folder_path)
+            with open(csv_file_path) as csv_file:
+                csv_reader = csv.DictReader(csv_file)
+                rows = [r for r in csv_reader]
+                rows = [nullify_empty_values_in_dict(row) for row in rows]
+                print rows
+                input_data = rows
+        else:
+            input_data = g.json
 
 
         fields_to_be_removed = union([
@@ -688,7 +704,8 @@ def construct_batch_save_view_function(
 
 def register_crud_routes_for_models(
         app_or_bp, registration_dict, register_schema_structure=True,
-        allow_unknown_fields=False, cache_handler=None, exception_handler=None):
+        allow_unknown_fields=False, cache_handler=None, exception_handler=None,
+        tmp_folder_path="/tmp"):
     if not hasattr(app_or_bp, "registered_models_and_crud_routes"):
         app_or_bp.registered_models_and_crud_routes = {
             "models_registered_for_views": [],
@@ -954,10 +971,11 @@ def register_crud_routes_for_models(
                 query_constructor=batch_save_dict.get('query_constructor') or default_query_constructor,
                 schemas_registry=schemas_registry,
                 exception_handler=exception_handler,
+                tmp_folder_path=tmp_folder_path,
                 fields_forbidden_from_being_set=union([
                     fields_forbidden_from_being_set_for_all_views,
                     batch_save_dict.get('fields_forbidden_from_being_set', [])]))
-            batch_save_url = batch_save_dict.get('url', None) or "/batch/%s" % base_url
+            batch_save_url = batch_save_dict.get('url', None) or "/batch-save/%s" % base_url
             app_or_bp.route(
                 batch_save_url, methods=['POST'], endpoint='batch_save_%s' % resource_name)(
                 batch_save_func)
