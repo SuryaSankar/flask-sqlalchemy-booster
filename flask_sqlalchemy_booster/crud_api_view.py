@@ -587,6 +587,9 @@ def construct_batch_save_view_function(
         registration_dict=None,
         pre_processors_for_post=None, pre_processors_for_put=None,
         post_processors_for_post=None, post_processors_for_put=None,
+        extra_pre_processors=None,
+        extra_post_processors=None,
+        unique_identifier_fields=None,
         query_constructor=None, schemas_registry=None,
         dict_struct=None,
         allow_unknown_fields=False,
@@ -617,9 +620,26 @@ def construct_batch_save_view_function(
             for dict_item in input_data:
                 delete_dict_keys(dict_item, fields_to_be_removed)
 
+        if extra_pre_processors:
+            for pre_processor in extra_pre_processors:
+                if callable(pre_processor):
+                    input_data = [pre_processor(row) for row in input_data]
+
+
         primary_key_name = model_class.primary_key_name()
         obj_ids = [obj.get(primary_key_name) for obj in input_data]
         existing_instances = model_class.get_all(obj_ids)
+
+        if unique_identifier_fields:
+            for idx, input_row in enumerate(input_data):
+                existing_instance = existing_instances[idx]
+                if existing_instance is None:
+                    if all(input_row.get(f) is not None for f in unique_identifier_fields):
+                        filter_kwargs = {f: input_row.get(f) for f in unique_identifier_fields}
+                        existing_instances[idx] = model_class.query.filter_by(**filter_kwargs).first()
+                        if existing_instances[idx]:
+                            input_row[primary_key_name] = getattr(
+                                existing_instances[idx], primary_key_name)
 
         if callable(access_checker):
             allowed, message = access_checker()
@@ -966,6 +986,9 @@ def register_crud_routes_for_models(
                 pre_processors_for_put=fetch_nested_key_from_dict(view_dict_for_model, 'put.pre_processors'),
                 post_processors_for_post=fetch_nested_key_from_dict(view_dict_for_model, 'post.post_processors'),
                 post_processors_for_put=fetch_nested_key_from_dict(view_dict_for_model, 'put.post_processors'),
+                extra_pre_processors=batch_save_dict.get('extra_pre_processors'),
+                extra_post_processors=batch_save_dict.get('extra_post_processors'),
+                unique_identifier_fields=batch_save_dict.get('unique_identifier_fields'),
                 dict_struct=batch_save_dict.get('dict_struct') or dict_struct_for_model,
                 allow_unknown_fields=allow_unknown_fields,
                 query_constructor=batch_save_dict.get('query_constructor') or default_query_constructor,
