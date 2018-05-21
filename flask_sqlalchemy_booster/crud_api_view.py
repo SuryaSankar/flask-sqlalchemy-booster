@@ -229,6 +229,7 @@ def construct_post_view_function(
                             {'status': 'success', 'result': obj}
                             for obj, error in zip(output_dict['result'], errors)]})
             else:
+                raw_input_data = deepcopy(g.json)
                 if len(fields_to_be_removed) > 0:
                     delete_dict_keys(g.json, fields_to_be_removed)
                 input_data = model_class.pre_validation_adapter(g.json)
@@ -244,7 +245,9 @@ def construct_post_view_function(
                 if post_processors is not None:
                     for processor in post_processors:
                         if callable(processor):
-                            processed_obj = processor(obj, input_data)
+                            processed_obj = processor(
+                                obj, input_data,
+                                raw_input_data=raw_input_data)
                             if processed_obj is not None:
                                 obj = processed_obj
                 if '_ret' in g.args:
@@ -293,6 +296,7 @@ def construct_put_view_function(
                 allowed, message = access_checker(obj)
                 if not allowed:
                     return error_json(401, message)
+            raw_input_data = deepcopy(g.json)
             if pre_processors is not None:
                 for processor in pre_processors:
                     if callable(processor):
@@ -324,7 +328,10 @@ def construct_put_view_function(
             if post_processors is not None:
                 for processor in post_processors:
                     if callable(processor):
-                        processed_updated_obj = processor(updated_obj, input_data, pre_modification_data=pre_modification_data)
+                        processed_updated_obj = processor(
+                            updated_obj, input_data,
+                            pre_modification_data=pre_modification_data,
+                            raw_input_data=raw_input_data)
                         if processed_updated_obj is not None:
                             updated_obj = processed_updated_obj
             if '_ret' in g.args:
@@ -612,6 +619,8 @@ def construct_batch_save_view_function(
         else:
             input_data = g.json
 
+        raw_input_data = deepcopy(input_data)
+
 
         fields_to_be_removed = union([
             fields_forbidden_from_being_set or [],
@@ -651,7 +660,7 @@ def construct_batch_save_view_function(
 
         responses = []
 
-        for input_row, existing_instance in zip(input_data, existing_instances):
+        for input_row, existing_instance, raw_input_row in zip(input_data, existing_instances, raw_input_data):
             if existing_instance and callable(access_checker):
                 allowed, message = access_checker(existing_instance)
                 if not allowed:
@@ -705,7 +714,10 @@ def construct_batch_save_view_function(
             if post_processors is not None:
                 for processor in post_processors:
                     if callable(processor):
-                        processed_obj = processor(obj, input_row, pre_modification_data=pre_modification_data)
+                        processed_obj = processor(
+                            obj, input_row,
+                            pre_modification_data=pre_modification_data,
+                            raw_input_data=raw_input_row)
                         if processed_obj is not None:
                             obj = processed_obj
 
