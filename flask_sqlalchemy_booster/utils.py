@@ -47,6 +47,12 @@ def nullify_empty_values_in_dict(d):
             d[k] = None
     return d
 
+def remove_empty_values_in_dict(d):
+    for k in d.keys():
+        if d[k] == '':
+            del d[k]
+    return d
+
 def save_file_from_request(_file, location=None):
     filename = "%s_%s_%s" % (datetime.utcnow().strftime("%Y%m%d_%H%M%S%f"),
                              uuid.uuid4().hex[0:6],

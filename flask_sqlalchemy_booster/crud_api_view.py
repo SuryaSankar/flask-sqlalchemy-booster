@@ -18,7 +18,7 @@ from .responses import (
     process_args_and_fetch_rows, convert_result_to_response)
 import urllib
 import functools
-from .utils import nullify_empty_values_in_dict, save_file_from_request
+from .utils import remove_empty_values_in_dict, save_file_from_request
 import csv
 
 
@@ -613,7 +613,7 @@ def construct_batch_save_view_function(
             with open(csv_file_path) as csv_file:
                 csv_reader = csv.DictReader(csv_file)
                 rows = [r for r in csv_reader]
-                rows = [nullify_empty_values_in_dict(row) for row in rows]
+                rows = [remove_empty_values_in_dict(row) for row in rows]
                 print rows
                 input_data = rows
         else:
