@@ -17,6 +17,7 @@ from schemalite.validators import is_a_type_of, is_a_list_of_types_of
 from sqlalchemy.orm import class_mapper
 from sqlalchemy.orm.query import Query
 from sqlalchemy import or_, and_
+from .utils import type_coerce_value
 
 
 RESTRICTED = ['limit', 'sort', 'orderby', 'groupby', 'attrs',
@@ -427,23 +428,23 @@ def as_list(func):
     return wrapper
 
 
-def type_coerce_value(column_type, value):
-    if value is None:
-        return None
-    if isinstance(value, unicode) or isinstance(value, str):
-        if value.lower() == 'none' or value.lower() == 'null' or value.strip() == '':
-            return None
-    if column_type is sqltypes.Integer:
-        value = int(value)
-    elif column_type is sqltypes.Numeric:
-        value = Decimal(value)
-    elif column_type is sqltypes.Boolean:
-        value = boolify(value)
-    elif column_type is sqltypes.DateTime:
-        value = dateutil.parser.parse(value)
-    elif column_type is sqltypes.Date:
-        value = dateutil.parser.parse(value).date()
-    return value
+# def type_coerce_value(column_type, value):
+#     if value is None:
+#         return None
+#     if isinstance(value, unicode) or isinstance(value, str):
+#         if value.lower() == 'none' or value.lower() == 'null' or value.strip() == '':
+#             return None
+#     if column_type is sqltypes.Integer:
+#         value = int(value)
+#     elif column_type is sqltypes.Numeric:
+#         value = Decimal(value)
+#     elif column_type is sqltypes.Boolean:
+#         value = boolify(value)
+#     elif column_type is sqltypes.DateTime:
+#         value = dateutil.parser.parse(value)
+#     elif column_type is sqltypes.Date:
+#         value = dateutil.parser.parse(value).date()
+#     return value
 
 
 def modify_query_and_get_filter_function(query, keyword, value, op):

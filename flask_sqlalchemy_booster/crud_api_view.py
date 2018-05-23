@@ -18,7 +18,7 @@ from .responses import (
     process_args_and_fetch_rows, convert_result_to_response)
 import urllib
 import functools
-from .utils import remove_empty_values_in_dict, save_file_from_request
+from .utils import remove_empty_values_in_dict, save_file_from_request, convert_to_proper_types
 import csv
 
 
@@ -613,8 +613,9 @@ def construct_batch_save_view_function(
             with open(csv_file_path) as csv_file:
                 csv_reader = csv.DictReader(csv_file)
                 rows = [r for r in csv_reader]
-                rows = [remove_empty_values_in_dict(row) for row in rows]
-                print rows
+                rows = [convert_to_proper_types(
+                    remove_empty_values_in_dict(row),
+                    model_class) for row in rows]
                 input_data = rows
         else:
             input_data = g.json
@@ -661,6 +662,9 @@ def construct_batch_save_view_function(
         responses = []
 
         for input_row, existing_instance, raw_input_row in zip(input_data, existing_instances, raw_input_data):
+            # print
+            # print "INPUT ", input_row
+            # print "CURRENT INSTANCE ", existing_instance
             if existing_instance and callable(access_checker):
                 allowed, message = access_checker(existing_instance)
                 if not allowed:
