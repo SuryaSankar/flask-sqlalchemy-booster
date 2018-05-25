@@ -16,7 +16,8 @@ from schemalite.core import validate_object
 from schemalite.validators import is_a_type_of, is_a_list_of_types_of
 from sqlalchemy.orm import class_mapper
 from sqlalchemy.orm.query import Query
-from sqlalchemy import or_
+from sqlalchemy import or_, and_
+from .utils import type_coerce_value
 
 
 RESTRICTED = ['limit', 'sort', 'orderby', 'groupby', 'attrs',
@@ -31,10 +32,12 @@ OPERATOR_FUNC = {
     'in': 'in_'
 }
 
+
 def json_dump(obj):
     return _json.dumps(
         obj,
         default=json_encoder)
+
 
 def json_response(json_string, status=200):
     return Response(json_string, status, mimetype='application/json')
@@ -43,7 +46,8 @@ def json_response(json_string, status=200):
 def serializable_obj(
         obj, attrs_to_serialize=None, rels_to_expand=None,
         group_listrels_by=None, rels_to_serialize=None,
-        key_modifications=None, dict_struct=None):
+        key_modifications=None, dict_struct=None,
+        dict_post_processors=None):
     if obj:
         if hasattr(obj, 'todict'):
             return obj.todict(
@@ -52,7 +56,8 @@ def serializable_obj(
                 group_listrels_by=group_listrels_by,
                 rels_to_serialize=rels_to_serialize,
                 key_modifications=key_modifications,
-                dict_struct=dict_struct)
+                dict_struct=dict_struct,
+                dict_post_processors=dict_post_processors)
         return str(obj)
     return None
 
@@ -62,17 +67,24 @@ def serialized_obj(obj, attrs_to_serialize=None,
                    group_listrels_by=None,
                    rels_to_serialize=None,
                    key_modifications=None,
-                   dict_struct=None):
+                   dict_struct=None,
+                   dict_post_processors=None):
     return serializable_obj(
-        obj, attrs_to_serialize, rels_to_expand, group_listrels_by,
-        rels_to_serialize, key_modifications, dict_struct)
+        obj,
+        attrs_to_serialize=attrs_to_serialize,
+        rels_to_expand=rels_to_expand, 
+        group_listrels_by=group_listrels_by,
+        rels_to_serialize=rels_to_serialize,
+        key_modifications=key_modifications,
+        dict_struct=dict_struct,
+        dict_post_processors=dict_post_processors)
 
 
 def serializable_list(
         olist, attrs_to_serialize=None, rels_to_expand=None,
         group_listrels_by=None, rels_to_serialize=None,
         key_modifications=None, groupby=None, keyvals_to_merge=None,
-        preserve_order=False, dict_struct=None):
+        preserve_order=False, dict_struct=None, dict_post_processors=None):
     """
     Converts a list of model instances to a list of dictionaries
     using their `todict` method.
@@ -108,7 +120,8 @@ def serializable_list(
                     'attrs_to_serialize': attrs_to_serialize,
                     'group_listrels_by': group_listrels_by,
                     'key_modifications': key_modifications,
-                    'dict_struct': dict_struct
+                    'dict_struct': dict_struct,
+                    'dict_post_processors': dict_post_processors
                 }))
         else:
             result = deep_group(
@@ -120,7 +133,8 @@ def serializable_list(
                     'attrs_to_serialize': attrs_to_serialize,
                     'group_listrels_by': group_listrels_by,
                     'key_modifications': key_modifications,
-                    'dict_struct': dict_struct
+                    'dict_struct': dict_struct,
+                    'dict_post_processors': dict_post_processors
                 })
         return result
     else:
@@ -131,7 +145,8 @@ def serializable_list(
                 group_listrels_by=group_listrels_by,
                 rels_to_serialize=rels_to_serialize,
                 key_modifications=key_modifications,
-                dict_struct=dict_struct),
+                dict_struct=dict_struct,
+                dict_post_processors=dict_post_processors),
             olist)
         if keyvals_to_merge:
             result_list = [merge(obj_dict, kvdict)
@@ -238,15 +253,18 @@ def as_json_obj(o, attrs_to_serialize=None,
                 key_modifications=None,
                 dict_struct=None,
                 groupkeys=None,
+                dict_post_processors=None,
                 meta=None):
-    return as_json(serialized_obj(
+    s_obj = serialized_obj(
         o, attrs_to_serialize=attrs_to_serialize,
         rels_to_expand=rels_to_expand,
         rels_to_serialize=rels_to_serialize,
         group_listrels_by=group_listrels_by,
         dict_struct=dict_struct,
-        key_modifications=key_modifications),
-        meta=meta)
+        key_modifications=key_modifications,
+        dict_post_processors=dict_post_processors)
+    return as_json(s_obj, meta=meta)
+
 
 def as_dict_list(olist, attrs_to_serialize=None,
                  rels_to_expand=None,
@@ -277,6 +295,7 @@ def as_json_list(olist, attrs_to_serialize=None,
                  groupby=None,
                  preserve_order=False,
                  keyvals_to_merge=None,
+                 dict_post_processors=None,
                  meta=None, pre_render_callback=None):
     return as_json(serializable_list(
         olist, attrs_to_serialize=attrs_to_serialize,
@@ -285,7 +304,8 @@ def as_json_list(olist, attrs_to_serialize=None,
         key_modifications=key_modifications,
         groupby=groupby, keyvals_to_merge=keyvals_to_merge,
         dict_struct=dict_struct,
-        preserve_order=preserve_order), meta=meta, pre_render_callback=pre_render_callback)
+        preserve_order=preserve_order,
+        dict_post_processors=dict_post_processors), meta=meta, pre_render_callback=pre_render_callback)
 
 
 def appropriate_json(olist, **kwargs):
@@ -356,6 +376,7 @@ def _serializable_params(args, check_groupby=False):
             params['preserve_order'] = boolify(request.args.get('preserve_order'))
     return params
 
+
 def params_for_serialization(
         attrs_to_serialize=None, rels_to_expand=None,
         rels_to_serialize=None, group_listrels_by=None,
@@ -406,21 +427,27 @@ def as_list(func):
             **_serializable_params(request.args, check_groupby=True))
     return wrapper
 
-def type_coerce_value(column_type, value):
-    if column_type is sqltypes.Integer:
-        value = int(value)
-    elif column_type is sqltypes.Numeric:
-        value = Decimal(value)
-    elif column_type is sqltypes.Boolean:
-        value = boolify(value)
-    elif column_type is sqltypes.DateTime:
-        value = dateutil.parser.parse(value)
-    elif column_type is sqltypes.Date:
-        value = dateutil.parser.parse(value).date()
-    return value
+
+# def type_coerce_value(column_type, value):
+#     if value is None:
+#         return None
+#     if isinstance(value, unicode) or isinstance(value, str):
+#         if value.lower() == 'none' or value.lower() == 'null' or value.strip() == '':
+#             return None
+#     if column_type is sqltypes.Integer:
+#         value = int(value)
+#     elif column_type is sqltypes.Numeric:
+#         value = Decimal(value)
+#     elif column_type is sqltypes.Boolean:
+#         value = boolify(value)
+#     elif column_type is sqltypes.DateTime:
+#         value = dateutil.parser.parse(value)
+#     elif column_type is sqltypes.Date:
+#         value = dateutil.parser.parse(value).date()
+#     return value
 
 
-def filter_query_with_key(query, keyword, value, op):
+def modify_query_and_get_filter_function(query, keyword, value, op):
     if '.' in keyword:
         kw_split_arr = keyword.split('.')
         prefix_names = kw_split_arr[:-1]
@@ -430,7 +457,7 @@ def filter_query_with_key(query, keyword, value, op):
         if prefix_names[0] in query.model_class._decl_class_registry:
             for class_name in prefix_names:
                 if class_name not in query.model_class._decl_class_registry:
-                    return query
+                    return (query, None)
                 model_class = query.model_class._decl_class_registry[
                     class_name]
                 if model_class not in [entity.class_ for entity in _query._join_entities]:
@@ -493,15 +520,16 @@ def filter_query_with_key(query, keyword, value, op):
         value = "%{0}%".format(value)
     if op in ['=', '>', '<', '>=', '<=', '!', '!=']:
         if attr_name in columns:
-            if value == 'none' or value == 'null':
-                value = None
-            if value is not None:
+            if value is not None and not isinstance(value, bool):
+                # if value.lower() == 'none' or value.lower() == 'null' or value.strip() == '':
+                #     value = None
+                # else:
                 value = type_coerce_value(column_type, value)
     elif op == 'in':
         value = map(lambda v: type_coerce_value(column_type, v), value)
 
     if hasattr(model_class, attr_name):
-        return _query.filter(getattr(
+        return (_query, getattr(
             getattr(model_class, attr_name), OPERATOR_FUNC[op])(value))
     else:
         subcls_filters = []
@@ -517,16 +545,71 @@ def filter_query_with_key(query, keyword, value, op):
                     )(value)
                 )
         if len(subcls_filters) > 0:
-            return _query.filter(or_(*subcls_filters))
-        return query
+            return (_query, or_(*subcls_filters))
+            # return _query.filter(or_(*subcls_filters))
+        return (query, None)
 
 
-def filter_query_using_filters_list(result, filters):
+def filter_query_with_key(query, keyword, value, op):
+    _query, filter_func = modify_query_and_get_filter_function(
+        query, keyword, value, op)
+    if filter_func is not None:
+        return _query.filter(filter_func)
+    return query
+
+
+def convert_filters_to_sqlalchemy_filter(query, filters, connector):
+    sqfilters = []
+    for f in filters:
+        if "c" in f:
+            sub_sq_filter = convert_filters_to_sqlalchemy_filter(
+                query, f['f'], f['c'])
+            if sub_sq_filter is not None:
+                sqfilters.append(sub_sq_filter)
+        else:
+            query, sqfilter = modify_query_and_get_filter_function(
+                query, f["k"], f["v"], f["op"])
+            sqfilters.append(sqfilter)
+    if len(sqfilters) > 0:
+        if connector == 'AND':
+            return and_(*sqfilters)
+        if connector == 'OR':
+            return or_(*sqfilters)
+    return None
+
+
+def filter_query_using_filters_list(result, filters_dict):
     """
-    filters = [
-        {"op": "=", "k": "layout_id", "v": 1},
-        {"op": ">=", "k": "created_at", "v": "2014-11-10T11:53:33"}
-    ]
+    filters = {
+        "c": "AND",
+        "f": [
+            {
+                "k": "layout_id",
+                "op": "=",
+                "v": 1
+            },
+            {
+                "k": "created_at",
+                "op": ">=",
+                "v": "2014-11-10T11:53:33"
+            },
+            {
+                "c": "OR",
+                "f": [
+                    {
+                        "k": "accepted",
+                        "op": "=",
+                        "v": true
+                    },
+                    {
+                        "k": "accepted",
+                        "op": "=",
+                        "v": null
+                    }
+                ]
+            }
+        ]
+    }
     """
     if not (isinstance(result, Query) or isinstance(result, QueryBooster)):
         if isinstance(result, _BoundDeclarativeMeta) and class_mapper(
@@ -534,11 +617,20 @@ def filter_query_using_filters_list(result, filters):
             result = result.query.with_polymorphic(result.all_subclasses_with_separate_tables())
         else:
             result = result.query
-    for f in filters:
-        result = filter_query_with_key(
-            result, f["k"], f["v"], f["op"])
+    filters = filters_dict['f']
+    connector = filters_dict.get('c') or 'AND'
+    sqfilter = convert_filters_to_sqlalchemy_filter(result, filters, connector)
+    if sqfilter is not None:
+        result = result.filter(sqfilter)
     return result
-
+    # for f in filters:
+    #     if "c" in f:
+    #         if f['c'] == 'AND':
+    #             subfilters = f['f']
+    #     else:
+    #         result = filter_query_with_key(
+    #             result, f["k"], f["v"], f["op"])
+    # return result
 
 
 def filter_query_using_args(result, args_to_skip=[]):
@@ -564,19 +656,21 @@ def filter_query_using_args(result, args_to_skip=[]):
                 # anywhere? Turns out it is here.
                 if kw not in RESTRICTED:
                     value = request.args.get(kw)
-                    if value.lower() == 'none' or value.lower() == 'null':
+                    if value.lower() == 'none' or value.lower() == 'null' or value.strip() == '':
                         value = None
                     result = filter_query_with_key(result, kw, value, '=')
     return result
 
 
-def fetch_results_in_requested_format(result):
-    limit = request.args.get('limit', None)
-    sort = request.args.get('sort', None)
-    orderby = request.args.get('orderby', 'id')
-    offset = request.args.get('offset', None)
-    page = request.args.get('page', None)
-    per_page = request.args.get('per_page', PER_PAGE_ITEMS_COUNT)
+def fetch_results_in_requested_format(
+        result, default_limit=None, default_sort=None, default_orderby=None,
+        default_offset=None, default_page=None, default_per_page=None):
+    limit = request.args.get('limit', default_limit)
+    sort = request.args.get('sort', default_sort)
+    orderby = request.args.get('orderby') or default_orderby or 'id'
+    offset = request.args.get('offset', None) or default_offset
+    page = request.args.get('page', None) or default_page
+    per_page = request.args.get('per_page') or default_per_page or PER_PAGE_ITEMS_COUNT
     if sort:
         if sort == 'asc':
             result = result.asc(orderby)
@@ -678,6 +772,37 @@ def template_response_from_obj(
     return render_template(template, **merge(obj, merge_keyvals))
 
 
+def process_args_and_fetch_rows(
+        q, default_limit=None, default_sort=None, default_orderby=None,
+        default_offset=None, default_page=None, default_per_page=None):
+
+    if isinstance(q, Response):
+        return q
+
+    if '_f' in request.args:
+        filters = _json.loads(request.args['_f'])
+        if isinstance(filters, str) or isinstance(filters, unicode):
+            filters = _json.loads(filters)
+        q = filter_query_using_filters_list(q, filters)
+
+    filtered_query = filter_query_using_args(q)
+
+    count_only = boolify(request.args.get('count_only', 'false'))
+    if count_only:
+        return as_json(filtered_query.count())
+
+    result = fetch_results_in_requested_format(
+        filtered_query,
+        default_limit=default_limit,
+        default_sort=default_sort,
+        default_orderby=default_orderby,
+        default_offset=default_offset,
+        default_page=default_page,
+        default_per_page=default_per_page
+    )
+    return result
+
+
 def process_args_and_render_json_list(q, **kwargs):
 
     if isinstance(q, Response):
@@ -696,7 +821,14 @@ def process_args_and_render_json_list(q, **kwargs):
         return as_json(filtered_query.count())
 
     try:
-        result = fetch_results_in_requested_format(filtered_query)
+        result = fetch_results_in_requested_format(
+            filtered_query,
+            default_limit=kwargs.pop('default_limit', None),
+            default_sort=kwargs.pop('default_sort', None),
+            default_orderby=kwargs.pop('default_orderby', None),
+            default_offset=kwargs.pop('default_offset', None),
+            default_page=kwargs.pop('default_page', None),
+            default_per_page=kwargs.pop('default_per_page', None))
     except:
         traceback.print_exc()
         per_page = request.args.get('per_page', PER_PAGE_ITEMS_COUNT)
@@ -707,6 +839,7 @@ def process_args_and_render_json_list(q, **kwargs):
         }, status=404, wrap=False)
 
     return convert_result_to_response(result, **kwargs)
+
 
 def merge_params_with_request_args_while_deep_merging_dict_struct(kwargs):
     params_from_request_args = _serializable_params(request.args)
@@ -722,6 +855,12 @@ def render_json_obj_with_requested_structure(obj, **kwargs):
         return obj
     merged_params = merge_params_with_request_args_while_deep_merging_dict_struct(kwargs)
     return as_json_obj(obj, **merged_params)
+
+def render_dict_with_requested_structure(obj, **kwargs):
+    if isinstance(obj, Response):
+        return obj
+    merged_params = merge_params_with_request_args_while_deep_merging_dict_struct(kwargs)
+    return as_dict(obj, **merged_params)
 
 
 def serializable_obj_with_requested_structure(obj):

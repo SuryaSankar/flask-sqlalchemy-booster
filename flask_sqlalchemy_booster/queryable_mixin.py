@@ -177,6 +177,29 @@ class QueryableMixin(object):
     def preprocess_kwargs_before_new(cls, kwargs):
         return kwargs
 
+    def clone(self, dict_struct=None, commit=True):
+        def remove_primary_keys_from_dict_struct(klass, ds):
+            pk = klass.primary_key_name()
+            if "attrs" not in ds:
+                ds['attrs'] = class_mapper(klass).columns.keys()
+            if 'attrs' in ds and pk in ds['attrs']:
+                ds['attrs'].remove(pk)
+            if 'rels' in ds:
+                for rel_name in ds['rels']:
+                    mapped_rel = next(
+                        r for r in class_mapper(klass).relationships
+                        if r.key == rel_name)
+                    rel_class = mapped_rel.mapper.class_
+                    ds['rels'][rel_name] = remove_primary_keys_from_dict_struct(
+                        rel_class, ds['rels'][rel_name])
+            return ds
+        cls = self.__class__
+        if dict_struct is None:
+            dict_struct = {}
+        dict_struct = remove_primary_keys_from_dict_struct(cls, dict_struct)
+        return cls.add(
+            cls.new(**self.todict(dict_struct=dict_struct)), commit=commit)
+
     def update(self, **kwargs):
         """Updates an instance.
 
@@ -628,6 +651,23 @@ class QueryableMixin(object):
         return objs
 
     @classmethod
+    def update_or_build(cls, **kwargs):
+        keys = kwargs.pop('keys') if 'keys' in kwargs else []
+        filter_kwargs = subdict(kwargs, keys)
+        if filter_kwargs == {}:
+            obj = None
+        else:
+            obj = cls.first(**filter_kwargs)
+        if obj is not None:
+            for key, value in kwargs.iteritems():
+                if (key not in keys and
+                        key not in cls._no_overwrite_):
+                    setattr(obj, key, value)
+        else:
+            obj = cls.build(**kwargs)
+        return obj
+
+    @classmethod
     def update_or_create(cls, **kwargs):
         """Checks if an instance already exists by filtering with the
         kwargs. If yes, updates the instance with new kwargs and
@@ -931,3 +971,7 @@ class QueryableMixin(object):
         for k, v in cls._preprocess_params(kwargs).items():
             setattr(model, k, v)
         return model
+
+    @classmethod
+    def buckets(cls, bucket_size=None):
+    	return cls.query.buckets(bucket_size=bucket_size)

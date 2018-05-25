@@ -39,3 +39,11 @@ class QueryBooster(BaseQuery):
 
     def is_joined_with(self, model_class):
         return model_class in [entity.class_ for entity in self._join_entities]
+
+
+    def buckets(self, bucket_size=None):
+        items_count = self.count()
+        no_of_buckets = items_count / bucket_size  + 1
+        for bucket in range(no_of_buckets):
+            items = self.limit(bucket_size).offset(bucket*bucket_size).all()
+            yield items
