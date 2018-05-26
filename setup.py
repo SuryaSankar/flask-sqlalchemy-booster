@@ -25,7 +25,7 @@ setup(
         "toolspy>=0.2.25",
         "Flask>=0.10.1",
         "SQLAlchemy>=1.1.11",
-        "Flask-SQLAlchemy==2.1",
+        "Flask-SQLAlchemy>=2.3.2",
         "Schemalite>=0.1.23"
     ],
     license='MIT',
