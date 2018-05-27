@@ -1,6 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
-from flask_sqlalchemy import (
-    _QueryProperty, _BoundDeclarativeMeta)
+from flask_sqlalchemy import _QueryProperty
 from .query_booster import QueryBooster
 from sqlalchemy.ext.declarative import declarative_base
 from .model_booster import ModelBooster

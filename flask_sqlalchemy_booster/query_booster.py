@@ -23,19 +23,19 @@ class QueryBooster(BaseQuery):
         key_result_mapping = {getattr(result, key): result for result in resultset.all()}
         return [key_result_mapping.get(kv) for kv in original_keyvals]
 
-    # def get(self, keyval, key='id'):
-    #     if keyval is None:
-    #         return None
-    #     if key not in self.model_class.__table__.columns:
-    #         raise Exception("Not a valid key")
-    #     if self.model_class.__table__.columns[key].primary_key:
-    #         try:
-    #             self._get_existing_condition()
-    #             return self.get(keyval)
-    #         except:
-    #             return self.filter(getattr(self.model_class, key) == keyval).first()
-    #     else:
-    #         return self.filter(getattr(self.model_class, key) == keyval).first()
+    def get(self, keyval, key='id'):
+        if keyval is None:
+            return None
+        if key not in self.model_class.__table__.columns:
+            raise Exception("Not a valid key")
+        if self.model_class.__table__.columns[key].primary_key:
+            try:
+                self._get_existing_condition()
+                return self.get(keyval)
+            except:
+                return self.filter(getattr(self.model_class, key) == keyval).first()
+        else:
+            return self.filter(getattr(self.model_class, key) == keyval).first()
 
     def is_joined_with(self, model_class):
         return model_class in [entity.class_ for entity in self._join_entities]

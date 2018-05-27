@@ -1,5 +1,5 @@
 from flask.json import _json
-from flask_sqlalchemy import _BoundDeclarativeMeta
+from flask_sqlalchemy import DefaultMeta
 from flask import Response, request, render_template, g
 from functools import wraps
 from toolspy import deep_group, merge, add_kv_to_dict, boolify, all_subclasses
@@ -448,6 +448,7 @@ def as_list(func):
 
 
 def modify_query_and_get_filter_function(query, keyword, value, op):
+    print "in modify_query_and_get_filter_function ", query, keyword, value, op
     if '.' in keyword:
         kw_split_arr = keyword.split('.')
         prefix_names = kw_split_arr[:-1]
@@ -544,6 +545,7 @@ def modify_query_and_get_filter_function(query, keyword, value, op):
                         OPERATOR_FUNC[op]
                     )(value)
                 )
+            print "adding filter to subcls filters ", subcls, attr_name, value
         if len(subcls_filters) > 0:
             return (_query, or_(*subcls_filters))
             # return _query.filter(or_(*subcls_filters))
@@ -612,9 +614,9 @@ def filter_query_using_filters_list(result, filters_dict):
     }
     """
     if not (isinstance(result, Query) or isinstance(result, QueryBooster)):
-        if isinstance(result, _BoundDeclarativeMeta) and class_mapper(
+        if isinstance(result, DefaultMeta) and class_mapper(
                 result).polymorphic_on is not None:
-            result = result.query.with_polymorphic(result.all_subclasses_with_separate_tables())
+            result = result.query.with_polymorphic('*')
         else:
             result = result.query
     filters = filters_dict['f']
@@ -635,10 +637,14 @@ def filter_query_using_filters_list(result, filters_dict):
 
 def filter_query_using_args(result, args_to_skip=[]):
     if not (isinstance(result, Query) or isinstance(result, QueryBooster)):
-        if isinstance(result, _BoundDeclarativeMeta) and class_mapper(
+        print "not an instance of Query"
+        print "instance of ", type(result)
+        if isinstance(result, DefaultMeta) and class_mapper(
                 result).polymorphic_on is not None:
-            result = result.query.with_polymorphic(result.all_subclasses_with_separate_tables())
+            print "marking as polymorphic"
+            result = result.query.with_polymorphic('*')
         else:
+            print "marking as not polymorphic"
             result = result.query
     for kw in request.args:
         if kw not in args_to_skip:
@@ -659,6 +665,7 @@ def filter_query_using_args(result, args_to_skip=[]):
                     if value.lower() == 'none' or value.lower() == 'null' or value.strip() == '':
                         value = None
                     result = filter_query_with_key(result, kw, value, '=')
+    print result
     return result
 
 
