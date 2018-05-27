@@ -637,10 +637,14 @@ def filter_query_using_filters_list(result, filters_dict):
 
 def filter_query_using_args(result, args_to_skip=[]):
     if not (isinstance(result, Query) or isinstance(result, QueryBooster)):
+        print "not an instance of Query"
+        print "instance of ", type(result)
         if isinstance(result, _BoundDeclarativeMeta) and class_mapper(
                 result).polymorphic_on is not None:
+            print "marking as polymorphic"
             result = result.query.with_polymorphic('*')
         else:
+            print "marking as not polymorphic"
             result = result.query
     for kw in request.args:
         if kw not in args_to_skip:
