@@ -448,6 +448,7 @@ def as_list(func):
 
 
 def modify_query_and_get_filter_function(query, keyword, value, op):
+    print "in modify_query_and_get_filter_function ", query, keyword, value, op
     if '.' in keyword:
         kw_split_arr = keyword.split('.')
         prefix_names = kw_split_arr[:-1]
@@ -544,6 +545,7 @@ def modify_query_and_get_filter_function(query, keyword, value, op):
                         OPERATOR_FUNC[op]
                     )(value)
                 )
+            print "adding filter to subcls filters ", subcls, attr_name, value
         if len(subcls_filters) > 0:
             return (_query, or_(*subcls_filters))
             # return _query.filter(or_(*subcls_filters))
@@ -659,6 +661,7 @@ def filter_query_using_args(result, args_to_skip=[]):
                     if value.lower() == 'none' or value.lower() == 'null' or value.strip() == '':
                         value = None
                     result = filter_query_with_key(result, kw, value, '=')
+    print result
     return result
 
 
