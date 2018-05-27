@@ -448,7 +448,7 @@ def as_list(func):
 
 
 def modify_query_and_get_filter_function(query, keyword, value, op):
-    print "in modify_query_and_get_filter_function ", query, keyword, value, op
+    # print "in modify_query_and_get_filter_function ", query, keyword, value, op
     if '.' in keyword:
         kw_split_arr = keyword.split('.')
         prefix_names = kw_split_arr[:-1]
@@ -545,7 +545,7 @@ def modify_query_and_get_filter_function(query, keyword, value, op):
                         OPERATOR_FUNC[op]
                     )(value)
                 )
-            print "adding filter to subcls filters ", subcls, attr_name, value
+            # print "adding filter to subcls filters ", subcls, attr_name, value
         if len(subcls_filters) > 0:
             return (_query, or_(*subcls_filters))
             # return _query.filter(or_(*subcls_filters))
@@ -637,14 +637,14 @@ def filter_query_using_filters_list(result, filters_dict):
 
 def filter_query_using_args(result, args_to_skip=[]):
     if not (isinstance(result, Query) or isinstance(result, QueryBooster)):
-        print "not an instance of Query"
-        print "instance of ", type(result)
+        # print "not an instance of Query"
+        # print "instance of ", type(result)
         if isinstance(result, DefaultMeta) and class_mapper(
                 result).polymorphic_on is not None:
-            print "marking as polymorphic"
+            # print "marking as polymorphic"
             result = result.query.with_polymorphic('*')
         else:
-            print "marking as not polymorphic"
+            # print "marking as not polymorphic"
             result = result.query
     for kw in request.args:
         if kw not in args_to_skip:
@@ -665,7 +665,7 @@ def filter_query_using_args(result, args_to_skip=[]):
                     if value.lower() == 'none' or value.lower() == 'null' or value.strip() == '':
                         value = None
                     result = filter_query_with_key(result, kw, value, '=')
-    print result
+    # print result
     return result
 
 

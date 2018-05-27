@@ -70,7 +70,8 @@ def construct_get_view_function(
                 obj = permitted_object_getter()
             else:
                 if get_query_creator:
-                    obj = get_query_creator(model_class.query).get(_id)
+                    obj = get_query_creator(model_class.query).filter(
+                        model_class.primary_key()==_id).first()
                 else:
                     obj = model_class.get(_id)
             if obj is None:
@@ -287,7 +288,9 @@ def construct_put_view_function(
                 obj = permitted_object_getter()
             else:
                 if callable(query_constructor):
-                    obj = query_constructor(model_class.query).get(_id)
+                    obj = query_constructor(
+                        model_class.query).filter(
+                        model_class.primary_key()==_id).first()
                 else:
                     obj = model_class.get(_id)
             if obj is None:
@@ -470,7 +473,8 @@ def construct_patch_view_function(model_class, schema, pre_processors=None,
                 obj = permitted_object_getter()
             else:
                 if callable(query_constructor):
-                    obj = query_constructor(model_class.query).get(_id)
+                    obj = query_constructor(model_class.query).filter(
+                        model_class.primary_key() == _id).first()
                 else:
                     obj = model_class.get(_id)
             if obj is None:
@@ -534,7 +538,9 @@ def construct_delete_view_function(
                 obj = permitted_object_getter()
             else:
                 if callable(query_constructor):
-                    obj = query_constructor(model_class.query).get(_id)
+                    obj = query_constructor(
+                        model_class.query).filter(
+                        model_class.primary_key()==_id).first()
                 else:
                     obj = model_class.get(_id)
             if obj is None:

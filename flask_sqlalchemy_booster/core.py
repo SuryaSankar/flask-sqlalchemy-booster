@@ -16,6 +16,7 @@ class QueryPropertyWithModelClass(_QueryProperty):
     def __get__(self, obj, type_):
         query = super(QueryPropertyWithModelClass, self).__get__(obj, type_)
         if query:
+            # print "about to set query.model_class"
             query.model_class = type_
         return query
 
