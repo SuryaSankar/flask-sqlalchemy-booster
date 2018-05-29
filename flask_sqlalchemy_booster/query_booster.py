@@ -41,9 +41,15 @@ class QueryBooster(BaseQuery):
         return model_class in [entity.class_ for entity in self._join_entities]
 
 
-    def buckets(self, bucket_size=None):
+    def buckets(self, bucket_size=None, offset_every_bucket=True):
         items_count = self.count()
-        no_of_buckets = items_count / bucket_size  + 1
-        for bucket in range(no_of_buckets):
-            items = self.limit(bucket_size).offset(bucket*bucket_size).all()
-            yield items
+        if offset_every_bucket:
+            no_of_buckets = items_count / bucket_size  + 1
+            for bucket in range(no_of_buckets):
+                items = self.limit(bucket_size).offset(bucket*bucket_size).all()
+                yield items
+        else:
+            while items_count > 0:
+                items = self.limit(bucket_size).all()
+                yield items
+                items_count = self.count()
