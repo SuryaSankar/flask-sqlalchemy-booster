@@ -610,10 +610,10 @@ def construct_batch_save_view_function(
         fields_forbidden_from_being_set=None, exception_handler=None,
         tmp_folder_path="/tmp"):
     def batch_save():
-        print "in batch save function"
-        print request.headers
+        # print "in batch save function"
+        # print request.headers
         if request.headers['Content-Type'].startswith("multipart/form-data"):
-            print "Received file upload"
+            # print "Received file upload"
             csv_file_path = save_file_from_request(
                 request.files['file'], location=tmp_folder_path)
             with open(csv_file_path) as csv_file:
@@ -677,7 +677,8 @@ def construct_batch_save_view_function(
                     responses.append({
                         "status": "failure",
                         "code": 401,
-                        "error": message
+                        "error": message,
+                        "input": raw_input_row
                     })
                     continue
 
@@ -689,14 +690,16 @@ def construct_batch_save_view_function(
                         if process_result and isinstance(process_result, Response):
                             response = get_result_dict_from_response(process_result)
                             if response:
-                                responses.append(response)
+                                responses.append(
+                                    merge(response, {"input": raw_input_row})
+                                )
                                 continue
 
             modified_input_row = model_class.pre_validation_adapter(input_row, existing_instance)
             if isinstance(modified_input_row, Response):
                 response = get_result_dict_from_response(modified_input_row)
                 if response:
-                    responses.append(response)
+                    responses.append(merge(response, {"input": raw_input_row}))
                     continue
             input_row = modified_input_row
 
@@ -714,7 +717,8 @@ def construct_batch_save_view_function(
                 responses.append({
                         "status": "failure",
                         "code": 401,
-                        "error": errors
+                        "error": errors,
+                        "input": raw_input_row
                     })
                 continue
             pre_modification_data = existing_instance.todict(dict_struct={"rels": {}}) if existing_instance else None
@@ -731,7 +735,12 @@ def construct_batch_save_view_function(
                         if processed_obj is not None:
                             obj = processed_obj
 
-            responses.append(render_dict_with_requested_structure(obj, dict_struct=dict_struct))
+            responses.append(
+                merge(
+                    render_dict_with_requested_structure(obj, dict_struct=dict_struct),
+                    "input": raw_input_row
+                )
+            )
 
         status = "success"
 
