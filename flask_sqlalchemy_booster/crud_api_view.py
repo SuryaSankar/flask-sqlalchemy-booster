@@ -6,7 +6,7 @@ from sqlalchemy.sql import sqltypes
 import json
 from toolspy import (
     all_subclasses, fetch_nested_key_from_dict,
-    delete_dict_keys, union)
+    delete_dict_keys, union, merge)
 from copy import deepcopy
 import inspect
 from .responses import (
@@ -738,7 +738,7 @@ def construct_batch_save_view_function(
             responses.append(
                 merge(
                     render_dict_with_requested_structure(obj, dict_struct=dict_struct),
-                    "input": raw_input_row
+                    {"input": raw_input_row}
                 )
             )
 
