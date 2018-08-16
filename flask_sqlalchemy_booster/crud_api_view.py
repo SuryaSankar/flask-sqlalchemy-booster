@@ -608,24 +608,13 @@ def construct_batch_save_view_function(
         allow_unknown_fields=False,
         access_checker=None,
         fields_forbidden_from_being_set=None, exception_handler=None,
-        tmp_folder_path="/tmp"):
-    def batch_save():
-        # print "in batch save function"
-        # print request.headers
-        if request.headers['Content-Type'].startswith("multipart/form-data"):
-            # print "Received file upload"
-            csv_file_path = save_file_from_request(
-                request.files['file'], location=tmp_folder_path)
-            with open(csv_file_path) as csv_file:
-                csv_reader = csv.DictReader(csv_file)
-                rows = [r for r in csv_reader]
-                rows = [convert_to_proper_types(
-                    remove_empty_values_in_dict(row),
-                    model_class) for row in rows]
-                input_data = rows
-        else:
-            input_data = g.json
+        tmp_folder_path="/tmp", celery_worker=None,
+        result_saving_instance_model=None,
+        result_saving_instance_getter=None,
+        async=False):
 
+
+    def process_batch_input_data(input_data):
         raw_input_data = deepcopy(input_data)
 
 
@@ -660,7 +649,8 @@ def construct_batch_save_view_function(
         if callable(access_checker):
             allowed, message = access_checker()
             if not allowed:
-                return error_json(401, message)
+                raise Unauthorized(message, error_json(401, message))
+                # return error_json(401, message)
 
         output_objs = []
         errors = []
@@ -748,7 +738,68 @@ def construct_batch_save_view_function(
             "status": status,
             "result": responses
         }
-        return as_json(consolidated_result, wrap=False)
+        return consolidated_result
+
+    def async_process_batch_input_data(input_data, result_saving_instance_id=None):
+        print "in async_process_batch_input_data task"
+        response = process_batch_input_data(input_data)
+        if result_saving_instance_id and result_saving_instance_model:
+            result_saving_instance = result_saving_instance_model.get(result_saving_instance_id)
+            if result_saving_instance:
+                print "Found result saving instance "
+                result_saving_instance.save_response_data(response)
+
+    if celery_worker and async:
+        print "received celery_worker"
+        async_process_batch_input_data = celery_worker.task(async_process_batch_input_data)
+        print "registered a  celery worker task for async process batch input data"
+
+    def batch_save():
+        # print "in batch save function"
+        # print request.headers
+
+        data_file_path = None
+        saving_model_instance = None
+        if request.headers['Content-Type'].startswith("multipart/form-data"):
+            # print "Received file upload"
+            data_file_path = save_file_from_request(
+                request.files['file'], location=tmp_folder_path)
+            with open(data_file_path) as csv_file:
+                csv_reader = csv.DictReader(csv_file)
+                rows = [r for r in csv_reader]
+                rows = [convert_to_proper_types(
+                    remove_empty_values_in_dict(row),
+                    model_class) for row in rows]
+                input_data = rows
+        else:
+            input_data = g.json
+
+        if async:
+            result_saving_instance = result_saving_instance_getter(input_data=input_data, input_file_path=data_file_path) if callable(result_saving_instance_getter) else None
+            print "about to queue async_process_batch_input_data task"
+            async_process_batch_input_data.delay(
+                input_data, result_saving_instance_id=result_saving_instance.id)
+            if result_saving_instance:
+                return render_json_obj_with_requested_structure(result_saving_instance)
+            else:
+                return success_json()
+
+
+        # if saving_model:
+        #     saving_model_instance = saving_model.create()
+
+        # if async and celery_worker:
+        #     if file_uploader:
+        #         data_file_url=file_uploader(data_file_path)
+        #     async_process_batch_input_data.delay(input_data, data_file_url, saving_model_instance)
+        #     return success_json()
+        else:
+            try:
+                consolidated_result = process_batch_input_data(input_data)
+            except Unauthorized as e:
+                return error_json(401, e.description)
+
+            return as_json(consolidated_result, wrap=False)
 
     return batch_save
 
@@ -756,7 +807,8 @@ def construct_batch_save_view_function(
 def register_crud_routes_for_models(
         app_or_bp, registration_dict, register_schema_structure=True,
         allow_unknown_fields=False, cache_handler=None, exception_handler=None,
-        tmp_folder_path="/tmp", forbidden_views=None):
+        tmp_folder_path="/tmp", forbidden_views=None, celery_worker=None):
+    print "in register_crud_routes_for_models for ", app_or_bp
     if not hasattr(app_or_bp, "registered_models_and_crud_routes"):
         app_or_bp.registered_models_and_crud_routes = {
             "models_registered_for_views": [],
@@ -1028,7 +1080,11 @@ def register_crud_routes_for_models(
                 tmp_folder_path=tmp_folder_path,
                 fields_forbidden_from_being_set=union([
                     fields_forbidden_from_being_set_for_all_views,
-                    batch_save_dict.get('fields_forbidden_from_being_set', [])]))
+                    batch_save_dict.get('fields_forbidden_from_being_set', [])]),
+                celery_worker=celery_worker,
+                result_saving_instance_model=batch_save_dict.get('result_saving_instance_model'),
+                result_saving_instance_getter=batch_save_dict.get('result_saving_instance_getter'),
+                async=batch_save_dict.get('async', False))
             batch_save_url = batch_save_dict.get('url', None) or "/batch-save/%s" % base_url
             app_or_bp.route(
                 batch_save_url, methods=['POST'], endpoint='batch_save_%s' % resource_name)(
