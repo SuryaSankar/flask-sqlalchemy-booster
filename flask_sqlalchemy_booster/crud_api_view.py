@@ -596,7 +596,7 @@ def get_result_dict_from_response(rsp):
 
 
 def construct_batch_save_view_function(
-        model_class, schema,
+        model_class, schema, app_or_bp=None,
         registration_dict=None,
         pre_processors_for_post=None, pre_processors_for_put=None,
         post_processors_for_post=None, post_processors_for_put=None,
@@ -741,18 +741,21 @@ def construct_batch_save_view_function(
         return consolidated_result
 
     def async_process_batch_input_data(input_data, result_saving_instance_id=None):
-        print "in async_process_batch_input_data task"
+        # print "in async_process_batch_input_data task"
         response = process_batch_input_data(input_data)
+        # print "received response as ", response
+        # print result_saving_instance_id
+        # print result_saving_instance_model
         if result_saving_instance_id and result_saving_instance_model:
             result_saving_instance = result_saving_instance_model.get(result_saving_instance_id)
             if result_saving_instance:
-                print "Found result saving instance "
+                # print "Found result saving instance "
                 result_saving_instance.save_response_data(response)
 
     if celery_worker and async:
-        print "received celery_worker"
-        async_process_batch_input_data = celery_worker.task(async_process_batch_input_data)
-        print "registered a  celery worker task for async process batch input data"
+        # print "received celery_worker"
+        async_process_batch_input_data = celery_worker.task(name="crud_{0}_bs_{1}".format(app_or_bp.name, model_class.__tablename__))(async_process_batch_input_data)
+        # print "registered a  celery worker task for async process batch input data"
 
     def batch_save():
         # print "in batch save function"
@@ -776,7 +779,7 @@ def construct_batch_save_view_function(
 
         if async:
             result_saving_instance = result_saving_instance_getter(input_data=input_data, input_file_path=data_file_path) if callable(result_saving_instance_getter) else None
-            print "about to queue async_process_batch_input_data task"
+            # print "about to queue async_process_batch_input_data task"
             async_process_batch_input_data.delay(
                 input_data, result_saving_instance_id=result_saving_instance.id)
             if result_saving_instance:
@@ -808,7 +811,7 @@ def register_crud_routes_for_models(
         app_or_bp, registration_dict, register_schema_structure=True,
         allow_unknown_fields=False, cache_handler=None, exception_handler=None,
         tmp_folder_path="/tmp", forbidden_views=None, celery_worker=None):
-    print "in register_crud_routes_for_models for ", app_or_bp
+    # print "in register_crud_routes_for_models for ", app_or_bp
     if not hasattr(app_or_bp, "registered_models_and_crud_routes"):
         app_or_bp.registered_models_and_crud_routes = {
             "models_registered_for_views": [],
@@ -1064,6 +1067,7 @@ def register_crud_routes_for_models(
                 batch_save_input_schema = model_default_input_schema
             batch_save_func = batch_save_dict.get('view_func', None) or construct_batch_save_view_function(
                 _model, batch_save_input_schema,
+                app_or_bp=app_or_bp,
                 registration_dict=registration_dict,
                 pre_processors_for_post=fetch_nested_key_from_dict(view_dict_for_model, 'post.pre_processors'),
                 pre_processors_for_put=fetch_nested_key_from_dict(view_dict_for_model, 'put.pre_processors'),
