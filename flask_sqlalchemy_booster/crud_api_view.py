@@ -742,15 +742,14 @@ def construct_batch_save_view_function(
 
     def async_process_batch_input_data(input_data, result_saving_instance_id=None):
         # print "in async_process_batch_input_data task"
-        response = process_batch_input_data(input_data)
-        # print "received response as ", response
-        # print result_saving_instance_id
-        # print result_saving_instance_model
+        result_saving_instance = None
         if result_saving_instance_id and result_saving_instance_model:
             result_saving_instance = result_saving_instance_model.get(result_saving_instance_id)
-            if result_saving_instance:
-                # print "Found result saving instance "
-                result_saving_instance.save_response_data(response)
+        if result_saving_instance:
+            result_saving_instance.mark_as_started()
+        response = process_batch_input_data(input_data)
+        if result_saving_instance:
+            result_saving_instance.save_response_data(response)
 
     if celery_worker and async:
         # print "received celery_worker"
