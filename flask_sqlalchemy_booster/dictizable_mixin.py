@@ -16,6 +16,7 @@ from toolspy import all_subclasses
 from schemalite.core import func_and_desc
 from sqlalchemy.orm import class_mapper
 from types import NoneType
+from sqlalchemy.dialects.mysql import MEDIUMTEXT
 
 
 def serialized_list(olist, rels_to_expand=[]):
@@ -46,7 +47,8 @@ def _set_fields_for_col(col_name, col, schema, forbidden, required):
                 sqltypes.String: (unicode, str),
                 sqltypes.Text: (unicode, str),
                 sqltypes.Boolean: (bool,),
-                sqltypes.Enum: (unicode, str)
+                sqltypes.Enum: (unicode, str),
+                MEDIUMTEXT: (unicode, str)
             }
             schema["fields"][col_name]["type"] = type_mapping[type(col.type)] + (NoneType, )
 
