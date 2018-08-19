@@ -10,6 +10,7 @@ from toolspy import (
 from copy import deepcopy
 import inspect
 from .responses import (
+    as_dict,
     process_args_and_render_json_list, success_json, error_json,
     render_json_obj_with_requested_structure,
     render_json_list_with_requested_structure,
@@ -727,7 +728,7 @@ def construct_batch_save_view_function(
 
             responses.append(
                 merge(
-                    render_dict_with_requested_structure(obj, dict_struct=dict_struct),
+                    as_dict(obj, dict_struct=dict_struct),
                     {"input": raw_input_row}
                 )
             )
