@@ -742,14 +742,19 @@ def construct_batch_save_view_function(
 
     def async_process_batch_input_data(input_data, result_saving_instance_id=None):
         # print "in async_process_batch_input_data task"
-        result_saving_instance = None
-        if result_saving_instance_id and result_saving_instance_model:
-            result_saving_instance = result_saving_instance_model.get(result_saving_instance_id)
-        if result_saving_instance:
-            result_saving_instance.mark_as_started()
-        response = process_batch_input_data(input_data)
-        if result_saving_instance:
-            result_saving_instance.save_response_data(response)
+        try:
+            result_saving_instance = None
+            if result_saving_instance_id and result_saving_instance_model:
+                result_saving_instance = result_saving_instance_model.get(result_saving_instance_id)
+            if result_saving_instance:
+                result_saving_instance.mark_as_started()
+            response = process_batch_input_data(input_data)
+            if result_saving_instance:
+                result_saving_instance.save_response_data(response)
+        except Exception as e:
+            result_saving_instance.record_exception(e)
+            if exception_handler:
+                return exception_handler(e)
 
     if celery_worker and async:
         # print "received celery_worker"
