@@ -733,12 +733,12 @@ def construct_batch_save_view_function(
 	                    {"input": raw_input_row}
 	                )
 	            )
-	        except Exception as e:
-	        	responses.append({
-	        			"status": "failure",
-	        			"code": 400,
-	        			"error": e.message
-	        		})
+            except Exception as e:
+                responses.append({
+                    "status": "failure",
+                    "code": 400,
+                    "error": e.message
+                    })
 
         status = "success"
 
