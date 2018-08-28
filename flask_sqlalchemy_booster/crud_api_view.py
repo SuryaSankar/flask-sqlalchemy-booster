@@ -662,76 +662,83 @@ def construct_batch_save_view_function(
             # print
             # print "INPUT ", input_row
             # print "CURRENT INSTANCE ", existing_instance
-            if existing_instance and callable(access_checker):
-                allowed, message = access_checker(existing_instance)
-                if not allowed:
-                    responses.append({
-                        "status": "failure",
-                        "code": 401,
-                        "error": message,
-                        "input": raw_input_row
-                    })
-                    continue
+            try:
+	            if existing_instance and callable(access_checker):
+	                allowed, message = access_checker(existing_instance)
+	                if not allowed:
+	                    responses.append({
+	                        "status": "failure",
+	                        "code": 401,
+	                        "error": message,
+	                        "input": raw_input_row
+	                    })
+	                    continue
 
-            pre_processors = pre_processors_for_put if existing_instance else pre_processors_for_post
-            if pre_processors is not None:
-                for pre_processor in pre_processors:
-                    if callable(pre_processor):
-                        process_result = pre_processor(existing_instance)
-                        if process_result and isinstance(process_result, Response):
-                            response = get_result_dict_from_response(process_result)
-                            if response:
-                                responses.append(
-                                    merge(response, {"input": raw_input_row})
-                                )
-                                continue
+	            pre_processors = pre_processors_for_put if existing_instance else pre_processors_for_post
+	            if pre_processors is not None:
+	                for pre_processor in pre_processors:
+	                    if callable(pre_processor):
+	                        process_result = pre_processor(existing_instance)
+	                        if process_result and isinstance(process_result, Response):
+	                            response = get_result_dict_from_response(process_result)
+	                            if response:
+	                                responses.append(
+	                                    merge(response, {"input": raw_input_row})
+	                                )
+	                                continue
 
-            modified_input_row = model_class.pre_validation_adapter(input_row, existing_instance)
-            if isinstance(modified_input_row, Response):
-                response = get_result_dict_from_response(modified_input_row)
-                if response:
-                    responses.append(merge(response, {"input": raw_input_row}))
-                    continue
-            input_row = modified_input_row
+	            modified_input_row = model_class.pre_validation_adapter(input_row, existing_instance)
+	            if isinstance(modified_input_row, Response):
+	                response = get_result_dict_from_response(modified_input_row)
+	                if response:
+	                    responses.append(merge(response, {"input": raw_input_row}))
+	                    continue
+	            input_row = modified_input_row
 
-            polymorphic_field = schema.get('polymorphic_on')
-            if polymorphic_field:
-                if polymorphic_field not in input_row:
-                    input_row[polymorphic_field] = getattr(existing_instance, polymorphic_field)
-            is_valid, errors = validate_object(
-                schema, input_row, allow_required_fields_to_be_skipped=True,
-                allow_unknown_fields=allow_unknown_fields,
-                context={"existing_instance": existing_instance,
-                         "model_class": model_class},
-                schemas_registry=schemas_registry)
-            if not is_valid:
-                responses.append({
-                        "status": "failure",
-                        "code": 401,
-                        "error": errors,
-                        "input": raw_input_row
-                    })
-                continue
-            pre_modification_data = existing_instance.todict(dict_struct={"rels": {}}) if existing_instance else None
-            obj = existing_instance.update(**input_row) if existing_instance else model_class.create(**input_row)
+	            polymorphic_field = schema.get('polymorphic_on')
+	            if polymorphic_field:
+	                if polymorphic_field not in input_row:
+	                    input_row[polymorphic_field] = getattr(existing_instance, polymorphic_field)
+	            is_valid, errors = validate_object(
+	                schema, input_row, allow_required_fields_to_be_skipped=True,
+	                allow_unknown_fields=allow_unknown_fields,
+	                context={"existing_instance": existing_instance,
+	                         "model_class": model_class},
+	                schemas_registry=schemas_registry)
+	            if not is_valid:
+	                responses.append({
+	                        "status": "failure",
+	                        "code": 401,
+	                        "error": errors,
+	                        "input": raw_input_row
+	                    })
+	                continue
+	            pre_modification_data = existing_instance.todict(dict_struct={"rels": {}}) if existing_instance else None
+	            obj = existing_instance.update(**input_row) if existing_instance else model_class.create(**input_row)
 
-            post_processors = post_processors_for_put if existing_instance else post_processors_for_post
-            if post_processors is not None:
-                for processor in post_processors:
-                    if callable(processor):
-                        processed_obj = processor(
-                            obj, input_row,
-                            pre_modification_data=pre_modification_data,
-                            raw_input_data=raw_input_row)
-                        if processed_obj is not None:
-                            obj = processed_obj
+	            post_processors = post_processors_for_put if existing_instance else post_processors_for_post
+	            if post_processors is not None:
+	                for processor in post_processors:
+	                    if callable(processor):
+	                        processed_obj = processor(
+	                            obj, input_row,
+	                            pre_modification_data=pre_modification_data,
+	                            raw_input_data=raw_input_row)
+	                        if processed_obj is not None:
+	                            obj = processed_obj
 
-            responses.append(
-                merge(
-                    as_dict(obj, dict_struct=dict_struct),
-                    {"input": raw_input_row}
-                )
-            )
+	            responses.append(
+	                merge(
+	                    as_dict(obj, dict_struct=dict_struct),
+	                    {"input": raw_input_row}
+	                )
+	            )
+	        except Exception as e:
+	        	responses.append({
+	        			"status": "failure",
+	        			"code": 400,
+	        			"error": e.message
+	        		})
 
         status = "success"
 
