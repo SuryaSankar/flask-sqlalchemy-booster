@@ -5,7 +5,7 @@ from schemalite.core import validate_object, validate_list_of_objects, json_enco
 from sqlalchemy.sql import sqltypes
 import json
 from toolspy import (
-    all_subclasses, fetch_nested_key_from_dict,
+    all_subclasses, fetch_nested_key_from_dict, fetch_nested_key,
     delete_dict_keys, union, merge)
 from copy import deepcopy
 import inspect
@@ -172,24 +172,27 @@ def construct_post_view_function(
 
     def post():
         try:
+            raw_input_data = deepcopy(g.json)
             if callable(access_checker):
                 allowed, message = access_checker()
                 if not allowed:
                     return error_json(401, message)
+            input_data = g.json
             if pre_processors is not None:
                 for processor in pre_processors:
                     if callable(processor):
-                        process_result = processor()
+                        process_result = processor(data=input_data)
                         if process_result and isinstance(process_result, Response):
                             return process_result
+
             fields_to_be_removed = union([
                 fields_forbidden_from_being_set or [],
                 model_class._fields_forbidden_from_being_set_ or []])
-            if isinstance(g.json, list):
+            if isinstance(input_data, list):
                 if len(fields_to_be_removed) > 0:
-                    for dict_item in g.json:
+                    for dict_item in input_data:
                         delete_dict_keys(dict_item, fields_to_be_removed)
-                input_data = model_class.pre_validation_adapter_for_list(g.json)
+                input_data = model_class.pre_validation_adapter_for_list(input_data)
                 if isinstance(input_data, Response):
                     return input_data
                 is_valid, errors = validate_list_of_objects(
@@ -231,10 +234,9 @@ def construct_post_view_function(
                             {'status': 'success', 'result': obj}
                             for obj, error in zip(output_dict['result'], errors)]})
             else:
-                raw_input_data = deepcopy(g.json)
                 if len(fields_to_be_removed) > 0:
-                    delete_dict_keys(g.json, fields_to_be_removed)
-                input_data = model_class.pre_validation_adapter(g.json)
+                    delete_dict_keys(input_data, fields_to_be_removed)
+                input_data = model_class.pre_validation_adapter(input_data)
                 if isinstance(input_data, Response):
                     return input_data
                 is_valid, errors = validate_object(
@@ -252,7 +254,7 @@ def construct_post_view_function(
                                 raw_input_data=raw_input_data)
                             if processed_obj is not None:
                                 obj = processed_obj
-                if '_ret' in g.args:
+                if g.args and '_ret' in g.args:
                     rels = g.args['_ret'].split(".")
                     final_obj = obj
                     for rel in rels:
@@ -301,18 +303,21 @@ def construct_put_view_function(
                 if not allowed:
                     return error_json(401, message)
             raw_input_data = deepcopy(g.json)
+            input_data = g.json
             if pre_processors is not None:
                 for processor in pre_processors:
                     if callable(processor):
-                        process_result = processor(obj)
+                        process_result = processor(data=input_data, existing_instance=obj)
                         if process_result and isinstance(process_result, Response):
                             return process_result
+
+                        
             fields_to_be_removed = union([
                 fields_forbidden_from_being_set or [],
                 model_class._fields_forbidden_from_being_set_ or []])
             if len(fields_to_be_removed) > 0:
-                delete_dict_keys(g.json, fields_to_be_removed)
-            input_data = model_class.pre_validation_adapter(g.json, existing_instance=obj)
+                delete_dict_keys(input_data, fields_to_be_removed)
+            input_data = model_class.pre_validation_adapter(input_data, existing_instance=obj)
             if isinstance(input_data, Response):
                 return input_data
             polymorphic_field = schema.get('polymorphic_on')
@@ -614,8 +619,78 @@ def construct_batch_save_view_function(
         result_saving_instance_getter=None,
         async=False):
 
+    def determine_response_for_input_row(
+            input_row, existing_instance, raw_input_row,
+            result_saving_instance=None):
+        if existing_instance and callable(access_checker):
+            allowed, message = access_checker(existing_instance)
+            if not allowed:
+                return {
+                    "status": "failure",
+                    "code": 401,
+                    "error": message,
+                    "input": raw_input_row
+                }
 
-    def process_batch_input_data(input_data):
+        pre_processors = pre_processors_for_put if existing_instance else pre_processors_for_post
+        if pre_processors is not None:
+            for pre_processor in pre_processors:
+                if callable(pre_processor):
+                    process_result = pre_processor(
+                        data=input_row, existing_instance=existing_instance,
+                        extra_params={"result_saving_instance_id": fetch_nested_key(result_saving_instance, 'id')})
+                    if process_result and isinstance(process_result, Response):
+                        response = get_result_dict_from_response(process_result)
+                        if response:
+                            return merge(response, {"input": raw_input_row})
+
+
+        modified_input_row = model_class.pre_validation_adapter(input_row, existing_instance)
+        if isinstance(modified_input_row, Response):
+            response = get_result_dict_from_response(modified_input_row)
+            if response:
+                return merge(response, {"input": raw_input_row})
+        input_row = modified_input_row
+
+        polymorphic_field = schema.get('polymorphic_on')
+        if polymorphic_field:
+            if polymorphic_field not in input_row:
+                input_row[polymorphic_field] = getattr(existing_instance, polymorphic_field)
+        is_valid, errors = validate_object(
+            schema, input_row, allow_required_fields_to_be_skipped=True,
+            allow_unknown_fields=allow_unknown_fields,
+            context={"existing_instance": existing_instance,
+                     "model_class": model_class},
+            schemas_registry=schemas_registry)
+        if not is_valid:
+            return {
+                    "status": "failure",
+                    "code": 401,
+                    "error": errors,
+                    "input": raw_input_row
+                }
+
+        pre_modification_data = existing_instance.todict(dict_struct={"rels": {}}) if existing_instance else None
+        obj = existing_instance.update(**input_row) if existing_instance else model_class.create(**input_row)
+
+        post_processors = post_processors_for_put if existing_instance else post_processors_for_post
+        if post_processors is not None:
+            for processor in post_processors:
+                if callable(processor):
+                    processed_obj = processor(
+                        obj, input_row,
+                        pre_modification_data=pre_modification_data,
+                        raw_input_data=raw_input_row)
+                    if processed_obj is not None:
+                        obj = processed_obj
+        return merge(
+            as_dict(obj, dict_struct=dict_struct),
+            {"input": raw_input_row}
+        )
+
+
+    def process_batch_input_data(input_data, result_saving_instance):
+
         raw_input_data = deepcopy(input_data)
 
 
@@ -659,80 +734,11 @@ def construct_batch_save_view_function(
         responses = []
 
         for input_row, existing_instance, raw_input_row in zip(input_data, existing_instances, raw_input_data):
-            # print
-            # print "INPUT ", input_row
-            # print "CURRENT INSTANCE ", existing_instance
             try:
-	            if existing_instance and callable(access_checker):
-	                allowed, message = access_checker(existing_instance)
-	                if not allowed:
-	                    responses.append({
-	                        "status": "failure",
-	                        "code": 401,
-	                        "error": message,
-	                        "input": raw_input_row
-	                    })
-	                    continue
-
-	            pre_processors = pre_processors_for_put if existing_instance else pre_processors_for_post
-	            if pre_processors is not None:
-	                for pre_processor in pre_processors:
-	                    if callable(pre_processor):
-	                        process_result = pre_processor(existing_instance)
-	                        if process_result and isinstance(process_result, Response):
-	                            response = get_result_dict_from_response(process_result)
-	                            if response:
-	                                responses.append(
-	                                    merge(response, {"input": raw_input_row})
-	                                )
-	                                continue
-
-	            modified_input_row = model_class.pre_validation_adapter(input_row, existing_instance)
-	            if isinstance(modified_input_row, Response):
-	                response = get_result_dict_from_response(modified_input_row)
-	                if response:
-	                    responses.append(merge(response, {"input": raw_input_row}))
-	                    continue
-	            input_row = modified_input_row
-
-	            polymorphic_field = schema.get('polymorphic_on')
-	            if polymorphic_field:
-	                if polymorphic_field not in input_row:
-	                    input_row[polymorphic_field] = getattr(existing_instance, polymorphic_field)
-	            is_valid, errors = validate_object(
-	                schema, input_row, allow_required_fields_to_be_skipped=True,
-	                allow_unknown_fields=allow_unknown_fields,
-	                context={"existing_instance": existing_instance,
-	                         "model_class": model_class},
-	                schemas_registry=schemas_registry)
-	            if not is_valid:
-	                responses.append({
-	                        "status": "failure",
-	                        "code": 401,
-	                        "error": errors,
-	                        "input": raw_input_row
-	                    })
-	                continue
-	            pre_modification_data = existing_instance.todict(dict_struct={"rels": {}}) if existing_instance else None
-	            obj = existing_instance.update(**input_row) if existing_instance else model_class.create(**input_row)
-
-	            post_processors = post_processors_for_put if existing_instance else post_processors_for_post
-	            if post_processors is not None:
-	                for processor in post_processors:
-	                    if callable(processor):
-	                        processed_obj = processor(
-	                            obj, input_row,
-	                            pre_modification_data=pre_modification_data,
-	                            raw_input_data=raw_input_row)
-	                        if processed_obj is not None:
-	                            obj = processed_obj
-
-	            responses.append(
-	                merge(
-	                    as_dict(obj, dict_struct=dict_struct),
-	                    {"input": raw_input_row}
-	                )
-	            )
+                responses.append(
+                    determine_response_for_input_row(
+                        input_row, existing_instance, raw_input_row,
+                        result_saving_instance=result_saving_instance))
             except Exception as e:
                 responses.append({
                     "status": "failure",
@@ -749,14 +755,15 @@ def construct_batch_save_view_function(
         return consolidated_result
 
     def async_process_batch_input_data(input_data, result_saving_instance_id=None):
-        # print "in async_process_batch_input_data task"
+        print "in async_process_batch_input_data task"
         try:
             result_saving_instance = None
             if result_saving_instance_id and result_saving_instance_model:
                 result_saving_instance = result_saving_instance_model.get(result_saving_instance_id)
             if result_saving_instance:
                 result_saving_instance.mark_as_started()
-            response = process_batch_input_data(input_data)
+                # result_saving_instance.pre_process_input_data(input_data)
+            response = process_batch_input_data(input_data, result_saving_instance)
             if result_saving_instance:
                 result_saving_instance.save_response_data(response)
         except Exception as e:
@@ -791,7 +798,7 @@ def construct_batch_save_view_function(
 
         if async:
             result_saving_instance = result_saving_instance_getter(input_data=input_data, input_file_path=data_file_path) if callable(result_saving_instance_getter) else None
-            # print "about to queue async_process_batch_input_data task"
+            print "about to queue async_process_batch_input_data task"
             async_process_batch_input_data.delay(
                 input_data, result_saving_instance_id=result_saving_instance.id)
             if result_saving_instance:
@@ -834,6 +841,7 @@ def register_crud_routes_for_models(
 
             }
         }
+    app_or_bp.registration_dict = registration_dict
     model_schemas = app_or_bp.registered_models_and_crud_routes["model_schemas"]
 
     def populate_model_schema(modelcls, modelcls_key=None):
