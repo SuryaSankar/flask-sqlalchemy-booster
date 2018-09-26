@@ -42,7 +42,7 @@ class QueryBooster(BaseQuery):
 
 
     def buckets(self, bucket_size=None, offset_to_start_from=0, offset_every_bucket=True):
-        items_count = self.count()
+        items_count = self.offset(offset_to_start_from).count()
         if offset_every_bucket:
             no_of_buckets = items_count / bucket_size  + 1
             for bucket in range(no_of_buckets):
@@ -50,6 +50,6 @@ class QueryBooster(BaseQuery):
                 yield items
         else:
             while items_count > 0:
-                items = self.limit(bucket_size).all()
+                items = self.limit(bucket_size).offset(offset_to_start_from).all()
                 yield items
                 items_count = self.count()
