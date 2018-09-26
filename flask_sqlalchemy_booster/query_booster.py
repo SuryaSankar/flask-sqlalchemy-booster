@@ -5,18 +5,28 @@ class QueryBooster(BaseQuery):
 
     cls = None
 
-    def desc(self, attr='id'):
+    def __init__(self, *args, **kwargs):
+        super(QueryBooster, self).__init__(*args, **kwargs)
+        self.model_class = self._primary_entity.mapper.class_
+
+    def desc(self, attr=None):
+        if attr is None:
+            attr = self.model_class.primary_key_name()
         return self.order_by(getattr(self.model_class, attr).desc())
 
-    def asc(self, attr='id'):
+    def asc(self, attr=None):
+        if attr is None:
+            attr = self.model_class.primary_key_name()
         return self.order_by(getattr(self.model_class, attr))
 
     def last(self, *criterion, **kwargs):
         return self.filter_by(**kwargs).filter(*criterion).desc().first()
 
-    def get_all(self, keyvals, key='id'):
+    def get_all(self, keyvals, key=None):
         if len(keyvals) == 0:
             return []
+        if key is None:
+            key = self.model_class.primary_key_name()
         original_keyvals = keyvals
         keyvals_set = list(set(keyvals))
         resultset = self.filter(getattr(self.model_class, key).in_(keyvals_set))
