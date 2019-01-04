@@ -455,7 +455,7 @@ class QueryableMixin(object):
         return result.one()
 
     @classmethod
-    def get(cls, keyval, key='id', user_id=None):
+    def get(cls, keyval, key='id'):
         """Fetches a single instance which has value `keyval`
         for the attribute `key`.
 
@@ -494,7 +494,7 @@ class QueryableMixin(object):
             return result.first()
 
     @classmethod
-    def get_all(cls, keyvals, key='id', user_id=None):
+    def get_all(cls, keyvals, key='id'):
         """Works like a map function from keyvals to instances.
 
 
