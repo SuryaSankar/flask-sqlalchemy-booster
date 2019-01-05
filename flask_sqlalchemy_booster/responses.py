@@ -446,9 +446,7 @@ def as_list(func):
 #         value = dateutil.parser.parse(value).date()
 #     return value
 
-
-def modify_query_and_get_filter_function(query, keyword, value, op):
-    # print "in modify_query_and_get_filter_function ", query, keyword, value, op
+def return_joined_query_model_class_and_attr_name(query, keyword):
     if '.' in keyword:
         kw_split_arr = keyword.split('.')
         prefix_names = kw_split_arr[:-1]
@@ -509,6 +507,12 @@ def modify_query_and_get_filter_function(query, keyword, value, op):
                 # Instead it is preferable to join by mentioning the relationshp
                 # itself.
                 _query = _query.join(getattr(prev_model_class, assoc_rel.key))
+    return (_query, model_class, attr_name)
+
+
+def modify_query_and_get_filter_function(query, keyword, value, op):
+    # print "in modify_query_and_get_filter_function ", query, keyword, value, op
+    _query, model_class, attr_name = return_joined_query_model_class_and_attr_name(query, keyword)
 
     columns = getattr(
         getattr(model_class, '__mapper__'),
@@ -675,14 +679,18 @@ def fetch_results_in_requested_format(
     limit = request.args.get('limit', default_limit)
     sort = request.args.get('sort', default_sort)
     orderby = request.args.get('orderby') or default_orderby or 'id'
+
     offset = request.args.get('offset', None) or default_offset
     page = request.args.get('page', None) or default_page
     per_page = request.args.get('per_page') or default_per_page or PER_PAGE_ITEMS_COUNT
+
     if sort:
+        result, model_class, attr_name = return_joined_query_model_class_and_attr_name(result, orderby)
+        attr = getattr(model_class, attr_name)
         if sort == 'asc':
-            result = result.asc(orderby)
+            result = result.order_by(attr.asc())
         elif sort == 'desc':
-            result = result.desc(orderby)
+            result = result.order_by(attr.desc())
     if page:
         try:
             pagination = result.paginate(int(page), int(per_page))
