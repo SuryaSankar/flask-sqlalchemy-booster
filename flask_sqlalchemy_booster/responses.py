@@ -511,7 +511,6 @@ def return_joined_query_model_class_and_attr_name(query, keyword):
 
 
 def modify_query_and_get_filter_function(query, keyword, value, op):
-    # print "in modify_query_and_get_filter_function ", query, keyword, value, op
     _query, model_class, attr_name = return_joined_query_model_class_and_attr_name(query, keyword)
 
     columns = getattr(
@@ -641,14 +640,10 @@ def filter_query_using_filters_list(result, filters_dict):
 
 def filter_query_using_args(result, args_to_skip=[]):
     if not (isinstance(result, Query) or isinstance(result, QueryBooster)):
-        # print "not an instance of Query"
-        # print "instance of ", type(result)
         if isinstance(result, DefaultMeta) and class_mapper(
                 result).polymorphic_on is not None:
-            # print "marking as polymorphic"
             result = result.query.with_polymorphic('*')
         else:
-            # print "marking as not polymorphic"
             result = result.query
     for kw in request.args:
         if kw not in args_to_skip:
@@ -669,7 +664,6 @@ def filter_query_using_args(result, args_to_skip=[]):
                     if value.lower() == 'none' or value.lower() == 'null' or value.strip() == '':
                         value = None
                     result = filter_query_with_key(result, kw, value, '=')
-    # print result
     return result
 
 

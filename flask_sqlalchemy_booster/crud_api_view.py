@@ -100,7 +100,6 @@ def construct_get_view_function(
                     (k, v) for k in sorted(args) for v in sorted(args.getlist(k))
                 ])
                 # key = url_for(request.endpoint, **request.args)
-                print "cache key ", key
                 return key
             cache_key_determiner = make_key_prefix
         cached_get = cache_handler.memoize(
@@ -755,7 +754,6 @@ def construct_batch_save_view_function(
         return consolidated_result
 
     def async_process_batch_input_data(input_data, result_saving_instance_id=None):
-        print "in async_process_batch_input_data task"
         try:
             result_saving_instance = None
             if result_saving_instance_id and result_saving_instance_model:
@@ -772,18 +770,13 @@ def construct_batch_save_view_function(
                 return exception_handler(e)
 
     if celery_worker and async:
-        # print "received celery_worker"
         async_process_batch_input_data = celery_worker.task(name="crud_{0}_bs_{1}".format(app_or_bp.name, model_class.__tablename__))(async_process_batch_input_data)
-        # print "registered a  celery worker task for async process batch input data"
 
     def batch_save():
-        # print "in batch save function"
-        # print request.headers
 
         data_file_path = None
         saving_model_instance = None
         if request.headers['Content-Type'].startswith("multipart/form-data"):
-            # print "Received file upload"
             data_file_path = save_file_from_request(
                 request.files['file'], location=tmp_folder_path)
             with open(data_file_path) as csv_file:
@@ -798,7 +791,6 @@ def construct_batch_save_view_function(
 
         if async:
             result_saving_instance = result_saving_instance_getter(input_data=input_data, input_file_path=data_file_path) if callable(result_saving_instance_getter) else None
-            print "about to queue async_process_batch_input_data task"
             async_process_batch_input_data.delay(
                 input_data, result_saving_instance_id=result_saving_instance.id)
             if result_saving_instance:
@@ -830,7 +822,6 @@ def register_crud_routes_for_models(
         app_or_bp, registration_dict, register_schema_structure=True,
         allow_unknown_fields=False, cache_handler=None, exception_handler=None,
         tmp_folder_path="/tmp", forbidden_views=None, celery_worker=None):
-    # print "in register_crud_routes_for_models for ", app_or_bp
     if not hasattr(app_or_bp, "registered_models_and_crud_routes"):
         app_or_bp.registered_models_and_crud_routes = {
             "models_registered_for_views": [],

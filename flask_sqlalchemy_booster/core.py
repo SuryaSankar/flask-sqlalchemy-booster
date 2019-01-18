@@ -52,7 +52,6 @@ class FlaskSQLAlchemyBooster(SQLAlchemy):
         # self.Query = QueryBooster
 
     def make_declarative_base(self, model, metadata=None):
-        print "calling make_declarative_base"
         base = super(FlaskSQLAlchemyBooster, self).make_declarative_base(
             model, metadata)
         base.query = QueryPropertyWithModelClass(self)

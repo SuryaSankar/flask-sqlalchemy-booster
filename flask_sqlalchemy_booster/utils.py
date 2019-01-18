@@ -9,6 +9,7 @@ from datetime import datetime
 import uuid
 import os
 from sqlalchemy.sql import sqltypes
+from sqlalchemy import func
 import dateutil.parser
 from decimal import Decimal
 
@@ -58,9 +59,10 @@ def remove_empty_values_in_dict(d):
     return d
 
 def save_file_from_request(_file, location=None):
-    filename = "%s_%s_%s" % (datetime.utcnow().strftime("%Y%m%d_%H%M%S%f"),
-                             uuid.uuid4().hex[0:6],
-                             secure_filename(_file.filename))
+    filename = "{}_{}_{}".format(
+        datetime.utcnow().strftime("%Y%m%d_%H%M%S%f"),
+        uuid.uuid4().hex[0:6],
+        secure_filename(_file.filename))
     file_path = os.path.join(location, filename)
     _file.save(file_path)
     return file_path
@@ -93,3 +95,15 @@ def convert_to_proper_types(data, model_class):
                 columns[attr_name].type)
             data[attr_name] = type_coerce_value(column_type, value)
     return data
+
+
+def tz_str(mins):
+    prefix = "+" if mins >= 0 else "-"
+    return "%s%02d:%02d" % (prefix, abs(mins) / 60, abs(mins) % 60)
+
+def tz_convert(datetime_col, timedelta_mins):
+    GMT_TZ_STR = '+00:00'
+    return func.convert_tz(datetime_col, GMT_TZ_STR, tz_str(timedelta_mins))
+
+def tz_converted_date(datetime_col, timedelta_mins):
+    return func.date(tz_convert(datetime_col, timedelta_mins))
