@@ -4,19 +4,19 @@ A mixin class to add `todict` method to objects.
 """
 
 from sqlalchemy.ext.associationproxy import AssociationProxy
-from .utils import is_list_like, is_dict_like
 from toolspy import deep_group
 import json
-from .json_encoder import json_encoder
 from sqlalchemy.sql import sqltypes
 from decimal import Decimal
 from datetime import datetime, date
-from .json_columns import JSONEncodedStruct
 from toolspy import all_subclasses
 from schemalite.core import func_and_desc
 from sqlalchemy.orm import class_mapper
 from sqlalchemy.dialects.mysql import MEDIUMTEXT
 
+from ..json_columns import JSONEncodedStruct
+from ..json_encoder import json_encoder
+from ..utils import is_list_like, is_dict_like
 
 def serialized_list(olist, rels_to_expand=[]):
     return map(
