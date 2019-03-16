@@ -22,6 +22,14 @@ import functools
 from .utils import remove_empty_values_in_dict, save_file_from_request, convert_to_proper_types
 import csv
 
+def permit_only_allowed_fields(data, fields_allowed_to_be_set=None, fields_forbidden_from_being_set=None):
+    if fields_allowed_to_be_set and len(fields_allowed_to_be_set) > 0:
+        for k in data.keys():
+            if k not in fields_allowed_to_be_set:
+                del data[k]
+    if fields_forbidden_from_being_set and len(fields_forbidden_from_being_set) > 0:
+        delete_dict_keys(data, fields_forbidden_from_being_set)
+
 
 def construct_get_view_function(
         model_class, registration_dict,
@@ -166,6 +174,7 @@ def construct_post_view_function(
         post_processors=None,
         allow_unknown_fields=False,
         dict_struct=None, schemas_registry=None,
+        fields_allowed_to_be_set=None,
         fields_forbidden_from_being_set=None, exception_handler=None,
         access_checker=None):
 
@@ -184,13 +193,23 @@ def construct_post_view_function(
                         if process_result and isinstance(process_result, Response):
                             return process_result
 
+
             fields_to_be_removed = union([
                 fields_forbidden_from_being_set or [],
                 model_class._fields_forbidden_from_being_set_ or []])
             if isinstance(input_data, list):
-                if len(fields_to_be_removed) > 0:
+                if fields_allowed_to_be_set and len(fields_to_be_removed) > 0:
                     for dict_item in input_data:
-                        delete_dict_keys(dict_item, fields_to_be_removed)
+                        permit_only_allowed_fields(
+                            dict_item, fields_allowed_to_be_set=fields_allowed_to_be_set, fields_forbidden_from_being_set=fields_to_be_removed)
+                # if fields_allowed_to_be_set:
+                #     for dict_item in input_data:
+                #         for k in dict_item.keys():
+                #             if k not in fields_allowed_to_be_set:
+                #                 del dict_item[k]
+                # if len(fields_to_be_removed) > 0:
+                #     for dict_item in input_data:
+                #         delete_dict_keys(dict_item, fields_to_be_removed)
                 input_data = model_class.pre_validation_adapter_for_list(input_data)
                 if isinstance(input_data, Response):
                     return input_data
@@ -233,8 +252,16 @@ def construct_post_view_function(
                             {'status': 'success', 'result': obj}
                             for obj, error in zip(output_dict['result'], errors)]})
             else:
-                if len(fields_to_be_removed) > 0:
-                    delete_dict_keys(input_data, fields_to_be_removed)
+                permit_only_allowed_fields(
+                    input_data,
+                    fields_allowed_to_be_set=fields_allowed_to_be_set,
+                    fields_forbidden_from_being_set=fields_to_be_removed)
+                # if fields_allowed_to_be_set:
+                #     for k in input_data.keys():
+                #         if k not in fields_allowed_to_be_set:
+                #             del input_data[k]
+                # if len(fields_to_be_removed) > 0:
+                #     delete_dict_keys(input_data, fields_to_be_removed)
                 input_data = model_class.pre_validation_adapter(input_data)
                 if isinstance(input_data, Response):
                     return input_data
@@ -283,6 +310,7 @@ def construct_put_view_function(
         dict_struct=None,
         allow_unknown_fields=False,
         access_checker=None,
+        fields_allowed_to_be_set=None,
         fields_forbidden_from_being_set=None, exception_handler=None):
     def put(_id):
         try:
@@ -1002,32 +1030,32 @@ def register_crud_routes_for_models(
                 views[_model_name]['put']['input_schema'] = put_dict['input_schema_modifier'](
                     deepcopy(model_schemas[_model.__name__]['input_schema']))
 
-        if 'batch_put' not in disabled_views:
-            batch_put_dict = view_dict_for_model.get('batch_put', {})
-            if callable(batch_put_dict.get('input_schema_modifier')):
-                batch_put_input_schema = batch_put_dict['input_schema_modifier'](deepcopy(model_default_input_schema))
-            else:
-                batch_put_input_schema = model_default_input_schema
-            batch_put_func = batch_put_dict.get('view_func', None) or construct_batch_put_view_function(
-                _model, batch_put_input_schema,
-                pre_processors=batch_put_dict.get('pre_processors'),
-                registration_dict=registration_dict,
-                post_processors=batch_put_dict.get('post_processors'),
-                allow_unknown_fields=allow_unknown_fields,
-                query_constructor=batch_put_dict.get('query_constructor') or default_query_constructor,
-                schemas_registry=schemas_registry,
-                exception_handler=exception_handler,
-                fields_forbidden_from_being_set=union([
-                    fields_forbidden_from_being_set_for_all_views,
-                    batch_put_dict.get('fields_forbidden_from_being_set', [])]))
-            batch_put_url = batch_put_dict.get('url', None) or "/%s" % base_url
-            app_or_bp.route(
-                batch_put_url, methods=['PUT'], endpoint='batch_put_%s' % resource_name)(
-                batch_put_func)
-            views[_model_name]['batch_put'] = {'url': batch_put_url}
-            if 'input_schema_modifier' in batch_put_dict:
-                views[_model_name]['batch_put']['input_schema'] = batch_put_dict['input_schema_modifier'](
-                    deepcopy(model_schemas[_model.__name__]['input_schema']))
+        # if 'batch_put' not in disabled_views:
+        #     batch_put_dict = view_dict_for_model.get('batch_put', {})
+        #     if callable(batch_put_dict.get('input_schema_modifier')):
+        #         batch_put_input_schema = batch_put_dict['input_schema_modifier'](deepcopy(model_default_input_schema))
+        #     else:
+        #         batch_put_input_schema = model_default_input_schema
+        #     batch_put_func = batch_put_dict.get('view_func', None) or construct_batch_put_view_function(
+        #         _model, batch_put_input_schema,
+        #         pre_processors=batch_put_dict.get('pre_processors'),
+        #         registration_dict=registration_dict,
+        #         post_processors=batch_put_dict.get('post_processors'),
+        #         allow_unknown_fields=allow_unknown_fields,
+        #         query_constructor=batch_put_dict.get('query_constructor') or default_query_constructor,
+        #         schemas_registry=schemas_registry,
+        #         exception_handler=exception_handler,
+        #         fields_forbidden_from_being_set=union([
+        #             fields_forbidden_from_being_set_for_all_views,
+        #             batch_put_dict.get('fields_forbidden_from_being_set', [])]))
+        #     batch_put_url = batch_put_dict.get('url', None) or "/%s" % base_url
+        #     app_or_bp.route(
+        #         batch_put_url, methods=['PUT'], endpoint='batch_put_%s' % resource_name)(
+        #         batch_put_func)
+        #     views[_model_name]['batch_put'] = {'url': batch_put_url}
+        #     if 'input_schema_modifier' in batch_put_dict:
+        #         views[_model_name]['batch_put']['input_schema'] = batch_put_dict['input_schema_modifier'](
+        #             deepcopy(model_schemas[_model.__name__]['input_schema']))
 
         if 'patch' not in disabled_views:
             patch_dict = view_dict_for_model.get('patch', {})
@@ -1111,101 +1139,3 @@ def register_crud_routes_for_models(
 
 
 
-## TO BE DEPRECATED
-
-
-class CrudApiView(MethodView):
-
-    _model_class_ = None
-    _list_query_ = None
-    _id_key_ = 'id'
-    _schema_for_post_ = None
-    _schema_for_put_ = None
-
-    def get(self, _id):
-        list_query = self._list_query_ or self._model_class_.query
-        if _id is None:
-            return process_args_and_render_json_list(list_query)
-        else:
-            _id = _id.strip()
-            if _id.startswith('[') and _id.endswith(']'):
-                ids = [int(i) for i in json.loads(_id)]
-                resources = self._model_class_.get_all(ids)
-                if all(r is None for r in resources):
-                    return error_json(404, "No matching resources found")
-                return render_json_list_with_requested_structure(
-                    resources,
-                    pre_render_callback=lambda output_dict: {
-                        'status': 'partial_success' if None in resources else 'success',
-                        'result': [
-                            {'status': 'failure', 'error': 'Resource not found'}
-                            if obj is None
-                            else
-                            {'status': 'success', 'result': obj}
-                            for obj in output_dict['result']]})
-                return process_args_and_render_json_list(
-                    self._model_class_.query.filter(
-                        self._model_class_.primary_key().in_(ids)))
-            return render_json_obj_with_requested_structure(
-                self._model_class_.get(_id, key=self._id_key_))
-
-    def post(self):
-        if self._schema_for_post_:
-            try:
-                if isinstance(g.json, list):
-                    self._schema_for_post_.validate_list(g.json)
-                else:
-                    self._schema_for_post_.validate(g.json)
-            except SchemaError as e:
-                return error_json(400, e.value)
-            json_data = g.json
-            # json_data = self._schema_for_post_.adapt(g.json)
-        else:
-            json_data = g.json
-        if isinstance(g.json, list):
-            return render_json_list_with_requested_structure(
-                self._model_class_.create_all(json_data))
-        return render_json_obj_with_requested_structure(
-            self._model_class_.create(**json_data))
-
-    def put(self, _id):
-        obj = self._model_class_.get(_id, key=self._id_key_)
-        if self._schema_for_put_:
-            try:
-                self._schema_for_put_.validate(g.json)
-            except SchemaError as e:
-                return error_json(400, e.value)
-            json_data = self._schema_for_put_.adapt(g.json)
-        else:
-            json_data = g.json
-        return render_json_obj_with_requested_structure(obj.update(**json_data))
-
-    def patch(self, _id):
-        obj = self._model_class_.get(_id, key=self._id_key_)
-        json_data = g.json
-        return render_json_obj_with_requested_structure(obj.update(**json_data))
-
-    def delete(self, _id):
-        obj = self._model_class_.get(_id, key=self._id_key_)
-        obj.delete()
-        return success_json()
-
-
-def register_crud_api_view(view, bp_or_app, endpoint, url_slug):
-    bp_or_app.add_url_rule(
-        '/%s/' % url_slug, defaults={'_id': None},
-        view_func=view.as_view('%s__INDEX' % endpoint), methods=['GET', ])
-    bp_or_app.add_url_rule(
-        '/%s' % url_slug, view_func=view.as_view('%s__POST' % endpoint), methods=['POST', ])
-    bp_or_app.add_url_rule(
-        '/%s/<_id>' % url_slug, view_func=view.as_view('%s__GET' % endpoint),
-        methods=['GET'])
-    bp_or_app.add_url_rule(
-        '/%s/<_id>' % url_slug, view_func=view.as_view('%s__PUT' % endpoint),
-        methods=['PUT'])
-    bp_or_app.add_url_rule(
-        '/%s/<_id>' % url_slug, view_func=view.as_view('%s__PATCH' % endpoint),
-        methods=['PATCH'])
-    bp_or_app.add_url_rule(
-        '/%s/<_id>' % url_slug, view_func=view.as_view('%s__DELETE' % endpoint),
-        methods=['DELETE'])
