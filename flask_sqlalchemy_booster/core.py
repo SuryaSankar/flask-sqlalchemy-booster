@@ -44,10 +44,10 @@ class FlaskSQLAlchemyBooster(SQLAlchemy):
 
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, *args, **kwargs):
         kwargs["model_class"] = ModelBooster
         kwargs["query_class"] = QueryBooster
-        super(FlaskSQLAlchemyBooster, self).__init__(**kwargs)
+        super(FlaskSQLAlchemyBooster, self).__init__(*args, **kwargs)
         # self.Query = QueryBooster
 
     def make_declarative_base(self, model, metadata=None):
