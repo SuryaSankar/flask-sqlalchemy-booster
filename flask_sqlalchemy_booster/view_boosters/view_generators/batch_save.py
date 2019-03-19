@@ -44,12 +44,13 @@ def construct_batch_save_view_function(
                         data=input_row, existing_instance=existing_instance,
                         extra_params={"result_saving_instance_id": fetch_nested_key(result_saving_instance, 'id')})
                     if process_result and isinstance(process_result, Response):
-                        response = get_result_dict_from_response(process_result)
+                        response = get_result_dict_from_response(
+                            process_result)
                         if response:
                             return merge(response, {"input": raw_input_row})
 
-
-        modified_input_row = model_class.pre_validation_adapter(input_row, existing_instance)
+        modified_input_row = model_class.pre_validation_adapter(
+            input_row, existing_instance)
         if isinstance(modified_input_row, Response):
             response = get_result_dict_from_response(modified_input_row)
             if response:
@@ -59,7 +60,8 @@ def construct_batch_save_view_function(
         polymorphic_field = schema.get('polymorphic_on')
         if polymorphic_field:
             if polymorphic_field not in input_row:
-                input_row[polymorphic_field] = getattr(existing_instance, polymorphic_field)
+                input_row[polymorphic_field] = getattr(
+                    existing_instance, polymorphic_field)
         is_valid, errors = validate_object(
             schema, input_row, allow_required_fields_to_be_skipped=True,
             allow_unknown_fields=allow_unknown_fields,
@@ -68,14 +70,16 @@ def construct_batch_save_view_function(
             schemas_registry=schemas_registry)
         if not is_valid:
             return {
-                    "status": "failure",
-                    "code": 401,
-                    "error": errors,
-                    "input": raw_input_row
-                }
+                "status": "failure",
+                "code": 401,
+                "error": errors,
+                "input": raw_input_row
+            }
 
-        pre_modification_data = existing_instance.todict(dict_struct={"rels": {}}) if existing_instance else None
-        obj = existing_instance.update(**input_row) if existing_instance else model_class.create(**input_row)
+        pre_modification_data = existing_instance.todict(
+            dict_struct={"rels": {}}) if existing_instance else None
+        obj = existing_instance.update(
+            **input_row) if existing_instance else model_class.create(**input_row)
 
         post_processors = post_processors_for_put if existing_instance else post_processors_for_post
         if post_processors is not None:
@@ -92,11 +96,9 @@ def construct_batch_save_view_function(
             {"input": raw_input_row}
         )
 
-
     def process_batch_input_data(input_data, result_saving_instance):
 
         raw_input_data = deepcopy(input_data)
-
 
         fields_to_be_removed = union([
             fields_forbidden_from_being_set or [],
@@ -110,7 +112,6 @@ def construct_batch_save_view_function(
                 if callable(pre_processor):
                     input_data = [pre_processor(row) for row in input_data]
 
-
         primary_key_name = model_class.primary_key_name()
         obj_ids = [obj.get(primary_key_name) for obj in input_data]
         existing_instances = model_class.get_all(obj_ids)
@@ -120,8 +121,10 @@ def construct_batch_save_view_function(
                 existing_instance = existing_instances[idx]
                 if existing_instance is None:
                     if all(input_row.get(f) is not None for f in unique_identifier_fields):
-                        filter_kwargs = {f: input_row.get(f) for f in unique_identifier_fields}
-                        existing_instances[idx] = model_class.query.filter_by(**filter_kwargs).first()
+                        filter_kwargs = {f: input_row.get(
+                            f) for f in unique_identifier_fields}
+                        existing_instances[idx] = model_class.query.filter_by(
+                            **filter_kwargs).first()
                         if existing_instances[idx]:
                             input_row[primary_key_name] = getattr(
                                 existing_instances[idx], primary_key_name)
@@ -148,7 +151,7 @@ def construct_batch_save_view_function(
                     "status": "failure",
                     "code": 400,
                     "error": e.message
-                    })
+                })
 
         status = "success"
 
@@ -162,11 +165,13 @@ def construct_batch_save_view_function(
         try:
             result_saving_instance = None
             if result_saving_instance_id and result_saving_instance_model:
-                result_saving_instance = result_saving_instance_model.get(result_saving_instance_id)
+                result_saving_instance = result_saving_instance_model.get(
+                    result_saving_instance_id)
             if result_saving_instance:
                 result_saving_instance.mark_as_started()
                 # result_saving_instance.pre_process_input_data(input_data)
-            response = process_batch_input_data(input_data, result_saving_instance)
+            response = process_batch_input_data(
+                input_data, result_saving_instance)
             if result_saving_instance:
                 result_saving_instance.save_response_data(response)
         except Exception as e:
@@ -175,7 +180,8 @@ def construct_batch_save_view_function(
                 return exception_handler(e)
 
     if celery_worker and async:
-        async_process_batch_input_data = celery_worker.task(name="crud_{0}_bs_{1}".format(app_or_bp.name, model_class.__tablename__))(async_process_batch_input_data)
+        async_process_batch_input_data = celery_worker.task(name="crud_{0}_bs_{1}".format(
+            app_or_bp.name, model_class.__tablename__))(async_process_batch_input_data)
 
     def batch_save():
 
@@ -195,14 +201,14 @@ def construct_batch_save_view_function(
             input_data = g.json
 
         if async:
-            result_saving_instance = result_saving_instance_getter(input_data=input_data, input_file_path=data_file_path) if callable(result_saving_instance_getter) else None
+            result_saving_instance = result_saving_instance_getter(
+                input_data=input_data, input_file_path=data_file_path) if callable(result_saving_instance_getter) else None
             async_process_batch_input_data.delay(
                 input_data, result_saving_instance_id=result_saving_instance.id)
             if result_saving_instance:
                 return render_json_obj_with_requested_structure(result_saving_instance)
             else:
                 return success_json()
-
 
         # if saving_model:
         #     saving_model_instance = saving_model.create()

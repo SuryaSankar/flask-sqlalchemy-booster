@@ -1,7 +1,9 @@
+from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_sqlalchemy import _QueryProperty
 from sqlalchemy.ext.declarative import declarative_base
 from .model_booster import ModelBooster, QueryBooster
+from .flask_client_booster import FlaskClientBooster
 
 
 class QueryPropertyWithModelClass(_QueryProperty):
@@ -56,3 +58,6 @@ class FlaskSQLAlchemyBooster(SQLAlchemy):
         base.query = QueryPropertyWithModelClass(self)
         base.session = self.session
         return base
+
+class FlaskBooster(Flask):
+    test_client_class = FlaskClientBooster
