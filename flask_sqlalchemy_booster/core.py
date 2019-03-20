@@ -2,7 +2,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_sqlalchemy import _QueryProperty
 from sqlalchemy.ext.declarative import declarative_base
-from .model_booster import ModelBooster, QueryBooster
+from .model_boosters import ModelBooster, QueryBooster
 from .flask_client_booster import FlaskClientBooster
 
 
@@ -47,6 +47,7 @@ class FlaskSQLAlchemyBooster(SQLAlchemy):
     """
 
     def __init__(self, *args, **kwargs):
+        print("in FSAB init")
         kwargs["model_class"] = ModelBooster
         kwargs["query_class"] = QueryBooster
         super(FlaskSQLAlchemyBooster, self).__init__(*args, **kwargs)
@@ -61,3 +62,8 @@ class FlaskSQLAlchemyBooster(SQLAlchemy):
 
 class FlaskBooster(Flask):
     test_client_class = FlaskClientBooster
+
+    # def __init__(self, *args, **kwargs):
+    #     super(FlaskBooster, self).__init__(*args, **kwargs)
+    #     self.before_request_funcs.setdefault(None, []).append(json_sanitizer)
+    #     self.before_request_funcs[None].append(args_sanitizer)

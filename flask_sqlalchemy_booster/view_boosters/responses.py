@@ -35,6 +35,17 @@ OPERATOR_FUNC = {
 }
 
 
+def get_request_json():
+    if 'json' in g:
+        return g.json
+    return request.get_json()
+
+def get_request_args():
+    if 'args' in g:
+        return g.args
+    return request.args
+
+
 def json_dump(obj):
     return _json.dumps(
         obj,

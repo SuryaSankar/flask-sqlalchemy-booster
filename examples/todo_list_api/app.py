@@ -1,7 +1,7 @@
 from flask_sqlalchemy_booster import FlaskSQLAlchemyBooster
 from sqlalchemy import func
 from flask_sqlalchemy_booster import FlaskBooster
-from flask_sqlalchemy_booster.crud_api_view import register_crud_routes_for_models
+from flask_sqlalchemy_booster import register_crud_routes_for_models
 
 from werkzeug.serving import run_simple
 
@@ -31,6 +31,7 @@ def create_todolist_app():
     app = FlaskBooster(__name__)
 
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite://'
+    app.config['DEBUG'] = True
 
     db.init_app(app)
 

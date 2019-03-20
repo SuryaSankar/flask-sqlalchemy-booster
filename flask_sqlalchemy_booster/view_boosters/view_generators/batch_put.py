@@ -1,3 +1,5 @@
+
+
 def construct_batch_put_view_function(
         model_class, schema, registration_dict=None,
         pre_processors=None,
@@ -21,7 +23,7 @@ def construct_batch_put_view_function(
                     delete_dict_keys(dict_item, fields_to_be_removed)
             output = {}
             obj_ids = g.json.keys()
-            if type(model_class.primary_key().type)==sqltypes.Integer:
+            if type(model_class.primary_key().type) == sqltypes.Integer:
                 obj_ids = [int(obj_id) for obj_id in obj_ids]
             if callable(query_constructor):
                 objs = query_constructor(model_class.query).get_all(obj_ids)
@@ -31,13 +33,14 @@ def construct_batch_put_view_function(
             all_success = True
             any_success = False
             polymorphic_field = schema.get('polymorphic_on')
-            input_data = model_class.pre_validation_adapter_for_mapped_collection(g.json, existing_instances)
+            input_data = model_class.pre_validation_adapter_for_mapped_collection(
+                g.json, existing_instances)
             if isinstance(input_data, Response):
                 return input_data
             updated_objects = {}
             for obj_id, put_data_for_obj in input_data.items():
                 output_key = obj_id
-                if type(model_class.primary_key().type)==sqltypes.Integer:
+                if type(model_class.primary_key().type) == sqltypes.Integer:
                     output_key = int(obj_id)
                 existing_instance = existing_instances[output_key]
                 if existing_instance is None:
@@ -50,7 +53,8 @@ def construct_batch_put_view_function(
                 else:
                     if polymorphic_field:
                         if polymorphic_field not in put_data_for_obj:
-                            put_data_for_obj[polymorphic_field] = getattr(existing_instance, polymorphic_field)
+                            put_data_for_obj[polymorphic_field] = getattr(
+                                existing_instance, polymorphic_field)
                     is_valid, errors = validate_object(
                         schema, put_data_for_obj, allow_required_fields_to_be_skipped=True,
                         allow_unknown_fields=allow_unknown_fields,
@@ -64,7 +68,8 @@ def construct_batch_put_view_function(
                         if post_processors is not None:
                             for processor in post_processors:
                                 if callable(processor):
-                                    processed_updated_object = processor(updated_object, put_data_for_obj)
+                                    processed_updated_object = processor(
+                                        updated_object, put_data_for_obj)
                                     if processed_updated_object is not None:
                                         updated_object = processed_updated_object
                         updated_objects[updated_object.id] = updated_object

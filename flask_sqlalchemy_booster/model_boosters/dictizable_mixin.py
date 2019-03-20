@@ -113,7 +113,7 @@ class DictizableMixin(object):
     _rels_to_serialize_ = []
     _rels_to_expand_ = []
     _group_listrels_by_ = {}
-    _autogenerate_dict_struct_if_none_ = False
+    _autogenerate_dict_struct_if_none_ = True
     _dict_struct_ = None
     _input_data_schema_ = None
 

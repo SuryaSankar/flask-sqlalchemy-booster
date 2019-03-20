@@ -1,3 +1,5 @@
+
+
 def construct_delete_view_function(
         model_class,
         registration_dict=None,
@@ -14,7 +16,7 @@ def construct_delete_view_function(
                 if callable(query_constructor):
                     obj = query_constructor(
                         model_class.query).filter(
-                        model_class.primary_key()==_id).first()
+                        model_class.primary_key() == _id).first()
                 else:
                     obj = model_class.get(_id)
             if obj is None:
@@ -35,7 +37,8 @@ def construct_delete_view_function(
                 if len(rels) > 0:
                     rel_obj_requested_in_return = obj
                     for rel in rels:
-                        rel_obj_requested_in_return = getattr(rel_obj_requested_in_return, rel)
+                        rel_obj_requested_in_return = getattr(
+                            rel_obj_requested_in_return, rel)
 
             obj.delete()
             if post_processors is not None:
@@ -44,7 +47,8 @@ def construct_delete_view_function(
                         processor(obj_data)
 
             if rel_obj_requested_in_return is not None:
-                cls_of_rel_obj_requested_in_return = type(rel_obj_requested_in_return)
+                cls_of_rel_obj_requested_in_return = type(
+                    rel_obj_requested_in_return)
                 rel_obj_dict_struct = None
                 refetched_rel_obj = cls_of_rel_obj_requested_in_return.get(
                     rel_obj_requested_in_return.primary_key_value())

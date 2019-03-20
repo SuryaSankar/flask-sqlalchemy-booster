@@ -1,3 +1,5 @@
+
+
 def construct_patch_view_function(model_class, schema, pre_processors=None,
                                   query_constructor=None, schemas_registry=None,
                                   exception_handler=None, permitted_object_getter=None,
@@ -35,7 +37,8 @@ def construct_patch_view_function(model_class, schema, pre_processors=None,
                 polymorphic_field = schema.get('polymorphic_on')
                 if polymorphic_field:
                     if polymorphic_field not in g.json:
-                        g.json[polymorphic_field] = getattr(obj, polymorphic_field)
+                        g.json[polymorphic_field] = getattr(
+                            obj, polymorphic_field)
                 is_valid, errors = validate_object(
                     schema, g.json, allow_required_fields_to_be_skipped=True,
                     context={"existing_instance": obj,
