@@ -47,7 +47,15 @@ def construct_get_view_function(
         try:
             _id = _id.strip()
             if _id.startswith('[') and _id.endswith(']'):
+                # Handles multiple ids being passed
+                # Eg: /tasks/[1,2,3]
                 if permitted_object_getter is not None:
+                    # If the endpoint is meant to allow only a particular instance to be queried,
+                    # that should be returned by the permitted_object_getter function. 
+                    # Typical use case is when you want to show a singleton object like current cart.
+                    # If the endpoint is always meant to return current cart only, you can register the
+                    # url like this - /carts/current and set the permitted_object_getter function to 
+                    # return the current cart only.
                     resources = [permitted_object_getter()]
                     ids = [_id[1:-1]]
                 else:
