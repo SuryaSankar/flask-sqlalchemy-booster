@@ -2,7 +2,7 @@ from flask_sqlalchemy import Model
 from .query_booster import QueryBooster
 from .queryable_mixin import QueryableMixin
 from .dictizable_mixin import DictizableMixin
-from sqlalchemy.ext.associationproxy import AssociationProxy
+from sqlalchemy.ext.associationproxy import AssociationProxyInstance
 from sqlalchemy.orm import class_mapper
 from toolspy import all_subclasses
 
@@ -57,7 +57,7 @@ class ModelBooster(Model, QueryableMixin, DictizableMixin):
         keys = cls.all_keys() if include_parent_classes else cls.__dict__.keys()
         for k in keys:
             try:
-                if isinstance(getattr(cls, k), AssociationProxy):
+                if isinstance(getattr(cls, k), AssociationProxyInstance) and not k.startswith("_AssociationProxy_"):
                     result.append(k)
             except:
                 continue
