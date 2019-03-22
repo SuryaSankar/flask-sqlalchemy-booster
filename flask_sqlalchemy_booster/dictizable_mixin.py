@@ -3,7 +3,7 @@ A mixin class to add `todict` method to objects.
 
 """
 
-from sqlalchemy.ext.associationproxy import AssociationProxy
+from sqlalchemy.ext.associationproxy import AssociationProxyInstance
 from .utils import is_list_like, is_dict_like
 from toolspy import deep_group
 import json
@@ -268,7 +268,7 @@ class DictizableMixin(object):
         if rel in cls.__mapper__.relationships:
             return cls.__mapper__.relationships[rel].uselist
         rel_instance = getattr(cls, rel)
-        if isinstance(rel_instance, AssociationProxy):
+        if isinstance(rel_instance, AssociationProxyInstance):
             return cls.__mapper__.relationships[
                 rel_instance.target_collection].uselist
         return False
