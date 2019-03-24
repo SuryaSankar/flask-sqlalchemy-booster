@@ -4,7 +4,6 @@ A mixin class to add `todict` method to objects.
 """
 
 from sqlalchemy.ext.associationproxy import AssociationProxyInstance
-from .utils import is_list_like, is_dict_like
 from toolspy import deep_group
 import json
 from sqlalchemy.sql import sqltypes
