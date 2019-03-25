@@ -1,1 +1,0 @@
-from .crud_api_view import register_crud_routes_for_models
