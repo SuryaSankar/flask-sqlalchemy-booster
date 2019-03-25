@@ -1,7 +1,7 @@
 from flask_sqlalchemy_booster import FlaskSQLAlchemyBooster
 from sqlalchemy import func
 from flask_sqlalchemy_booster import FlaskBooster
-from flask_sqlalchemy_booster import register_crud_routes_for_models
+from flask_sqlalchemy_booster.crud_api_view import register_crud_routes_for_models
 
 from werkzeug.serving import run_simple
 

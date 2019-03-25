@@ -47,7 +47,6 @@ class FlaskSQLAlchemyBooster(SQLAlchemy):
     """
 
     def __init__(self, *args, **kwargs):
-        print("in FSAB init")
         kwargs["model_class"] = ModelBooster
         kwargs["query_class"] = QueryBooster
         super(FlaskSQLAlchemyBooster, self).__init__(*args, **kwargs)
