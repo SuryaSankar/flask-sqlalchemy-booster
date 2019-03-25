@@ -36,6 +36,7 @@ OPERATOR_FUNC = {
 
 
 def get_request_json():
+    print("in get_request_json")
     if 'json' in g:
         return g.json
     return request.get_json()

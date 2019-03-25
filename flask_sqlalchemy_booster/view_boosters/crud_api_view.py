@@ -887,7 +887,9 @@ def construct_batch_save_view_function(
 def register_crud_routes_for_models(
         app_or_bp, registration_dict, register_schema_structure=True,
         allow_unknown_fields=False, cache_handler=None, exception_handler=None,
-        tmp_folder_path="/tmp", forbidden_views=None, celery_worker=None):
+        tmp_folder_path="/tmp", forbidden_views=None, celery_worker=None,
+        register_schema_definition=False, register_views_map=False,
+        schema_def_url='/schema-def', views_map_url='/views-map'):
     if not hasattr(app_or_bp, "registered_models_and_crud_routes"):
         app_or_bp.registered_models_and_crud_routes = {
             "models_registered_for_views": [],
@@ -968,6 +970,7 @@ def register_crud_routes_for_models(
                             for k, v in model_schemas.items()}
         if _model_name not in views:
             views[_model_name] = {}
+
 
         if 'index' not in disabled_views:
             index_dict = view_dict_for_model.get('index', {})
@@ -1219,3 +1222,26 @@ def register_crud_routes_for_models(
             if 'input_schema_modifier' in batch_save_dict:
                 views[_model_name]['batch_save']['input_schema'] = batch_save_dict['input_schema_modifier'](
                     deepcopy(model_schemas[_model.__name__]['input_schema']))
+
+
+    if register_schema_definition:
+        def schema_def():
+            return Response(
+                json.dumps(
+                    app_or_bp.registered_models_and_crud_routes,
+                    default=json_encoder, sort_keys=True),
+                200, mimetype='application/json')
+        if cache_handler:
+            schema_def = cache_handler.cached(timeout=86400)(schema_def)
+        app_or_bp.route(schema_def_url, methods=['GET'])(schema_def)
+
+    if register_views_map:
+        def views_map():
+            return Response(
+                json.dumps(
+                    app_or_bp.registered_models_and_crud_routes['views'],
+                    default=json_encoder, sort_keys=True),
+                200, mimetype='application/json')
+        if cache_handler:
+            views_map = cache_handler.cached(timeout=86400)(views_map)
+        app_or_bp.route(views_map_url, methods=['GET'])(views_map)

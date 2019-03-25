@@ -14,9 +14,9 @@ def test_task_creation(todolist_app):
 				"name": "First task"
 			}
 		)
-		print resp
+		print(resp)
 		assert resp['status'] == 'success'
 		assert 'id' in resp['result']
-		print resp['result']['id']
+		print(resp['result']['id'])
 		assert resp['result']['id'] == 1
 
