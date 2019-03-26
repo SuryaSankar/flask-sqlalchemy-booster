@@ -1,4 +1,3 @@
-from flask.views import MethodView
 from flask import g, request, Response, url_for
 from schemalite import SchemaError
 from schemalite.core import validate_object, validate_list_of_objects, json_encoder

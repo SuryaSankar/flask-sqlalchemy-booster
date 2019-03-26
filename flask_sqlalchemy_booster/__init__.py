@@ -10,4 +10,4 @@ from .query_booster import QueryBooster
 from .json_encoder import json_encoder
 from .json_columns import JSONEncodedStruct, MutableDict, MutableList
 from .schema_generators import generate_input_data_schema
-import crud_api_view, responses
+from . import crud_api_view, responses

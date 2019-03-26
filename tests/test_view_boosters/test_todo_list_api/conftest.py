@@ -1,5 +1,5 @@
 import pytest
-from todo_list_api.app import create_todolist_app
+from .todo_list_api.app import create_todolist_app
 
 
 @pytest.fixture(scope="session")
