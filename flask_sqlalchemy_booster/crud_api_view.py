@@ -24,6 +24,7 @@ from .responses import (
 
 from .utils import remove_empty_values_in_dict, save_file_from_request, convert_to_proper_types
 
+from werkzeug.exceptions import Unauthorized
 
 def permit_only_allowed_fields(data, fields_allowed_to_be_set=None, fields_forbidden_from_being_set=None):
     if fields_allowed_to_be_set and len(fields_allowed_to_be_set) > 0:
@@ -674,7 +675,7 @@ def construct_batch_save_view_function(
         tmp_folder_path="/tmp", celery_worker=None,
         result_saving_instance_model=None,
         result_saving_instance_getter=None,
-        async=False):
+        run_as_async_task=False):
 
     def determine_response_for_input_row(
             input_row, existing_instance, raw_input_row,
@@ -749,7 +750,7 @@ def construct_batch_save_view_function(
             {"input": raw_input_row}
         )
 
-    def process_batch_input_data(input_data, result_saving_instance):
+    def process_batch_input_data(input_data, result_saving_instance=None):
 
         raw_input_data = deepcopy(input_data)
 
@@ -832,7 +833,7 @@ def construct_batch_save_view_function(
             if exception_handler:
                 return exception_handler(e)
 
-    if celery_worker and async:
+    if celery_worker and run_as_async_task:
         async_process_batch_input_data = celery_worker.task(name="crud_{0}_bs_{1}".format(
             app_or_bp.name, model_class.__tablename__))(async_process_batch_input_data)
 
@@ -853,7 +854,7 @@ def construct_batch_save_view_function(
         else:
             input_data = get_request_json()
 
-        if async:
+        if run_as_async_task:
             result_saving_instance = result_saving_instance_getter(
                 input_data=input_data, input_file_path=data_file_path) if callable(result_saving_instance_getter) else None
             async_process_batch_input_data.delay(
@@ -1211,7 +1212,7 @@ def register_crud_routes_for_models(
                     'result_saving_instance_model'),
                 result_saving_instance_getter=batch_save_dict.get(
                     'result_saving_instance_getter'),
-                async=batch_save_dict.get('async', False))
+                run_as_async_task=batch_save_dict.get('run_as_async_task', False))
             batch_save_url = batch_save_dict.get(
                 'url', None) or "/batch-save/%s" % base_url
             app_or_bp.route(
