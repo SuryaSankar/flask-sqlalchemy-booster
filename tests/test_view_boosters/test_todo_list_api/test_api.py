@@ -11,7 +11,7 @@ def test_task_creation(todolist_app):
 	with todolist_app.test_client() as client:
 		resp = client.jpost(
 			'/tasks', {
-				"name": "First task"
+				"title": "First task"
 			}
 		)
 		print(resp)
