@@ -14,9 +14,18 @@ def test_task_creation(todolist_app):
 				"title": "First task"
 			}
 		)
-		print(resp)
 		assert resp['status'] == 'success'
 		assert 'id' in resp['result']
-		print(resp['result']['id'])
 		assert resp['result']['id'] == 1
 
+def test_task_updation(todolist_app):
+	with todolist_app.test_client() as client:
+		modified_title = "First task - modified"
+		resp = client.jput(
+			'/tasks/1', {
+				"title": modified_title
+			}
+		)
+		assert resp['status'] == 'success'
+		assert 'id' in resp['result']
+		assert resp['result']['title'] == modified_title
