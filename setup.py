@@ -16,8 +16,7 @@ setup(
         "Schemalite>=0.1.23"
     ],
     tests_require=[
-        "pytest",
-        "pytest-xprocess"
+        "pytest"
     ],
     license='MIT',
     url='https://github.com/inkmonk/flask-sqlalchemy-booster',

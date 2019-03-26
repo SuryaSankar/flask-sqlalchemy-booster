@@ -23,7 +23,7 @@ def test_task_updation(todolist_app):
 		modified_title = "First task - modified"
 		resp = client.jput(
 			'/tasks/1', {
-				"title": modified_title
+				"title": "First task - modified"
 			}
 		)
 		assert resp['status'] == 'success'
