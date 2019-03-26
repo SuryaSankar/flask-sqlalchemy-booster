@@ -1,11 +1,10 @@
 from flask_sqlalchemy import Model
-from .query_booster import QueryBooster
-from .queryable_mixin import QueryableMixin
-from .dictizable_mixin import DictizableMixin
 from sqlalchemy.ext.associationproxy import AssociationProxyInstance
 from sqlalchemy.orm import class_mapper
 from toolspy import all_subclasses
-
+from ..query_booster import QueryBooster
+from .queryable_mixin import QueryableMixin
+from .dictizable_mixin import DictizableMixin
 
 class ModelBooster(Model, QueryableMixin, DictizableMixin):
 

@@ -2,7 +2,8 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_sqlalchemy import _QueryProperty
 from sqlalchemy.ext.declarative import declarative_base
-from .model_boosters import ModelBooster, QueryBooster
+from .model_booster import ModelBooster
+from .query_booster import QueryBooster
 from .flask_client_booster import FlaskClientBooster
 
 

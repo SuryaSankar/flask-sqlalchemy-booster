@@ -23,7 +23,7 @@ from .responses import (
     _serializable_params, serializable_obj, as_json,
     process_args_and_fetch_rows, convert_result_to_response)
 
-from ..utils import remove_empty_values_in_dict, save_file_from_request, convert_to_proper_types
+from .utils import remove_empty_values_in_dict, save_file_from_request, convert_to_proper_types
 
 
 def permit_only_allowed_fields(data, fields_allowed_to_be_set=None, fields_forbidden_from_being_set=None):
