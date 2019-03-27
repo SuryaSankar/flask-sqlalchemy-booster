@@ -107,3 +107,15 @@ def tz_convert(datetime_col, timedelta_mins):
 
 def tz_converted_date(datetime_col, timedelta_mins):
     return func.date(tz_convert(datetime_col, timedelta_mins))
+
+
+def get_rel_from_key(parent_class, rel_key):
+    return next(
+        r for r in class_mapper(parent_class).relationships
+        if r.key == rel_key)
+
+def get_rel_class_from_key(parent_class, rel_key):
+    return get_rel_from_key(parent_class, rel_key).mapper.class_
+
+def attr_is_a_property(klass, attr):
+    return hasattr(klass, attr) and isinstance(getattr(klass, attr), property)

@@ -1,10 +1,11 @@
 from flask_sqlalchemy import Model
-from sqlalchemy.ext.associationproxy import AssociationProxyInstance
+from sqlalchemy.ext.associationproxy import AssociationProxy, AssociationProxyInstance
 from sqlalchemy.orm import class_mapper
 from toolspy import all_subclasses
 from ..query_booster import QueryBooster
 from .queryable_mixin import QueryableMixin
 from .dictizable_mixin import DictizableMixin
+from ..utils import get_rel_from_key, get_rel_class_from_key, attr_is_a_property
 
 class ModelBooster(Model, QueryableMixin, DictizableMixin):
 
@@ -12,14 +13,12 @@ class ModelBooster(Model, QueryableMixin, DictizableMixin):
 
     query_class = QueryBooster
 
-    #################################################################
-    # Following methods are helpers used for older implementation of
-    # to_serializable_dict. Not required anymore. But might be useful
-    # in some future cases. Keeping them anyway
-    ##################################################################
-
     def serial_key(self, key):
         return self.__modified_keys__.get(key, key)
+
+    @classmethod
+    def is_property_attr(cls, attr):
+        return attr_is_a_property(cls, attr)
 
     @classmethod
     def parents(cls):
@@ -39,6 +38,16 @@ class ModelBooster(Model, QueryableMixin, DictizableMixin):
         return keys
 
     @classmethod
+    def dict_with_parent_class_fields(cls):
+        result = {}
+        for c in cls.parents():
+            for k, v in c.__dict__.iteritems():
+                result[k] = v
+        for k, v in cls.__dict__.iteritems():
+            result[k] = v
+        return result    
+
+    @classmethod
     def parent_with_column(cls, clmn):
         for p in cls.parents():
             if clmn in p.__table__.columns.keys():
@@ -52,15 +61,33 @@ class ModelBooster(Model, QueryableMixin, DictizableMixin):
 
     @classmethod
     def association_proxy_keys(cls, include_parent_classes=True):
-        result = []
-        keys = cls.all_keys() if include_parent_classes else cls.__dict__.keys()
-        for k in keys:
-            try:
-                if isinstance(getattr(cls, k), AssociationProxyInstance) and not k.startswith("_AssociationProxy_"):
-                    result.append(k)
-            except:
-                continue
-        return result
+        keys_dict = cls.dict_with_parent_class_fields() if include_parent_classes else cls.__dict__
+        assoc_keys = []
+        for k, v in keys_dict.iteritems():
+            if isinstance(v, AssociationProxy) and not k.startswith("_AssociationProxy_"):
+                assoc_keys.append(k)
+        return assoc_keys
+
+    @classmethod
+    def association_proxy_keys_dict(cls, include_parent_classes=True):
+        keys_dict = cls.dict_with_parent_class_fields() if include_parent_classes else cls.__dict__
+        return { 
+            k: v for k, v in keys_dict.iteritems()
+            if isinstance(v, AssociationProxy) and
+            not k.startswith("_AssociationProxy_")
+        }
+
+    # @classmethod
+    # def association_proxy_keys(cls, include_parent_classes=True):
+    #     result = []
+    #     keys = cls.all_keys() if include_parent_classes else cls.__dict__.keys()
+    #     for k in keys:
+    #         try:
+    #             if isinstance(getattr(cls, k), AssociationProxyInstance) and not k.startswith("_AssociationProxy_"):
+    #                 result.append(k)
+    #         except:
+    #             continue
+    #     return result
 
     @classmethod
     def column_keys(cls):
@@ -77,28 +104,55 @@ class ModelBooster(Model, QueryableMixin, DictizableMixin):
     @classmethod
     def col_assoc_proxy_keys(cls):
         result = []
-        for k in cls.association_proxy_keys():
-            assoc_proxy = getattr(cls, k)
-            assoc_rel = next(
-                r for r in cls.__mapper__.relationships
-                if r.key == assoc_proxy.target_collection)
-            assoc_rel_class = assoc_rel.mapper.class_
-            if assoc_proxy.value_attr in assoc_rel_class.__mapper__.columns.keys():
+        for k, assoc_proxy in cls.association_proxy_keys_dict().iteritems():
+            assoc_rel_class = get_rel_class_from_key(cls, assoc_proxy.target_collection)
+            if assoc_proxy.value_attr in class_mapper(assoc_rel_class).columns.keys():
                 result.append(k)
         return result
 
     @classmethod
     def rel_assoc_proxy_keys(cls):
         result = []
-        for k in cls.association_proxy_keys():
-            assoc_proxy = getattr(cls, k)
-            assoc_rel = next(
-                r for r in cls.__mapper__.relationships
-                if r.key == assoc_proxy.target_collection)
-            assoc_rel_class = assoc_rel.mapper.class_
-            if assoc_proxy.value_attr in assoc_rel_class.__mapper__.relationships.keys():
+        for k, assoc_proxy in cls.association_proxy_keys_dict().iteritems():
+            assoc_rel_class = get_rel_class_from_key(cls, assoc_proxy.target_collection)
+            if assoc_proxy.value_attr in class_mapper(assoc_rel_class).relationships.keys():
                 result.append(k)
         return result
+
+    @classmethod
+    def prop_assoc_proxy_keys(cls):
+        result = []
+        for k, assoc_proxy in cls.association_proxy_keys_dict().iteritems():
+            assoc_rel_class = get_rel_class_from_key(cls, assoc_proxy.target_collection)
+            if assoc_rel_class.is_property_attr(assoc_proxy.value_attr):
+                result.append(k)
+        return result
+
+    # @classmethod
+    # def col_assoc_proxy_keys(cls):
+    #     result = []
+    #     for k in cls.association_proxy_keys():
+    #         assoc_proxy = getattr(cls, k)
+    #         assoc_rel = next(
+    #             r for r in cls.__mapper__.relationships
+    #             if r.key == assoc_proxy.target_collection)
+    #         assoc_rel_class = assoc_rel.mapper.class_
+    #         if assoc_proxy.value_attr in assoc_rel_class.__mapper__.columns.keys():
+    #             result.append(k)
+    #     return result
+
+    # @classmethod
+    # def rel_assoc_proxy_keys(cls):
+    #     result = []
+    #     for k in cls.association_proxy_keys():
+    #         assoc_proxy = getattr(cls, k)
+    #         assoc_rel = next(
+    #             r for r in cls.__mapper__.relationships
+    #             if r.key == assoc_proxy.target_collection)
+    #         assoc_rel_class = assoc_rel.mapper.class_
+    #         if assoc_proxy.value_attr in assoc_rel_class.__mapper__.relationships.keys():
+    #             result.append(k)
+    #     return result
 
     @classmethod
     def subclass(cls, pm_identity):
