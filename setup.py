@@ -19,6 +19,6 @@ setup(
         "pytest"
     ],
     license='MIT',
-    url='https://github.com/inkmonk/flask-sqlalchemy-booster',
+    url='https://github.com/SuryaSankar/flask-sqlalchemy-booster',
     author='SuryaSankar',
     author_email='suryashankar.m@gmail.com')
