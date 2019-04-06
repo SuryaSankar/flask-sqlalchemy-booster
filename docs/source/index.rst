@@ -5,8 +5,7 @@
 
 Flask-SQLAlchemy-Booster
 ========================
-Flask-SQLAlchemy-Booster is a collection of enhancements to the Flask-SQLAlchemy
-library.
+Flask-SQLAlchemy-Booster is a collection of methods which make querying easier
 
 It replaces the Model class with a subclass that adds 
 	1. Additional querying methods and
