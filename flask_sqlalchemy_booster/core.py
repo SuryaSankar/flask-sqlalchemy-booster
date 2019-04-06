@@ -1,11 +1,11 @@
-from flask import Flask
+from flask import Flask, g, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_sqlalchemy import _QueryProperty
 from sqlalchemy.ext.declarative import declarative_base
 from .model_booster import ModelBooster
 from .query_booster import QueryBooster
 from .flask_client_booster import FlaskClientBooster
-
+import bleach
 
 class QueryPropertyWithModelClass(_QueryProperty):
     """Subclassed to add the cls attribute to a query instance.
@@ -60,10 +60,45 @@ class FlaskSQLAlchemyBooster(SQLAlchemy):
         base.session = self.session
         return base
 
+def sanitize_args():
+    if 'args' not in g:
+        g.args = {}
+    for arg, argv in request.args.items():
+        g.args[arg] = bleach.clean(argv)
+
+def sanitize_json():
+    def _sanitize_object(obj):
+        result = {}
+        for k, v in obj.items():
+            if isinstance(v, int) or isinstance(v, Decimal):
+                result[k] = v
+            elif not (isinstance(v, str) or isinstance(v, unicode)):
+                result[k] = json.loads(bleach.clean(json.dumps(v)))
+            else:
+                result[k] = bleach.clean(v)
+            if result[k] == '':
+                result[k] = None
+            # Making an assumption that there is no good usecase
+            # for setting an empty string. This will help prevent
+            # cases where empty string is sent because of client
+            # not clearing form fields to null
+        return result
+    g.json = None
+    json_data = request.get_json()
+    if isinstance(json_data, dict):
+        g.json = _sanitize_object(json_data)
+    elif isinstance(json_data, list):
+        g.json = [_sanitize_object(o) for o in json_data]
+    else:
+        g.json = None
+
 class FlaskBooster(Flask):
     test_client_class = FlaskClientBooster
 
-    # def __init__(self, *args, **kwargs):
-    #     super(FlaskBooster, self).__init__(*args, **kwargs)
-    #     self.before_request_funcs.setdefault(None, []).append(json_sanitizer)
-    #     self.before_request_funcs[None].append(args_sanitizer)
+    def __init__(self, *args, **kwargs):
+        json_sanitizer = kwargs.pop('json_sanitizer', sanitize_json)
+        args_sanitizer = kwargs.pop('args_sanitizer', sanitize_args)
+        super(FlaskBooster, self).__init__(*args, **kwargs)
+
+        self.before_request_funcs.setdefault(None, []).append(json_sanitizer)
+        self.before_request_funcs[None].append(args_sanitizer)
