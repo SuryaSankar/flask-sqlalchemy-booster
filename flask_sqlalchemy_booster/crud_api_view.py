@@ -1,5 +1,4 @@
-from flask.views import MethodView
-from flask import g, request, Response,url_for
+from flask import g, request, Response, url_for
 from schemalite import SchemaError
 from schemalite.core import validate_object, validate_list_of_objects, json_encoder
 from sqlalchemy.sql import sqltypes
@@ -9,18 +8,31 @@ from toolspy import (
     delete_dict_keys, union, merge)
 from copy import deepcopy
 import inspect
+import urllib
+import functools
+import csv
+import traceback
+
 from .responses import (
-    as_dict,
+    as_dict, get_request_json, get_request_args,
     process_args_and_render_json_list, success_json, error_json,
     render_json_obj_with_requested_structure,
     render_json_list_with_requested_structure,
     render_dict_with_requested_structure,
     _serializable_params, serializable_obj, as_json,
     process_args_and_fetch_rows, convert_result_to_response)
-import urllib
-import functools
+
 from .utils import remove_empty_values_in_dict, save_file_from_request, convert_to_proper_types
-import csv
+
+from werkzeug.exceptions import Unauthorized
+
+def permit_only_allowed_fields(data, fields_allowed_to_be_set=None, fields_forbidden_from_being_set=None):
+    if fields_allowed_to_be_set and len(fields_allowed_to_be_set) > 0:
+        for k in data.keys():
+            if k not in fields_allowed_to_be_set:
+                del data[k]
+    if fields_forbidden_from_being_set and len(fields_forbidden_from_being_set) > 0:
+        delete_dict_keys(data, fields_forbidden_from_being_set)
 
 
 def construct_get_view_function(
@@ -35,13 +47,22 @@ def construct_get_view_function(
         try:
             _id = _id.strip()
             if _id.startswith('[') and _id.endswith(']'):
+                # Handles multiple ids being passed
+                # Eg: /tasks/[1,2,3]
                 if permitted_object_getter is not None:
+                    # If the endpoint is meant to allow only a particular instance to be queried,
+                    # that should be returned by the permitted_object_getter function. 
+                    # Typical use case is when you want to show a singleton object like current cart.
+                    # If the endpoint is always meant to return current cart only, you can register the
+                    # url like this - /carts/current and set the permitted_object_getter function to 
+                    # return the current cart only.
                     resources = [permitted_object_getter()]
                     ids = [_id[1:-1]]
                 else:
                     ids = [int(i) for i in json.loads(_id)]
                     if get_query_creator:
-                        resources = get_query_creator(model_class.query).get_all(ids)
+                        resources = get_query_creator(
+                            model_class.query).get_all(ids)
                     else:
                         resources = model_class.get_all(ids)
                 if callable(access_checker):
@@ -72,7 +93,7 @@ def construct_get_view_function(
             else:
                 if get_query_creator:
                     obj = get_query_creator(model_class.query).filter(
-                        model_class.primary_key()==_id).first()
+                        model_class.primary_key() == _id).first()
                 else:
                     obj = model_class.get(_id)
             if obj is None:
@@ -89,6 +110,7 @@ def construct_get_view_function(
         except Exception as e:
             if exception_handler:
                 return exception_handler(e)
+            traceback.print_exc()
             return error_json(400, e.message)
 
     if enable_caching and cache_handler is not None:
@@ -100,7 +122,6 @@ def construct_get_view_function(
                     (k, v) for k in sorted(args) for v in sorted(args.getlist(k))
                 ])
                 # key = url_for(request.endpoint, **request.args)
-                print "cache key ", key
                 return key
             cache_key_determiner = make_key_prefix
         cached_get = cache_handler.memoize(
@@ -143,6 +164,7 @@ def construct_index_view_function(
         except Exception as e:
             if exception_handler:
                 return exception_handler(e)
+            traceback.print_exc()
             return error_json(400, e.message)
 
     if enable_caching and cache_handler is not None:
@@ -167,17 +189,19 @@ def construct_post_view_function(
         post_processors=None,
         allow_unknown_fields=False,
         dict_struct=None, schemas_registry=None,
+        fields_allowed_to_be_set=None,
         fields_forbidden_from_being_set=None, exception_handler=None,
         access_checker=None):
 
     def post():
         try:
-            raw_input_data = deepcopy(g.json)
+            request_json = get_request_json()
+            raw_input_data = deepcopy(request_json)
             if callable(access_checker):
                 allowed, message = access_checker()
                 if not allowed:
                     return error_json(401, message)
-            input_data = g.json
+            input_data = request_json
             if pre_processors is not None:
                 for processor in pre_processors:
                     if callable(processor):
@@ -189,10 +213,20 @@ def construct_post_view_function(
                 fields_forbidden_from_being_set or [],
                 model_class._fields_forbidden_from_being_set_ or []])
             if isinstance(input_data, list):
-                if len(fields_to_be_removed) > 0:
+                if fields_allowed_to_be_set and len(fields_to_be_removed) > 0:
                     for dict_item in input_data:
-                        delete_dict_keys(dict_item, fields_to_be_removed)
-                input_data = model_class.pre_validation_adapter_for_list(input_data)
+                        permit_only_allowed_fields(
+                            dict_item, fields_allowed_to_be_set=fields_allowed_to_be_set, fields_forbidden_from_being_set=fields_to_be_removed)
+                # if fields_allowed_to_be_set:
+                #     for dict_item in input_data:
+                #         for k in dict_item.keys():
+                #             if k not in fields_allowed_to_be_set:
+                #                 del dict_item[k]
+                # if len(fields_to_be_removed) > 0:
+                #     for dict_item in input_data:
+                #         delete_dict_keys(dict_item, fields_to_be_removed)
+                input_data = model_class.pre_validation_adapter_for_list(
+                    input_data)
                 if isinstance(input_data, Response):
                     return input_data
                 is_valid, errors = validate_list_of_objects(
@@ -212,7 +246,8 @@ def construct_post_view_function(
                             for resource, datum in zip(resources, input_data):
                                 processed_resource = processor(resource, datum)
                                 if processed_resource is not None:
-                                    processed_resources.append(processed_resource)
+                                    processed_resources.append(
+                                        processed_resource)
                                 else:
                                     processed_resources.append(resource)
                             resources = processed_resources
@@ -234,8 +269,16 @@ def construct_post_view_function(
                             {'status': 'success', 'result': obj}
                             for obj, error in zip(output_dict['result'], errors)]})
             else:
-                if len(fields_to_be_removed) > 0:
-                    delete_dict_keys(input_data, fields_to_be_removed)
+                permit_only_allowed_fields(
+                    input_data,
+                    fields_allowed_to_be_set=fields_allowed_to_be_set,
+                    fields_forbidden_from_being_set=fields_to_be_removed)
+                # if fields_allowed_to_be_set:
+                #     for k in input_data.keys():
+                #         if k not in fields_allowed_to_be_set:
+                #             del input_data[k]
+                # if len(fields_to_be_removed) > 0:
+                #     delete_dict_keys(input_data, fields_to_be_removed)
                 input_data = model_class.pre_validation_adapter(input_data)
                 if isinstance(input_data, Response):
                     return input_data
@@ -254,8 +297,9 @@ def construct_post_view_function(
                                 raw_input_data=raw_input_data)
                             if processed_obj is not None:
                                 obj = processed_obj
-                if g.args and '_ret' in g.args:
-                    rels = g.args['_ret'].split(".")
+                request_args = get_request_args()
+                if request_args and '_ret' in request_args:
+                    rels = request_args['_ret'].split(".")
                     final_obj = obj
                     for rel in rels:
                         final_obj = getattr(final_obj, rel)
@@ -270,9 +314,9 @@ def construct_post_view_function(
         except Exception as e:
             if exception_handler:
                 return exception_handler(e)
+            traceback.print_exc()
             return error_json(400, e.message)
     return post
-
 
 def construct_put_view_function(
         model_class, schema,
@@ -284,6 +328,7 @@ def construct_put_view_function(
         dict_struct=None,
         allow_unknown_fields=False,
         access_checker=None,
+        fields_allowed_to_be_set=None,
         fields_forbidden_from_being_set=None, exception_handler=None):
     def put(_id):
         try:
@@ -302,8 +347,9 @@ def construct_put_view_function(
                 allowed, message = access_checker(obj)
                 if not allowed:
                     return error_json(401, message)
-            raw_input_data = deepcopy(g.json)
-            input_data = g.json
+            request_json = get_request_json()
+            raw_input_data = deepcopy(request_json)
+            input_data = request_json
             if pre_processors is not None:
                 for processor in pre_processors:
                     if callable(processor):
@@ -343,8 +389,9 @@ def construct_put_view_function(
                             raw_input_data=raw_input_data)
                         if processed_updated_obj is not None:
                             updated_obj = processed_updated_obj
-            if '_ret' in g.args:
-                rels = g.args['_ret'].split(".")
+            request_args = get_request_args()
+            if '_ret' in request_args:
+                rels = request_args['_ret'].split(".")
                 final_obj = updated_obj
                 for rel in rels:
                     final_obj = getattr(final_obj, rel)
@@ -361,10 +408,143 @@ def construct_put_view_function(
         except Exception as e:
             if exception_handler:
                 return exception_handler(e)
+            traceback.print_exc()
             return error_json(400, e.message)
 
     return put
 
+def construct_patch_view_function(model_class, schema, pre_processors=None,
+                                  query_constructor=None, schemas_registry=None,
+                                  exception_handler=None, permitted_object_getter=None,
+                                  processors=None, post_processors=None, access_checker=None,
+                                  dict_struct=None):
+    def patch(_id):
+        try:
+            request_json = get_request_json()
+            if permitted_object_getter is not None:
+                obj = permitted_object_getter()
+            else:
+                if callable(query_constructor):
+                    obj = query_constructor(model_class.query).filter(
+                        model_class.primary_key() == _id).first()
+                else:
+                    obj = model_class.get(_id)
+            if obj is None:
+                return error_json(404, 'Resource not found')
+            if callable(access_checker):
+                allowed, message = access_checker(obj)
+                if not allowed:
+                    return error_json(401, message)
+            if pre_processors is not None:
+                for processor in pre_processors:
+                    if callable(processor):
+                        processor(obj)
+            if processors:
+                updated_obj = obj
+                for processor in processors:
+                    if callable(processor):
+                        updated_obj = processor(updated_obj, request_json)
+                        if isinstance(updated_obj, Response):
+                            return updated_obj
+
+            else:
+                polymorphic_field = schema.get('polymorphic_on')
+                if polymorphic_field:
+                    if polymorphic_field not in request_json:
+                        # Why is this being done only on patch? If polymorphic objects can be handled by put, why cant they be handled in patch without setting the discriminator?
+                        request_json[polymorphic_field] = getattr(
+                            obj, polymorphic_field)
+                is_valid, errors = validate_object(
+                    schema, request_json, allow_required_fields_to_be_skipped=True,
+                    context={"existing_instance": obj,
+                             "model_class": model_class},
+                    schemas_registry=schemas_registry)
+                if not is_valid:
+                    return error_json(400, errors)
+                updated_obj = obj.update(**request_json)
+
+            if post_processors is not None:
+                for processor in post_processors:
+                    if callable(processor):
+                        processed_updated_obj = processor(updated_obj, request_json)
+                        if processed_updated_obj is not None:
+                            updated_obj = processed_updated_obj
+            return render_json_obj_with_requested_structure(updated_obj, dict_struct=dict_struct)
+        except Exception as e:
+            if exception_handler:
+                return exception_handler(e)
+            traceback.print_exc()
+            return error_json(400, e.message)
+
+    return patch
+
+def construct_delete_view_function(
+        model_class,
+        registration_dict=None,
+        pre_processors=None,
+        post_processors=None,
+        query_constructor=None,
+        permitted_object_getter=None, exception_handler=None,
+        access_checker=None):
+    def delete(_id):
+        try:
+            if permitted_object_getter is not None:
+                obj = permitted_object_getter()
+            else:
+                if callable(query_constructor):
+                    obj = query_constructor(
+                        model_class.query).filter(
+                        model_class.primary_key() == _id).first()
+                else:
+                    obj = model_class.get(_id)
+            if obj is None:
+                return error_json(404, 'Resource not found')
+            if callable(access_checker):
+                allowed, message = access_checker(obj)
+                if not allowed:
+                    return error_json(401, message)
+            if pre_processors is not None:
+                for processor in pre_processors:
+                    if callable(processor):
+                        processor(obj)
+            obj_data = obj.todict()
+
+            rel_obj_requested_in_return = None
+            request_args = get_request_args()
+            if '_ret' in request_args:
+                rels = request_args['_ret'].split(".")
+                if len(rels) > 0:
+                    rel_obj_requested_in_return = obj
+                    for rel in rels:
+                        rel_obj_requested_in_return = getattr(
+                            rel_obj_requested_in_return, rel)
+
+            obj.delete()
+            if post_processors is not None:
+                for processor in post_processors:
+                    if callable(processor):
+                        processor(obj_data)
+
+            if rel_obj_requested_in_return is not None:
+                cls_of_rel_obj_requested_in_return = type(
+                    rel_obj_requested_in_return)
+                rel_obj_dict_struct = None
+                refetched_rel_obj = cls_of_rel_obj_requested_in_return.get(
+                    rel_obj_requested_in_return.primary_key_value())
+                if cls_of_rel_obj_requested_in_return in registration_dict:
+                    rel_obj_dict_struct = (fetch_nested_key_from_dict(
+                        registration_dict[cls_of_rel_obj_requested_in_return], 'views.get.dict_struct') or
+                        registration_dict[cls_of_rel_obj_requested_in_return].get('dict_struct'))
+                return render_json_obj_with_requested_structure(
+                    refetched_rel_obj, dict_struct=rel_obj_dict_struct)
+
+            return success_json()
+        except Exception as e:
+            if exception_handler:
+                return exception_handler(e)
+            traceback.print_exc()
+            return error_json(400, e.message)
+    return delete
 
 def construct_batch_put_view_function(
         model_class, schema, registration_dict=None,
@@ -377,6 +557,7 @@ def construct_batch_put_view_function(
 
     def batch_put():
         try:
+            request_json = get_request_json()
             if pre_processors is not None:
                 for processor in pre_processors:
                     if callable(processor):
@@ -385,11 +566,11 @@ def construct_batch_put_view_function(
                 fields_forbidden_from_being_set or [],
                 model_class._fields_forbidden_from_being_set_ or []])
             if len(fields_to_be_removed) > 0:
-                for dict_item in g.json.values():
+                for dict_item in request_json.values():
                     delete_dict_keys(dict_item, fields_to_be_removed)
             output = {}
-            obj_ids = g.json.keys()
-            if type(model_class.primary_key().type)==sqltypes.Integer:
+            obj_ids = request_json.keys()
+            if type(model_class.primary_key().type) == sqltypes.Integer:
                 obj_ids = [int(obj_id) for obj_id in obj_ids]
             if callable(query_constructor):
                 objs = query_constructor(model_class.query).get_all(obj_ids)
@@ -399,13 +580,14 @@ def construct_batch_put_view_function(
             all_success = True
             any_success = False
             polymorphic_field = schema.get('polymorphic_on')
-            input_data = model_class.pre_validation_adapter_for_mapped_collection(g.json, existing_instances)
+            input_data = model_class.pre_validation_adapter_for_mapped_collection(
+                request_json, existing_instances)
             if isinstance(input_data, Response):
                 return input_data
             updated_objects = {}
             for obj_id, put_data_for_obj in input_data.items():
                 output_key = obj_id
-                if type(model_class.primary_key().type)==sqltypes.Integer:
+                if type(model_class.primary_key().type) == sqltypes.Integer:
                     output_key = int(obj_id)
                 existing_instance = existing_instances[output_key]
                 if existing_instance is None:
@@ -418,7 +600,8 @@ def construct_batch_put_view_function(
                 else:
                     if polymorphic_field:
                         if polymorphic_field not in put_data_for_obj:
-                            put_data_for_obj[polymorphic_field] = getattr(existing_instance, polymorphic_field)
+                            put_data_for_obj[polymorphic_field] = getattr(
+                                existing_instance, polymorphic_field)
                     is_valid, errors = validate_object(
                         schema, put_data_for_obj, allow_required_fields_to_be_skipped=True,
                         allow_unknown_fields=allow_unknown_fields,
@@ -432,7 +615,8 @@ def construct_batch_put_view_function(
                         if post_processors is not None:
                             for processor in post_processors:
                                 if callable(processor):
-                                    processed_updated_object = processor(updated_object, put_data_for_obj)
+                                    processed_updated_object = processor(
+                                        updated_object, put_data_for_obj)
                                     if processed_updated_object is not None:
                                         updated_object = processed_updated_object
                         updated_objects[updated_object.id] = updated_object
@@ -464,135 +648,9 @@ def construct_batch_put_view_function(
         except Exception as e:
             if exception_handler:
                 return exception_handler(e)
+            traceback.print_exc()
             return error_json(400, e.message)
     return batch_put
-
-
-def construct_patch_view_function(model_class, schema, pre_processors=None,
-                                  query_constructor=None, schemas_registry=None,
-                                  exception_handler=None, permitted_object_getter=None,
-                                  processors=None, post_processors=None, access_checker=None,
-                                  dict_struct=None):
-    def patch(_id):
-        try:
-            if permitted_object_getter is not None:
-                obj = permitted_object_getter()
-            else:
-                if callable(query_constructor):
-                    obj = query_constructor(model_class.query).filter(
-                        model_class.primary_key() == _id).first()
-                else:
-                    obj = model_class.get(_id)
-            if obj is None:
-                return error_json(404, 'Resource not found')
-            if callable(access_checker):
-                allowed, message = access_checker(obj)
-                if not allowed:
-                    return error_json(401, message)
-            if pre_processors is not None:
-                for processor in pre_processors:
-                    if callable(processor):
-                        processor(obj)
-            if processors:
-                updated_obj = obj
-                for processor in processors:
-                    if callable(processor):
-                        updated_obj = processor(updated_obj, g.json)
-                        if isinstance(updated_obj, Response):
-                            return updated_obj
-
-            else:
-                polymorphic_field = schema.get('polymorphic_on')
-                if polymorphic_field:
-                    if polymorphic_field not in g.json:
-                        g.json[polymorphic_field] = getattr(obj, polymorphic_field)
-                is_valid, errors = validate_object(
-                    schema, g.json, allow_required_fields_to_be_skipped=True,
-                    context={"existing_instance": obj,
-                             "model_class": model_class},
-                    schemas_registry=schemas_registry)
-                if not is_valid:
-                    return error_json(400, errors)
-                updated_obj = obj.update(**g.json)
-
-            if post_processors is not None:
-                for processor in post_processors:
-                    if callable(processor):
-                        processed_updated_obj = processor(updated_obj, g.json)
-                        if processed_updated_obj is not None:
-                            updated_obj = processed_updated_obj
-            return render_json_obj_with_requested_structure(updated_obj, dict_struct=dict_struct)
-        except Exception as e:
-            if exception_handler:
-                return exception_handler(e)
-            return error_json(400, e.message)
-
-    return patch
-
-
-def construct_delete_view_function(
-        model_class,
-        registration_dict=None,
-        pre_processors=None,
-        post_processors=None,
-        query_constructor=None,
-        permitted_object_getter=None, exception_handler=None,
-        access_checker=None):
-    def delete(_id):
-        try:
-            if permitted_object_getter is not None:
-                obj = permitted_object_getter()
-            else:
-                if callable(query_constructor):
-                    obj = query_constructor(
-                        model_class.query).filter(
-                        model_class.primary_key()==_id).first()
-                else:
-                    obj = model_class.get(_id)
-            if obj is None:
-                return error_json(404, 'Resource not found')
-            if callable(access_checker):
-                allowed, message = access_checker(obj)
-                if not allowed:
-                    return error_json(401, message)
-            if pre_processors is not None:
-                for processor in pre_processors:
-                    if callable(processor):
-                        processor(obj)
-            obj_data = obj.todict()
-
-            rel_obj_requested_in_return = None
-            if '_ret' in g.args:
-                rels = g.args['_ret'].split(".")
-                if len(rels) > 0:
-                    rel_obj_requested_in_return = obj
-                    for rel in rels:
-                        rel_obj_requested_in_return = getattr(rel_obj_requested_in_return, rel)
-
-            obj.delete()
-            if post_processors is not None:
-                for processor in post_processors:
-                    if callable(processor):
-                        processor(obj_data)
-
-            if rel_obj_requested_in_return is not None:
-                cls_of_rel_obj_requested_in_return = type(rel_obj_requested_in_return)
-                rel_obj_dict_struct = None
-                refetched_rel_obj = cls_of_rel_obj_requested_in_return.get(
-                    rel_obj_requested_in_return.primary_key_value())
-                if cls_of_rel_obj_requested_in_return in registration_dict:
-                    rel_obj_dict_struct = (fetch_nested_key_from_dict(
-                        registration_dict[cls_of_rel_obj_requested_in_return], 'views.get.dict_struct') or
-                        registration_dict[cls_of_rel_obj_requested_in_return].get('dict_struct'))
-                return render_json_obj_with_requested_structure(
-                    refetched_rel_obj, dict_struct=rel_obj_dict_struct)
-
-            return success_json()
-        except Exception as e:
-            if exception_handler:
-                return exception_handler(e)
-            return error_json(400, e.message)
-    return delete
 
 def get_result_dict_from_response(rsp):
     response = rsp.response
@@ -617,7 +675,7 @@ def construct_batch_save_view_function(
         tmp_folder_path="/tmp", celery_worker=None,
         result_saving_instance_model=None,
         result_saving_instance_getter=None,
-        async=False):
+        run_as_async_task=False):
 
     def determine_response_for_input_row(
             input_row, existing_instance, raw_input_row,
@@ -640,12 +698,13 @@ def construct_batch_save_view_function(
                         data=input_row, existing_instance=existing_instance,
                         extra_params={"result_saving_instance_id": fetch_nested_key(result_saving_instance, 'id')})
                     if process_result and isinstance(process_result, Response):
-                        response = get_result_dict_from_response(process_result)
+                        response = get_result_dict_from_response(
+                            process_result)
                         if response:
                             return merge(response, {"input": raw_input_row})
 
-
-        modified_input_row = model_class.pre_validation_adapter(input_row, existing_instance)
+        modified_input_row = model_class.pre_validation_adapter(
+            input_row, existing_instance)
         if isinstance(modified_input_row, Response):
             response = get_result_dict_from_response(modified_input_row)
             if response:
@@ -655,7 +714,8 @@ def construct_batch_save_view_function(
         polymorphic_field = schema.get('polymorphic_on')
         if polymorphic_field:
             if polymorphic_field not in input_row:
-                input_row[polymorphic_field] = getattr(existing_instance, polymorphic_field)
+                input_row[polymorphic_field] = getattr(
+                    existing_instance, polymorphic_field)
         is_valid, errors = validate_object(
             schema, input_row, allow_required_fields_to_be_skipped=True,
             allow_unknown_fields=allow_unknown_fields,
@@ -664,14 +724,16 @@ def construct_batch_save_view_function(
             schemas_registry=schemas_registry)
         if not is_valid:
             return {
-                    "status": "failure",
-                    "code": 401,
-                    "error": errors,
-                    "input": raw_input_row
-                }
+                "status": "failure",
+                "code": 401,
+                "error": errors,
+                "input": raw_input_row
+            }
 
-        pre_modification_data = existing_instance.todict(dict_struct={"rels": {}}) if existing_instance else None
-        obj = existing_instance.update(**input_row) if existing_instance else model_class.create(**input_row)
+        pre_modification_data = existing_instance.todict(
+            dict_struct={"rels": {}}) if existing_instance else None
+        obj = existing_instance.update(
+            **input_row) if existing_instance else model_class.create(**input_row)
 
         post_processors = post_processors_for_put if existing_instance else post_processors_for_post
         if post_processors is not None:
@@ -688,11 +750,9 @@ def construct_batch_save_view_function(
             {"input": raw_input_row}
         )
 
-
-    def process_batch_input_data(input_data, result_saving_instance):
+    def process_batch_input_data(input_data, result_saving_instance=None):
 
         raw_input_data = deepcopy(input_data)
-
 
         fields_to_be_removed = union([
             fields_forbidden_from_being_set or [],
@@ -706,7 +766,6 @@ def construct_batch_save_view_function(
                 if callable(pre_processor):
                     input_data = [pre_processor(row) for row in input_data]
 
-
         primary_key_name = model_class.primary_key_name()
         obj_ids = [obj.get(primary_key_name) for obj in input_data]
         existing_instances = model_class.get_all(obj_ids)
@@ -716,8 +775,10 @@ def construct_batch_save_view_function(
                 existing_instance = existing_instances[idx]
                 if existing_instance is None:
                     if all(input_row.get(f) is not None for f in unique_identifier_fields):
-                        filter_kwargs = {f: input_row.get(f) for f in unique_identifier_fields}
-                        existing_instances[idx] = model_class.query.filter_by(**filter_kwargs).first()
+                        filter_kwargs = {f: input_row.get(
+                            f) for f in unique_identifier_fields}
+                        existing_instances[idx] = model_class.query.filter_by(
+                            **filter_kwargs).first()
                         if existing_instances[idx]:
                             input_row[primary_key_name] = getattr(
                                 existing_instances[idx], primary_key_name)
@@ -744,7 +805,7 @@ def construct_batch_save_view_function(
                     "status": "failure",
                     "code": 400,
                     "error": e.message
-                    })
+                })
 
         status = "success"
 
@@ -755,15 +816,16 @@ def construct_batch_save_view_function(
         return consolidated_result
 
     def async_process_batch_input_data(input_data, result_saving_instance_id=None):
-        print "in async_process_batch_input_data task"
         try:
             result_saving_instance = None
             if result_saving_instance_id and result_saving_instance_model:
-                result_saving_instance = result_saving_instance_model.get(result_saving_instance_id)
+                result_saving_instance = result_saving_instance_model.get(
+                    result_saving_instance_id)
             if result_saving_instance:
                 result_saving_instance.mark_as_started()
                 # result_saving_instance.pre_process_input_data(input_data)
-            response = process_batch_input_data(input_data, result_saving_instance)
+            response = process_batch_input_data(
+                input_data, result_saving_instance)
             if result_saving_instance:
                 result_saving_instance.save_response_data(response)
         except Exception as e:
@@ -771,19 +833,15 @@ def construct_batch_save_view_function(
             if exception_handler:
                 return exception_handler(e)
 
-    if celery_worker and async:
-        # print "received celery_worker"
-        async_process_batch_input_data = celery_worker.task(name="crud_{0}_bs_{1}".format(app_or_bp.name, model_class.__tablename__))(async_process_batch_input_data)
-        # print "registered a  celery worker task for async process batch input data"
+    if celery_worker and run_as_async_task:
+        async_process_batch_input_data = celery_worker.task(name="crud_{0}_bs_{1}".format(
+            app_or_bp.name, model_class.__tablename__))(async_process_batch_input_data)
 
     def batch_save():
-        # print "in batch save function"
-        # print request.headers
 
         data_file_path = None
         saving_model_instance = None
         if request.headers['Content-Type'].startswith("multipart/form-data"):
-            # print "Received file upload"
             data_file_path = save_file_from_request(
                 request.files['file'], location=tmp_folder_path)
             with open(data_file_path) as csv_file:
@@ -794,18 +852,17 @@ def construct_batch_save_view_function(
                     model_class) for row in rows]
                 input_data = rows
         else:
-            input_data = g.json
+            input_data = get_request_json()
 
-        if async:
-            result_saving_instance = result_saving_instance_getter(input_data=input_data, input_file_path=data_file_path) if callable(result_saving_instance_getter) else None
-            print "about to queue async_process_batch_input_data task"
+        if run_as_async_task:
+            result_saving_instance = result_saving_instance_getter(
+                input_data=input_data, input_file_path=data_file_path) if callable(result_saving_instance_getter) else None
             async_process_batch_input_data.delay(
                 input_data, result_saving_instance_id=result_saving_instance.id)
             if result_saving_instance:
                 return render_json_obj_with_requested_structure(result_saving_instance)
             else:
                 return success_json()
-
 
         # if saving_model:
         #     saving_model_instance = saving_model.create()
@@ -826,11 +883,13 @@ def construct_batch_save_view_function(
     return batch_save
 
 
+
 def register_crud_routes_for_models(
         app_or_bp, registration_dict, register_schema_structure=True,
         allow_unknown_fields=False, cache_handler=None, exception_handler=None,
-        tmp_folder_path="/tmp", forbidden_views=None, celery_worker=None):
-    # print "in register_crud_routes_for_models for ", app_or_bp
+        tmp_folder_path="/tmp", forbidden_views=None, celery_worker=None,
+        register_schema_definition=False, register_views_map=False,
+        schema_def_url='/schema-def', views_map_url='/views-map'):
     if not hasattr(app_or_bp, "registered_models_and_crud_routes"):
         app_or_bp.registered_models_and_crud_routes = {
             "models_registered_for_views": [],
@@ -852,7 +911,8 @@ def register_crud_routes_for_models(
         else:
             input_schema = modelcls.generate_input_data_schema()
         if modelcls in registration_dict and callable(registration_dict[modelcls].get('input_schema_modifier')):
-            input_schema = registration_dict[modelcls]['input_schema_modifier'](input_schema)
+            input_schema = registration_dict[modelcls]['input_schema_modifier'](
+                input_schema)
         model_schemas[modelcls_key] = {
             "input_schema": input_schema,
             "output_schema": modelcls.output_data_schema(),
@@ -862,7 +922,7 @@ def register_crud_routes_for_models(
             if subcls.__name__ not in model_schemas:
                 model_schemas[subcls.__name__] = {
                     'is_a_polymorphically_derived_from': modelcls.__name__,
-                    'polymorphic_identity': subcls.__mapper_args__['polymorphic_identity'] 
+                    'polymorphic_identity': subcls.__mapper_args__['polymorphic_identity']
                 }
         for rel in modelcls.__mapper__.relationships.values():
             if rel.mapper.class_.__name__ not in model_schemas:
@@ -876,19 +936,24 @@ def register_crud_routes_for_models(
             _model = _model_key
             _model_name = _model.__name__
         base_url = _model_dict.get('url_slug')
-        disabled_views = _model_dict.get('forbidden_views') or forbidden_views or []
+        disabled_views = _model_dict.get(
+            'forbidden_views') or forbidden_views or []
         default_query_constructor = _model_dict.get('query_constructor')
         default_access_checker = _model_dict.get('access_checker')
         default_dict_post_processors = _model_dict.get('dict_post_processors')
         view_dict_for_model = _model_dict.get('views', {})
         dict_struct_for_model = _model_dict.get('dict_struct')
-        fields_forbidden_from_being_set_for_all_views = _model_dict.get('fields_forbidden_from_being_set', [])
-        enable_caching = _model_dict.get('enable_caching', False) and cache_handler is not None
+        fields_forbidden_from_being_set_for_all_views = _model_dict.get(
+            'fields_forbidden_from_being_set', [])
+        enable_caching = _model_dict.get(
+            'enable_caching', False) and cache_handler is not None
         cache_timeout = _model_dict.get('cache_timeout')
-        resource_name = _model_dict.get('resource_name') or _model.__tablename__
+        resource_name = _model_dict.get(
+            'resource_name') or _model.__tablename__
 
         if _model_name not in app_or_bp.registered_models_and_crud_routes["models_registered_for_views"]:
-            app_or_bp.registered_models_and_crud_routes["models_registered_for_views"].append(_model_name)
+            app_or_bp.registered_models_and_crud_routes["models_registered_for_views"].append(
+                _model_name)
         if _model_name not in model_schemas:
             populate_model_schema(_model, modelcls_key=_model_name)
 
@@ -897,28 +962,36 @@ def register_crud_routes_for_models(
         else:
             model_default_input_schema = _model.generate_input_data_schema()
         if callable(registration_dict[_model].get('input_schema_modifier')):
-            model_default_input_schema = registration_dict[_model]['input_schema_modifier'](model_default_input_schema)
+            model_default_input_schema = registration_dict[_model]['input_schema_modifier'](
+                model_default_input_schema)
 
         views = app_or_bp.registered_models_and_crud_routes["views"]
-        schemas_registry = {k: v.get('input_schema') for k, v in model_schemas.items()}
+        schemas_registry = {k: v.get('input_schema')
+                            for k, v in model_schemas.items()}
         if _model_name not in views:
             views[_model_name] = {}
+
 
         if 'index' not in disabled_views:
             index_dict = view_dict_for_model.get('index', {})
             if 'enable_caching' in index_dict:
-                enable_caching = index_dict.get('enable_caching') and cache_handler is not None
+                enable_caching = index_dict.get(
+                    'enable_caching') and cache_handler is not None
             cache_key_determiner = index_dict.get('cache_key_determiner')
             cache_timeout = index_dict.get('cache_timeout') or cache_timeout
             index_func = index_dict.get('view_func', None) or construct_index_view_function(
                 _model,
-                index_query_creator=index_dict.get('query_constructor') or default_query_constructor,
-                dict_struct=index_dict.get('dict_struct') or dict_struct_for_model,
-                custom_response_creator=index_dict.get('custom_response_creator'),
+                index_query_creator=index_dict.get(
+                    'query_constructor') or default_query_constructor,
+                dict_struct=index_dict.get(
+                    'dict_struct') or dict_struct_for_model,
+                custom_response_creator=index_dict.get(
+                    'custom_response_creator'),
                 enable_caching=enable_caching,
                 cache_handler=cache_handler, cache_key_determiner=cache_key_determiner,
                 cache_timeout=cache_timeout, exception_handler=exception_handler,
-                access_checker=index_dict.get('access_checker') or default_access_checker,
+                access_checker=index_dict.get(
+                    'access_checker') or default_access_checker,
                 default_limit=index_dict.get('default_limit'),
                 default_sort=index_dict.get('default_sort'),
                 default_orderby=index_dict.get('default_orderby'),
@@ -934,18 +1007,23 @@ def register_crud_routes_for_models(
         if 'get' not in disabled_views:
             get_dict = view_dict_for_model.get('get', {})
             if 'enable_caching' in get_dict:
-                enable_caching = get_dict.get('enable_caching') and cache_handler is not None
+                enable_caching = get_dict.get(
+                    'enable_caching') and cache_handler is not None
             cache_key_determiner = get_dict.get('cache_key_determiner')
             cache_timeout = get_dict.get('cache_timeout') or cache_timeout
             get_func = get_dict.get('view_func', None) or construct_get_view_function(
                 _model, registration_dict,
-                permitted_object_getter=get_dict.get('permitted_object_getter') or _model_dict.get('permitted_object_getter'),
-                get_query_creator=get_dict.get('query_constructor') or default_query_constructor,
-                dict_struct=get_dict.get('dict_struct') or dict_struct_for_model,
+                permitted_object_getter=get_dict.get(
+                    'permitted_object_getter') or _model_dict.get('permitted_object_getter'),
+                get_query_creator=get_dict.get(
+                    'query_constructor') or default_query_constructor,
+                dict_struct=get_dict.get(
+                    'dict_struct') or dict_struct_for_model,
                 enable_caching=enable_caching,
                 cache_handler=cache_handler, cache_key_determiner=cache_key_determiner,
                 cache_timeout=cache_timeout, exception_handler=exception_handler,
-                access_checker=get_dict.get('access_checker') or default_access_checker,
+                access_checker=get_dict.get(
+                    'access_checker') or default_access_checker,
                 dict_post_processors=get_dict.get('dict_post_processors') or default_dict_post_processors)
             get_url = get_dict.get('url', None) or '/%s/<_id>' % base_url
             app_or_bp.route(
@@ -956,7 +1034,8 @@ def register_crud_routes_for_models(
         if 'post' not in disabled_views:
             post_dict = view_dict_for_model.get('post', {})
             if callable(post_dict.get('input_schema_modifier')):
-                post_input_schema = post_dict['input_schema_modifier'](deepcopy(model_default_input_schema))
+                post_input_schema = post_dict['input_schema_modifier'](
+                    deepcopy(model_default_input_schema))
             else:
                 post_input_schema = model_default_input_schema
             post_func = post_dict.get('view_func', None) or construct_post_view_function(
@@ -966,9 +1045,11 @@ def register_crud_routes_for_models(
                 post_processors=post_dict.get('post_processors'),
                 schemas_registry=schemas_registry,
                 allow_unknown_fields=allow_unknown_fields,
-                dict_struct=post_dict.get('dict_struct') or dict_struct_for_model,
+                dict_struct=post_dict.get(
+                    'dict_struct') or dict_struct_for_model,
                 exception_handler=exception_handler,
-                access_checker=post_dict.get('access_checker') or default_access_checker,
+                access_checker=post_dict.get(
+                    'access_checker') or default_access_checker,
                 fields_forbidden_from_being_set=union([
                     fields_forbidden_from_being_set_for_all_views,
                     post_dict.get('fields_forbidden_from_being_set', [])]))
@@ -984,21 +1065,26 @@ def register_crud_routes_for_models(
         if 'put' not in disabled_views:
             put_dict = view_dict_for_model.get('put', {})
             if callable(put_dict.get('input_schema_modifier')):
-                put_input_schema = put_dict['input_schema_modifier'](deepcopy(model_default_input_schema))
+                put_input_schema = put_dict['input_schema_modifier'](
+                    deepcopy(model_default_input_schema))
             else:
                 put_input_schema = model_default_input_schema
             put_func = put_dict.get('view_func', None) or construct_put_view_function(
                 _model, put_input_schema,
                 registration_dict=registration_dict,
-                permitted_object_getter=put_dict.get('permitted_object_getter') or _model_dict.get('permitted_object_getter'),
+                permitted_object_getter=put_dict.get(
+                    'permitted_object_getter') or _model_dict.get('permitted_object_getter'),
                 pre_processors=put_dict.get('pre_processors'),
                 post_processors=put_dict.get('post_processors'),
-                dict_struct=put_dict.get('dict_struct') or dict_struct_for_model,
+                dict_struct=put_dict.get(
+                    'dict_struct') or dict_struct_for_model,
                 allow_unknown_fields=allow_unknown_fields,
-                query_constructor=put_dict.get('query_constructor') or default_query_constructor,
+                query_constructor=put_dict.get(
+                    'query_constructor') or default_query_constructor,
                 schemas_registry=schemas_registry,
                 exception_handler=exception_handler,
-                access_checker=put_dict.get('access_checker') or default_access_checker,
+                access_checker=put_dict.get(
+                    'access_checker') or default_access_checker,
                 fields_forbidden_from_being_set=union([
                     fields_forbidden_from_being_set_for_all_views,
                     put_dict.get('fields_forbidden_from_being_set', [])]))
@@ -1011,37 +1097,38 @@ def register_crud_routes_for_models(
                 views[_model_name]['put']['input_schema'] = put_dict['input_schema_modifier'](
                     deepcopy(model_schemas[_model.__name__]['input_schema']))
 
-        if 'batch_put' not in disabled_views:
-            batch_put_dict = view_dict_for_model.get('batch_put', {})
-            if callable(batch_put_dict.get('input_schema_modifier')):
-                batch_put_input_schema = batch_put_dict['input_schema_modifier'](deepcopy(model_default_input_schema))
-            else:
-                batch_put_input_schema = model_default_input_schema
-            batch_put_func = batch_put_dict.get('view_func', None) or construct_batch_put_view_function(
-                _model, batch_put_input_schema,
-                pre_processors=batch_put_dict.get('pre_processors'),
-                registration_dict=registration_dict,
-                post_processors=batch_put_dict.get('post_processors'),
-                allow_unknown_fields=allow_unknown_fields,
-                query_constructor=batch_put_dict.get('query_constructor') or default_query_constructor,
-                schemas_registry=schemas_registry,
-                exception_handler=exception_handler,
-                fields_forbidden_from_being_set=union([
-                    fields_forbidden_from_being_set_for_all_views,
-                    batch_put_dict.get('fields_forbidden_from_being_set', [])]))
-            batch_put_url = batch_put_dict.get('url', None) or "/%s" % base_url
-            app_or_bp.route(
-                batch_put_url, methods=['PUT'], endpoint='batch_put_%s' % resource_name)(
-                batch_put_func)
-            views[_model_name]['batch_put'] = {'url': batch_put_url}
-            if 'input_schema_modifier' in batch_put_dict:
-                views[_model_name]['batch_put']['input_schema'] = batch_put_dict['input_schema_modifier'](
-                    deepcopy(model_schemas[_model.__name__]['input_schema']))
+        # if 'batch_put' not in disabled_views:
+        #     batch_put_dict = view_dict_for_model.get('batch_put', {})
+        #     if callable(batch_put_dict.get('input_schema_modifier')):
+        #         batch_put_input_schema = batch_put_dict['input_schema_modifier'](deepcopy(model_default_input_schema))
+        #     else:
+        #         batch_put_input_schema = model_default_input_schema
+        #     batch_put_func = batch_put_dict.get('view_func', None) or construct_batch_put_view_function(
+        #         _model, batch_put_input_schema,
+        #         pre_processors=batch_put_dict.get('pre_processors'),
+        #         registration_dict=registration_dict,
+        #         post_processors=batch_put_dict.get('post_processors'),
+        #         allow_unknown_fields=allow_unknown_fields,
+        #         query_constructor=batch_put_dict.get('query_constructor') or default_query_constructor,
+        #         schemas_registry=schemas_registry,
+        #         exception_handler=exception_handler,
+        #         fields_forbidden_from_being_set=union([
+        #             fields_forbidden_from_being_set_for_all_views,
+        #             batch_put_dict.get('fields_forbidden_from_being_set', [])]))
+        #     batch_put_url = batch_put_dict.get('url', None) or "/%s" % base_url
+        #     app_or_bp.route(
+        #         batch_put_url, methods=['PUT'], endpoint='batch_put_%s' % resource_name)(
+        #         batch_put_func)
+        #     views[_model_name]['batch_put'] = {'url': batch_put_url}
+        #     if 'input_schema_modifier' in batch_put_dict:
+        #         views[_model_name]['batch_put']['input_schema'] = batch_put_dict['input_schema_modifier'](
+        #             deepcopy(model_schemas[_model.__name__]['input_schema']))
 
         if 'patch' not in disabled_views:
             patch_dict = view_dict_for_model.get('patch', {})
             if callable(patch_dict.get('input_schema_modifier')):
-                patch_input_schema = patch_dict['input_schema_modifier'](deepcopy(model_default_input_schema))
+                patch_input_schema = patch_dict['input_schema_modifier'](
+                    deepcopy(model_default_input_schema))
             else:
                 patch_input_schema = model_default_input_schema
             patch_func = patch_dict.get('view_func', None) or construct_patch_view_function(
@@ -1049,10 +1136,13 @@ def register_crud_routes_for_models(
                 pre_processors=patch_dict.get('pre_processors'),
                 processors=patch_dict.get('processors'),
                 post_processors=patch_dict.get('post_processors'),
-                query_constructor=patch_dict.get('query_constructor') or default_query_constructor,
-                permitted_object_getter=patch_dict.get('permitted_object_getter') or _model_dict.get('permitted_object_getter'),
+                query_constructor=patch_dict.get(
+                    'query_constructor') or default_query_constructor,
+                permitted_object_getter=patch_dict.get(
+                    'permitted_object_getter') or _model_dict.get('permitted_object_getter'),
                 schemas_registry=schemas_registry, exception_handler=exception_handler,
-                access_checker=patch_dict.get('access_checker') or default_access_checker,
+                access_checker=patch_dict.get(
+                    'access_checker') or default_access_checker,
                 dict_struct=patch_dict.get('dict_struct') or dict_struct_for_model)
             patch_url = patch_dict.get('url', None) or "/%s/<_id>" % base_url
             app_or_bp.route(
@@ -1067,10 +1157,12 @@ def register_crud_routes_for_models(
             delete_dict = view_dict_for_model.get('delete', {})
             delete_func = delete_dict.get('view_func', None) or construct_delete_view_function(
                 _model,
-                query_constructor=delete_dict.get('query_constructor') or default_query_constructor,
+                query_constructor=delete_dict.get(
+                    'query_constructor') or default_query_constructor,
                 pre_processors=delete_dict.get('pre_processors'),
                 registration_dict=registration_dict,
-                permitted_object_getter=delete_dict.get('permitted_object_getter') or _model_dict.get('permitted_object_getter'),
+                permitted_object_getter=delete_dict.get(
+                    'permitted_object_getter') or _model_dict.get('permitted_object_getter'),
                 post_processors=delete_dict.get('post_processors'), exception_handler=exception_handler,
                 access_checker=delete_dict.get('access_checker') or default_access_checker)
             delete_url = delete_dict.get('url', None) or "/%s/<_id>" % base_url
@@ -1082,23 +1174,33 @@ def register_crud_routes_for_models(
         if 'batch_save' not in disabled_views:
             batch_save_dict = view_dict_for_model.get('batch_save', {})
             if callable(batch_save_dict.get('input_schema_modifier')):
-                batch_save_input_schema = batch_save_dict['input_schema_modifier'](deepcopy(model_default_input_schema))
+                batch_save_input_schema = batch_save_dict['input_schema_modifier'](
+                    deepcopy(model_default_input_schema))
             else:
                 batch_save_input_schema = model_default_input_schema
             batch_save_func = batch_save_dict.get('view_func', None) or construct_batch_save_view_function(
                 _model, batch_save_input_schema,
                 app_or_bp=app_or_bp,
                 registration_dict=registration_dict,
-                pre_processors_for_post=fetch_nested_key_from_dict(view_dict_for_model, 'post.pre_processors'),
-                pre_processors_for_put=fetch_nested_key_from_dict(view_dict_for_model, 'put.pre_processors'),
-                post_processors_for_post=fetch_nested_key_from_dict(view_dict_for_model, 'post.post_processors'),
-                post_processors_for_put=fetch_nested_key_from_dict(view_dict_for_model, 'put.post_processors'),
-                extra_pre_processors=batch_save_dict.get('extra_pre_processors'),
-                extra_post_processors=batch_save_dict.get('extra_post_processors'),
-                unique_identifier_fields=batch_save_dict.get('unique_identifier_fields'),
-                dict_struct=batch_save_dict.get('dict_struct') or dict_struct_for_model,
+                pre_processors_for_post=fetch_nested_key_from_dict(
+                    view_dict_for_model, 'post.pre_processors'),
+                pre_processors_for_put=fetch_nested_key_from_dict(
+                    view_dict_for_model, 'put.pre_processors'),
+                post_processors_for_post=fetch_nested_key_from_dict(
+                    view_dict_for_model, 'post.post_processors'),
+                post_processors_for_put=fetch_nested_key_from_dict(
+                    view_dict_for_model, 'put.post_processors'),
+                extra_pre_processors=batch_save_dict.get(
+                    'extra_pre_processors'),
+                extra_post_processors=batch_save_dict.get(
+                    'extra_post_processors'),
+                unique_identifier_fields=batch_save_dict.get(
+                    'unique_identifier_fields'),
+                dict_struct=batch_save_dict.get(
+                    'dict_struct') or dict_struct_for_model,
                 allow_unknown_fields=allow_unknown_fields,
-                query_constructor=batch_save_dict.get('query_constructor') or default_query_constructor,
+                query_constructor=batch_save_dict.get(
+                    'query_constructor') or default_query_constructor,
                 schemas_registry=schemas_registry,
                 exception_handler=exception_handler,
                 tmp_folder_path=tmp_folder_path,
@@ -1106,10 +1208,13 @@ def register_crud_routes_for_models(
                     fields_forbidden_from_being_set_for_all_views,
                     batch_save_dict.get('fields_forbidden_from_being_set', [])]),
                 celery_worker=celery_worker,
-                result_saving_instance_model=batch_save_dict.get('result_saving_instance_model'),
-                result_saving_instance_getter=batch_save_dict.get('result_saving_instance_getter'),
-                async=batch_save_dict.get('async', False))
-            batch_save_url = batch_save_dict.get('url', None) or "/batch-save/%s" % base_url
+                result_saving_instance_model=batch_save_dict.get(
+                    'result_saving_instance_model'),
+                result_saving_instance_getter=batch_save_dict.get(
+                    'result_saving_instance_getter'),
+                run_as_async_task=batch_save_dict.get('run_as_async_task', False))
+            batch_save_url = batch_save_dict.get(
+                'url', None) or "/batch-save/%s" % base_url
             app_or_bp.route(
                 batch_save_url, methods=['POST'], endpoint='batch_save_%s' % resource_name)(
                 batch_save_func)
@@ -1119,102 +1224,24 @@ def register_crud_routes_for_models(
                     deepcopy(model_schemas[_model.__name__]['input_schema']))
 
 
+    if register_schema_definition:
+        def schema_def():
+            return Response(
+                json.dumps(
+                    app_or_bp.registered_models_and_crud_routes,
+                    default=json_encoder, sort_keys=True),
+                200, mimetype='application/json')
+        if cache_handler:
+            schema_def = cache_handler.cached(timeout=86400)(schema_def)
+        app_or_bp.route(schema_def_url, methods=['GET'])(schema_def)
 
-## TO BE DEPRECATED
-
-
-class CrudApiView(MethodView):
-
-    _model_class_ = None
-    _list_query_ = None
-    _id_key_ = 'id'
-    _schema_for_post_ = None
-    _schema_for_put_ = None
-
-    def get(self, _id):
-        list_query = self._list_query_ or self._model_class_.query
-        if _id is None:
-            return process_args_and_render_json_list(list_query)
-        else:
-            _id = _id.strip()
-            if _id.startswith('[') and _id.endswith(']'):
-                ids = [int(i) for i in json.loads(_id)]
-                resources = self._model_class_.get_all(ids)
-                if all(r is None for r in resources):
-                    return error_json(404, "No matching resources found")
-                return render_json_list_with_requested_structure(
-                    resources,
-                    pre_render_callback=lambda output_dict: {
-                        'status': 'partial_success' if None in resources else 'success',
-                        'result': [
-                            {'status': 'failure', 'error': 'Resource not found'}
-                            if obj is None
-                            else
-                            {'status': 'success', 'result': obj}
-                            for obj in output_dict['result']]})
-                return process_args_and_render_json_list(
-                    self._model_class_.query.filter(
-                        self._model_class_.primary_key().in_(ids)))
-            return render_json_obj_with_requested_structure(
-                self._model_class_.get(_id, key=self._id_key_))
-
-    def post(self):
-        if self._schema_for_post_:
-            try:
-                if isinstance(g.json, list):
-                    self._schema_for_post_.validate_list(g.json)
-                else:
-                    self._schema_for_post_.validate(g.json)
-            except SchemaError as e:
-                return error_json(400, e.value)
-            json_data = g.json
-            # json_data = self._schema_for_post_.adapt(g.json)
-        else:
-            json_data = g.json
-        if isinstance(g.json, list):
-            return render_json_list_with_requested_structure(
-                self._model_class_.create_all(json_data))
-        return render_json_obj_with_requested_structure(
-            self._model_class_.create(**json_data))
-
-    def put(self, _id):
-        obj = self._model_class_.get(_id, key=self._id_key_)
-        if self._schema_for_put_:
-            try:
-                self._schema_for_put_.validate(g.json)
-            except SchemaError as e:
-                return error_json(400, e.value)
-            json_data = self._schema_for_put_.adapt(g.json)
-        else:
-            json_data = g.json
-        return render_json_obj_with_requested_structure(obj.update(**json_data))
-
-    def patch(self, _id):
-        obj = self._model_class_.get(_id, key=self._id_key_)
-        json_data = g.json
-        return render_json_obj_with_requested_structure(obj.update(**json_data))
-
-    def delete(self, _id):
-        obj = self._model_class_.get(_id, key=self._id_key_)
-        obj.delete()
-        return success_json()
-
-
-def register_crud_api_view(view, bp_or_app, endpoint, url_slug):
-    bp_or_app.add_url_rule(
-        '/%s/' % url_slug, defaults={'_id': None},
-        view_func=view.as_view('%s__INDEX' % endpoint), methods=['GET', ])
-    bp_or_app.add_url_rule(
-        '/%s' % url_slug, view_func=view.as_view('%s__POST' % endpoint), methods=['POST', ])
-    bp_or_app.add_url_rule(
-        '/%s/<_id>' % url_slug, view_func=view.as_view('%s__GET' % endpoint),
-        methods=['GET'])
-    bp_or_app.add_url_rule(
-        '/%s/<_id>' % url_slug, view_func=view.as_view('%s__PUT' % endpoint),
-        methods=['PUT'])
-    bp_or_app.add_url_rule(
-        '/%s/<_id>' % url_slug, view_func=view.as_view('%s__PATCH' % endpoint),
-        methods=['PATCH'])
-    bp_or_app.add_url_rule(
-        '/%s/<_id>' % url_slug, view_func=view.as_view('%s__DELETE' % endpoint),
-        methods=['DELETE'])
+    if register_views_map:
+        def views_map():
+            return Response(
+                json.dumps(
+                    app_or_bp.registered_models_and_crud_routes['views'],
+                    default=json_encoder, sort_keys=True),
+                200, mimetype='application/json')
+        if cache_handler:
+            views_map = cache_handler.cached(timeout=86400)(views_map)
+        app_or_bp.route(views_map_url, methods=['GET'])(views_map)

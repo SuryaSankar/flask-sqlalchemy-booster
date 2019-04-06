@@ -69,3 +69,10 @@ class QueryBooster(BaseQuery):
                 items = self.limit(bucket_size).offset(offset_to_start_from + bucket*bucket_size).all()
                 yield items
 
+    def paginate(self, *args, **kwargs):
+        pagination = super(QueryBooster, self).paginate(*args, **kwargs)
+        if pagination.page == 1:
+            pagination.total = self.order_by(None).count()
+        return pagination
+
+

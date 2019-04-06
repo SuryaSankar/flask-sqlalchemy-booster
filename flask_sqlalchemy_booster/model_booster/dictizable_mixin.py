@@ -3,21 +3,20 @@ A mixin class to add `todict` method to objects.
 
 """
 
-from sqlalchemy.ext.associationproxy import AssociationProxy
-from .utils import is_list_like, is_dict_like
+from sqlalchemy.ext.associationproxy import AssociationProxyInstance
 from toolspy import deep_group
 import json
-from .json_encoder import json_encoder
 from sqlalchemy.sql import sqltypes
 from decimal import Decimal
 from datetime import datetime, date
-from .json_columns import JSONEncodedStruct
 from toolspy import all_subclasses
 from schemalite.core import func_and_desc
 from sqlalchemy.orm import class_mapper
-from types import NoneType
 from sqlalchemy.dialects.mysql import MEDIUMTEXT
 
+from ..json_columns import JSONEncodedStruct
+from ..json_encoder import json_encoder
+from ..utils import is_list_like, is_dict_like
 
 def serialized_list(olist, rels_to_expand=[]):
     return map(
@@ -50,7 +49,7 @@ def _set_fields_for_col(col_name, col, schema, forbidden, required):
                 sqltypes.Enum: (unicode, str),
                 MEDIUMTEXT: (unicode, str)
             }
-            schema["fields"][col_name]["type"] = type_mapping[type(col.type)] + (NoneType, )
+            schema["fields"][col_name]["type"] = type_mapping[type(col.type)] + (type(None), )
 
 
 def _set_fields_for_rel(rel_name, rel, schema, forbidden, required):
@@ -114,7 +113,7 @@ class DictizableMixin(object):
     _rels_to_serialize_ = []
     _rels_to_expand_ = []
     _group_listrels_by_ = {}
-    _autogenerate_dict_struct_if_none_ = False
+    _autogenerate_dict_struct_if_none_ = True
     _dict_struct_ = None
     _input_data_schema_ = None
 
@@ -269,7 +268,7 @@ class DictizableMixin(object):
         if rel in cls.__mapper__.relationships:
             return cls.__mapper__.relationships[rel].uselist
         rel_instance = getattr(cls, rel)
-        if isinstance(rel_instance, AssociationProxy):
+        if isinstance(rel_instance, AssociationProxyInstance):
             return cls.__mapper__.relationships[
                 rel_instance.target_collection].uselist
         return False

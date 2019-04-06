@@ -1,6 +1,6 @@
 # from sqlalchemy import func
 from toolspy import subdict, remove_and_mark_duplicate_dicts, merge
-from sqlalchemy.ext.associationproxy import AssociationProxy
+from sqlalchemy.ext.associationproxy import AssociationProxyInstance
 from sqlalchemy.ext.orderinglist import OrderingList
 from sqlalchemy.orm import class_mapper
 
@@ -70,7 +70,7 @@ class QueryableMixin(object):
                 setattr(self, key, value)
             if isinstance(getattr(self, key), OrderingList):
                 getattr(self, key).reorder()
-            elif isinstance(getattr(cls, key), AssociationProxy):
+            elif isinstance(getattr(cls, key), AssociationProxyInstance):
                 target_name = getattr(cls, key).target_collection
                 target_rel = getattr(self, target_name)
                 if isinstance(target_rel, OrderingList):
@@ -222,7 +222,7 @@ class QueryableMixin(object):
                 setattr(self, key, value)
             if isinstance(getattr(self, key), OrderingList):
                 getattr(self, key).reorder()
-            elif isinstance(getattr(cls, key), AssociationProxy):
+            elif isinstance(getattr(cls, key), AssociationProxyInstance):
                 target_name = getattr(cls, key).target_collection
                 target_rel = getattr(self, target_name)
                 if isinstance(target_rel, OrderingList):

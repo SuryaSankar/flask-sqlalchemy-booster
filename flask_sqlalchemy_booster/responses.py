@@ -4,8 +4,7 @@ from flask import Response, request, render_template, g
 from functools import wraps
 from toolspy import deep_group, merge, add_kv_to_dict, boolify, all_subclasses
 import inspect
-from .json_encoder import json_encoder
-from .query_booster import QueryBooster
+
 from sqlalchemy.sql import sqltypes
 from decimal import Decimal
 import dateutil.parser
@@ -17,6 +16,9 @@ from schemalite.validators import is_a_type_of, is_a_list_of_types_of
 from sqlalchemy.orm import class_mapper
 from sqlalchemy.orm.query import Query
 from sqlalchemy import or_, and_
+
+from .json_encoder import json_encoder
+from .query_booster import QueryBooster
 from .utils import type_coerce_value
 
 
@@ -31,6 +33,17 @@ OPERATOR_FUNC = {
     '>=': '__ge__', '<=': '__le__', '!': '__ne__', '!=': '__ne__',
     'in': 'in_'
 }
+
+
+def get_request_json():
+    if 'json' in g:
+        return g.json
+    return request.get_json()
+
+def get_request_args():
+    if 'args' in g:
+        return g.args
+    return request.args
 
 
 def json_dump(obj):
@@ -446,9 +459,7 @@ def as_list(func):
 #         value = dateutil.parser.parse(value).date()
 #     return value
 
-
-def modify_query_and_get_filter_function(query, keyword, value, op):
-    # print "in modify_query_and_get_filter_function ", query, keyword, value, op
+def return_joined_query_model_class_and_attr_name(query, keyword):
     if '.' in keyword:
         kw_split_arr = keyword.split('.')
         prefix_names = kw_split_arr[:-1]
@@ -509,6 +520,11 @@ def modify_query_and_get_filter_function(query, keyword, value, op):
                 # Instead it is preferable to join by mentioning the relationshp
                 # itself.
                 _query = _query.join(getattr(prev_model_class, assoc_rel.key))
+    return (_query, model_class, attr_name)
+
+
+def modify_query_and_get_filter_function(query, keyword, value, op):
+    _query, model_class, attr_name = return_joined_query_model_class_and_attr_name(query, keyword)
 
     columns = getattr(
         getattr(model_class, '__mapper__'),
@@ -637,14 +653,10 @@ def filter_query_using_filters_list(result, filters_dict):
 
 def filter_query_using_args(result, args_to_skip=[]):
     if not (isinstance(result, Query) or isinstance(result, QueryBooster)):
-        # print "not an instance of Query"
-        # print "instance of ", type(result)
         if isinstance(result, DefaultMeta) and class_mapper(
                 result).polymorphic_on is not None:
-            # print "marking as polymorphic"
             result = result.query.with_polymorphic('*')
         else:
-            # print "marking as not polymorphic"
             result = result.query
     for kw in request.args:
         if kw not in args_to_skip:
@@ -665,7 +677,6 @@ def filter_query_using_args(result, args_to_skip=[]):
                     if value.lower() == 'none' or value.lower() == 'null' or value.strip() == '':
                         value = None
                     result = filter_query_with_key(result, kw, value, '=')
-    # print result
     return result
 
 
@@ -675,14 +686,18 @@ def fetch_results_in_requested_format(
     limit = request.args.get('limit', default_limit)
     sort = request.args.get('sort', default_sort)
     orderby = request.args.get('orderby') or default_orderby or 'id'
+
     offset = request.args.get('offset', None) or default_offset
     page = request.args.get('page', None) or default_page
     per_page = request.args.get('per_page') or default_per_page or PER_PAGE_ITEMS_COUNT
+
     if sort:
+        result, model_class, attr_name = return_joined_query_model_class_and_attr_name(result, orderby)
+        attr = getattr(model_class, attr_name)
         if sort == 'asc':
-            result = result.asc(orderby)
+            result = result.order_by(attr.asc())
         elif sort == 'desc':
-            result = result.desc(orderby)
+            result = result.order_by(attr.desc())
     if page:
         try:
             pagination = result.paginate(int(page), int(per_page))

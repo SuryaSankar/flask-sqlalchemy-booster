@@ -1,8 +1,10 @@
+from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_sqlalchemy import _QueryProperty
-from .query_booster import QueryBooster
 from sqlalchemy.ext.declarative import declarative_base
 from .model_booster import ModelBooster
+from .query_booster import QueryBooster
+from .flask_client_booster import FlaskClientBooster
 
 
 class QueryPropertyWithModelClass(_QueryProperty):
@@ -45,16 +47,23 @@ class FlaskSQLAlchemyBooster(SQLAlchemy):
 
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, *args, **kwargs):
         kwargs["model_class"] = ModelBooster
         kwargs["query_class"] = QueryBooster
-        super(FlaskSQLAlchemyBooster, self).__init__(**kwargs)
+        super(FlaskSQLAlchemyBooster, self).__init__(*args, **kwargs)
         # self.Query = QueryBooster
 
     def make_declarative_base(self, model, metadata=None):
-        print "calling make_declarative_base"
         base = super(FlaskSQLAlchemyBooster, self).make_declarative_base(
             model, metadata)
         base.query = QueryPropertyWithModelClass(self)
         base.session = self.session
         return base
+
+class FlaskBooster(Flask):
+    test_client_class = FlaskClientBooster
+
+    # def __init__(self, *args, **kwargs):
+    #     super(FlaskBooster, self).__init__(*args, **kwargs)
+    #     self.before_request_funcs.setdefault(None, []).append(json_sanitizer)
+    #     self.before_request_funcs[None].append(args_sanitizer)
