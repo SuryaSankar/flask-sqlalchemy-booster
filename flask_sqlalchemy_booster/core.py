@@ -7,7 +7,7 @@ from .query_booster import QueryBooster
 from .flask_client_booster import FlaskClientBooster
 import bleach
 from werkzeug.datastructures import MultiDict
-
+from decimal import Decimal
 
 class QueryPropertyWithModelClass(_QueryProperty):
     """Subclassed to add the cls attribute to a query instance.
