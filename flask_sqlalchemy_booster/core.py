@@ -80,14 +80,12 @@ def _sanitize_object(obj):
     return result
 
 def sanitize_args():
-    print("In FSAB sanitize_args")
     if 'args' not in g:
         g.args = {}
     for arg, argv in request.args.items():
         g.args[arg] = bleach.clean(argv)
 
 def sanitize_json():
-    print("In FSAB sanitize_json")
     g.json = None
     json_data = request.get_json()
     if isinstance(json_data, dict):
@@ -98,7 +96,6 @@ def sanitize_json():
         g.json = None
 
 def sanitize_form():
-    print("In FSAB sanitize_form")
     if 'form' not in g:
         g.form = MultiDict(request.form)
     if request.form is not None:
