@@ -11,7 +11,7 @@ import dateutil.parser
 import math
 from flask_sqlalchemy import Pagination
 import traceback
-from schemalite.core import validate_object
+from schemalite.core import validate_dict
 from schemalite.validators import is_a_type_of, is_a_list_of_types_of
 from sqlalchemy.orm import class_mapper
 from sqlalchemy.orm.query import Query

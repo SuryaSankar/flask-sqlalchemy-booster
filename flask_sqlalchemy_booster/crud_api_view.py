@@ -1,5 +1,5 @@
 from flask import g, request, Response, url_for
-from schemalite.core import validate_object, validate_list_of_objects, json_encoder
+from schemalite.core import validate_dict, validate_list_of_dicts, json_encoder
 from sqlalchemy.sql import sqltypes
 import json
 from toolspy import (
@@ -228,8 +228,8 @@ def construct_post_view_function(
                     input_data)
                 if isinstance(input_data, Response):
                     return input_data
-                is_valid, errors = validate_list_of_objects(
-                    schema, input_data, context={"model_class": model_class},
+                is_valid, errors = validate_list_of_dicts(
+                    input_data, schema, context={"model_class": model_class},
                     allow_unknown_fields=allow_unknown_fields,
                     schemas_registry=schemas_registry)
                 input_objs = input_data
@@ -281,8 +281,8 @@ def construct_post_view_function(
                 input_data = model_class.pre_validation_adapter(input_data)
                 if isinstance(input_data, Response):
                     return input_data
-                is_valid, errors = validate_object(
-                    schema, input_data, context={"model_class": model_class},
+                is_valid, errors = validate_dict(
+                    input_data, schema, context={"model_class": model_class},
                     schemas_registry=schemas_registry,
                     allow_unknown_fields=allow_unknown_fields)
                 if not is_valid:
@@ -369,8 +369,8 @@ def construct_put_view_function(
             if polymorphic_field:
                 if polymorphic_field not in input_data:
                     input_data[polymorphic_field] = getattr(obj, polymorphic_field)
-            is_valid, errors = validate_object(
-                schema, input_data, allow_required_fields_to_be_skipped=True,
+            is_valid, errors = validate_dict(
+                input_data, schema, allow_required_fields_to_be_skipped=True,
                 allow_unknown_fields=allow_unknown_fields,
                 context={"existing_instance": obj,
                          "model_class": model_class},
@@ -453,8 +453,8 @@ def construct_patch_view_function(model_class, schema, pre_processors=None,
                         # Why is this being done only on patch? If polymorphic objects can be handled by put, why cant they be handled in patch without setting the discriminator?
                         request_json[polymorphic_field] = getattr(
                             obj, polymorphic_field)
-                is_valid, errors = validate_object(
-                    schema, request_json, allow_required_fields_to_be_skipped=True,
+                is_valid, errors = validate_dict(
+                    request_json, schema, allow_required_fields_to_be_skipped=True,
                     context={"existing_instance": obj,
                              "model_class": model_class},
                     schemas_registry=schemas_registry)
@@ -601,8 +601,8 @@ def construct_batch_put_view_function(
                         if polymorphic_field not in put_data_for_obj:
                             put_data_for_obj[polymorphic_field] = getattr(
                                 existing_instance, polymorphic_field)
-                    is_valid, errors = validate_object(
-                        schema, put_data_for_obj, allow_required_fields_to_be_skipped=True,
+                    is_valid, errors = validate_dict(
+                        put_data_for_obj, schema, allow_required_fields_to_be_skipped=True,
                         allow_unknown_fields=allow_unknown_fields,
                         context={
                             "existing_instance": existing_instance,
@@ -715,8 +715,8 @@ def construct_batch_save_view_function(
             if polymorphic_field not in input_row:
                 input_row[polymorphic_field] = getattr(
                     existing_instance, polymorphic_field)
-        is_valid, errors = validate_object(
-            schema, input_row, allow_required_fields_to_be_skipped=True,
+        is_valid, errors = validate_dict(
+            input_row, schema, allow_required_fields_to_be_skipped=True,
             allow_unknown_fields=allow_unknown_fields,
             context={"existing_instance": existing_instance,
                      "model_class": model_class},
