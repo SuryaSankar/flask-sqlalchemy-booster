@@ -6,6 +6,8 @@ from ..query_booster import QueryBooster
 from .queryable_mixin import QueryableMixin
 from .dictizable_mixin import DictizableMixin
 from ..utils import get_rel_from_key, get_rel_class_from_key, attr_is_a_property
+from sqlalchemy.ext.hybrid import hybrid_property
+
 
 class ModelBooster(Model, QueryableMixin, DictizableMixin):
 
@@ -98,8 +100,17 @@ class ModelBooster(Model, QueryableMixin, DictizableMixin):
         return map(lambda r: r.key, cls.__mapper__.relationships)
 
     @classmethod
+    def hybrid_property_keys(cls):
+        return [k for k in cls.all_keys() if hasattr(getattr(cls, k), 'descriptor') and isinstance(
+            getattr(cls, k).descriptor, hybrid_property)]
+
+    @classmethod
+    def settable_hybrid_property_keys(cls):
+        return [k for k in cls.hybrid_property_keys() if callable(getattr(cls, k).setter)]        
+
+    @classmethod
     def all_settable_keys(cls):
-        return cls.column_keys() + cls.relationship_keys() + cls.association_proxy_keys()
+        return cls.column_keys() + cls.relationship_keys() + cls.association_proxy_keys() + cls.settable_hybrid_property_keys()
 
     @classmethod
     def col_assoc_proxy_keys(cls):
