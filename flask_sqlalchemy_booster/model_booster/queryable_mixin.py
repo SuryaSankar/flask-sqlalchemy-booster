@@ -1,8 +1,11 @@
 # from sqlalchemy import func
+from __future__ import absolute_import
 from toolspy import subdict, remove_and_mark_duplicate_dicts, merge
 from sqlalchemy.ext.associationproxy import AssociationProxyInstance
 from sqlalchemy.ext.orderinglist import OrderingList
 from sqlalchemy.orm import class_mapper
+import six
+from six.moves import range
 
 
 class QueryableMixin(object):
@@ -41,7 +44,7 @@ class QueryableMixin(object):
 
     @classmethod
     def column_names(cls):
-        return cls.__mapper__.columns.keys()
+        return list(cls.__mapper__.columns.keys())
 
     @classmethod
     def is_the_primary_key(cls, attr):
@@ -60,7 +63,7 @@ class QueryableMixin(object):
     def update_without_commit(self, **kwargs):
         kwargs = self._preprocess_params(kwargs)
         kwargs = self.preprocess_kwargs_before_update(kwargs)
-        for key, value in kwargs.iteritems():
+        for key, value in six.iteritems(kwargs):
             cls = type(self)
             if key not in cls.all_settable_keys():
                 continue
@@ -181,7 +184,7 @@ class QueryableMixin(object):
         def remove_primary_keys_from_dict_struct(klass, ds):
             pk = klass.primary_key_name()
             if "attrs" not in ds:
-                ds['attrs'] = class_mapper(klass).columns.keys()
+                ds['attrs'] = list(class_mapper(klass).columns.keys())
             if 'attrs' in ds and pk in ds['attrs']:
                 ds['attrs'].remove(pk)
             if 'rels' in ds:
@@ -214,7 +217,7 @@ class QueryableMixin(object):
         """
         kwargs = self._preprocess_params(kwargs)
         kwargs = self.preprocess_kwargs_before_update(kwargs)
-        for key, value in kwargs.iteritems():
+        for key, value in six.iteritems(kwargs):
             cls = type(self)
             if not hasattr(cls, key) or isinstance(getattr(cls, key), property):
                 continue
@@ -627,7 +630,7 @@ class QueryableMixin(object):
             obj = cls.first(**filter_kwargs)
         if obj is not None:
             update_kwargs = {
-                k: v for k, v in kwargs.iteritems()
+                k: v for k, v in six.iteritems(kwargs)
                 if k not in filter_keys and k not in cls._no_overwrite_}
             obj.update_without_commit(**update_kwargs)
             # for key, value in kwargs.iteritems():
@@ -659,7 +662,7 @@ class QueryableMixin(object):
         else:
             obj = cls.first(**filter_kwargs)
         if obj is not None:
-            for key, value in kwargs.iteritems():
+            for key, value in six.iteritems(kwargs):
                 if (key not in keys and
                         key not in cls._no_overwrite_):
                     setattr(obj, key, value)
@@ -711,7 +714,7 @@ class QueryableMixin(object):
         else:
             obj = cls.first(**filter_kwargs)
         if obj is not None:
-            for key, value in kwargs.iteritems():
+            for key, value in six.iteritems(kwargs):
                 if (key not in keys and
                         key not in cls._no_overwrite_):
                     setattr(obj, key, value)
@@ -811,7 +814,7 @@ class QueryableMixin(object):
             else:
                 obj = cls.first(**filter_kwargs)
             if obj is not None:
-                for key, value in kwargs.iteritems():
+                for key, value in six.iteritems(kwargs):
                     if (key not in keys and
                             key not in cls._no_overwrite_):
                         setattr(obj, key, value)
@@ -853,7 +856,7 @@ class QueryableMixin(object):
             else:
                 obj = cls.first(**filter_kwargs)
             if obj is not None:
-                for key, value in kwargs.iteritems():
+                for key, value in six.iteritems(kwargs):
                     if (key not in keys and
                             key not in cls._no_overwrite_):
                         setattr(obj, key, value)
