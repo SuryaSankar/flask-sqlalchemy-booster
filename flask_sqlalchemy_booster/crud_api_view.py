@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from flask import g, request, Response, url_for
 from schemalite.core import validate_dict, validate_list_of_dicts, json_encoder
 from sqlalchemy.sql import sqltypes
@@ -7,7 +8,7 @@ from toolspy import (
     delete_dict_keys, union, merge)
 from copy import deepcopy
 import inspect
-import urllib
+import six.moves.urllib.request, six.moves.urllib.parse, six.moves.urllib.error
 import functools
 import csv
 import traceback
@@ -24,6 +25,7 @@ from .responses import (
 from .utils import remove_empty_values_in_dict, save_file_from_request, convert_to_proper_types
 
 from werkzeug.exceptions import Unauthorized
+from six.moves import zip
 
 def permit_only_allowed_fields(data, fields_allowed_to_be_set=None, fields_forbidden_from_being_set=None):
     if fields_allowed_to_be_set and len(fields_allowed_to_be_set) > 0:
@@ -82,7 +84,7 @@ def construct_get_view_function(
                             _id: {'status': 'failure', 'error': 'Resource not found'}
                             if obj is None
                             else {'status': 'success', 'result': obj}
-                            for _id, obj in zip(ids, output_dict['result'])}
+                            for _id, obj in list(zip(ids, output_dict['result']))}
                     },
                     dict_struct=dict_struct,
                     dict_post_processors=dict_post_processors
@@ -117,7 +119,7 @@ def construct_get_view_function(
             def make_key_prefix(func_name):
                 """Make a key that includes GET parameters."""
                 args = request.args
-                key = request.path + '?' + urllib.urlencode([
+                key = request.path + '?' + six.moves.urllib.parse.urlencode([
                     (k, v) for k in sorted(args) for v in sorted(args.getlist(k))
                 ])
                 # key = url_for(request.endpoint, **request.args)
@@ -171,7 +173,7 @@ def construct_index_view_function(
             def make_key_prefix():
                 """Make a key that includes GET parameters."""
                 args = request.args
-                key = request.path + '?' + urllib.urlencode([
+                key = request.path + '?' + six.moves.urllib.parse.urlencode([
                     (k, v) for k in sorted(args) for v in sorted(args.getlist(k))
                 ])
                 # key = url_for(request.endpoint, **request.args)
@@ -568,14 +570,14 @@ def construct_batch_put_view_function(
                 for dict_item in request_json.values():
                     delete_dict_keys(dict_item, fields_to_be_removed)
             output = {}
-            obj_ids = request_json.keys()
+            obj_ids = list(request_json.keys())
             if type(model_class.primary_key().type) == sqltypes.Integer:
                 obj_ids = [int(obj_id) for obj_id in obj_ids]
             if callable(query_constructor):
                 objs = query_constructor(model_class.query).get_all(obj_ids)
             else:
                 objs = model_class.get_all(obj_ids)
-            existing_instances = dict(zip(obj_ids, objs))
+            existing_instances = dict(list(zip(obj_ids, objs)))
             all_success = True
             any_success = False
             polymorphic_field = schema.get('polymorphic_on')
@@ -966,7 +968,7 @@ def register_crud_routes_for_models(
 
         views = app_or_bp.registered_models_and_crud_routes["views"]
         schemas_registry = {k: v.get('input_schema')
-                            for k, v in model_schemas.items()}
+                            for k, v in list(model_schemas.items())}
         if _model_name not in views:
             views[_model_name] = {}
 

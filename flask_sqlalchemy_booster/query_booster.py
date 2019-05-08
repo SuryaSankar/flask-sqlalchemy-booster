@@ -1,4 +1,6 @@
+from __future__ import absolute_import
 from flask_sqlalchemy import BaseQuery
+from six.moves import range
 
 
 class QueryBooster(BaseQuery):

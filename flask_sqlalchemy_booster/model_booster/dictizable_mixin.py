@@ -13,6 +13,7 @@ from toolspy import all_subclasses
 from schemalite.core import func_and_desc
 from sqlalchemy.orm import class_mapper
 from sqlalchemy.dialects.mysql import MEDIUMTEXT
+from past.builtins import long
 
 from ..json_columns import JSONEncodedStruct
 from ..json_encoder import json_encoder

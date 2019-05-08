@@ -1,8 +1,10 @@
+from __future__ import absolute_import
 from sqlalchemy.sql import sqltypes
 from schemalite.validators import is_a_type_of
 from decimal import Decimal
 from datetime import datetime, date
 from .json_columns import JSONEncodedStruct
+import six
 
 
 def generate_input_data_schema(model_cls, seen_classes=None, required=None, forbidden=None, post_processor=None):
@@ -33,10 +35,10 @@ def generate_input_data_schema(model_cls, seen_classes=None, required=None, forb
                     sqltypes.Numeric: (Decimal, float),
                     sqltypes.DateTime: datetime,
                     sqltypes.Date: date,
-                    sqltypes.Unicode: (unicode, str),
-                    sqltypes.UnicodeText: (unicode, str),
-                    sqltypes.String: (unicode, str),
-                    sqltypes.Text: (unicode, str),
+                    sqltypes.Unicode: (six.text_type, str),
+                    sqltypes.UnicodeText: (six.text_type, str),
+                    sqltypes.String: (six.text_type, str),
+                    sqltypes.Text: (six.text_type, str),
                     sqltypes.Boolean: bool,
                 }
                 schema["fields"][col_name]["type"] = type_mapping[type(col.type)]

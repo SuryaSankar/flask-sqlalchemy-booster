@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from flask.testing import FlaskClient
 from flask.json import _json as json
 from .json_encoder import json_encoder

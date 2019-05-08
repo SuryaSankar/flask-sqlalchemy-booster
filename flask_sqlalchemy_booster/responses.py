@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from flask.json import _json
 from flask_sqlalchemy import DefaultMeta
 from flask import Response, request, render_template, g
@@ -20,6 +21,8 @@ from sqlalchemy import or_, and_
 from .json_encoder import json_encoder
 from .query_booster import QueryBooster
 from .utils import type_coerce_value
+import six
+from six.moves import zip
 
 
 RESTRICTED = ['limit', 'sort', 'orderby', 'groupby', 'attrs',
@@ -151,16 +154,14 @@ def serializable_list(
                 })
         return result
     else:
-        result_list = map(
-            lambda o: serialized_obj(
+        result_list = [serialized_obj(
                 o, attrs_to_serialize=attrs_to_serialize,
                 rels_to_expand=rels_to_expand,
                 group_listrels_by=group_listrels_by,
                 rels_to_serialize=rels_to_serialize,
                 key_modifications=key_modifications,
                 dict_struct=dict_struct,
-                dict_post_processors=dict_post_processors),
-            olist)
+                dict_post_processors=dict_post_processors) for o in olist]
         if keyvals_to_merge:
             result_list = [merge(obj_dict, kvdict)
                            for obj_dict, kvdict in
@@ -172,9 +173,7 @@ def serialized_list(olist, **kwargs):
     """
     Misnamed. Should be deprecated eventually.
     """
-    return map(
-        lambda o: serialized_obj(o, **kwargs),
-        olist)
+    return [serialized_obj(o, **kwargs) for o in olist]
 
 
 def structured(struct, wrap=True, meta=None, struct_key='result', pre_render_callback=None):
@@ -343,7 +342,7 @@ ds_schema = {
     "fields": {
         "attrs": {
             "required": False,
-            "validators": [is_a_list_of_types_of(str, unicode)]
+            "validators": [is_a_list_of_types_of(str, six.text_type)]
         },
         "rels": {
             "required": False,
@@ -357,7 +356,7 @@ def _serializable_params(args, check_groupby=False):
     params = {}
     if '_ds' in args:
         params['dict_struct'] = _json.loads(args['_ds'])
-        if isinstance(params['dict_struct'], str) or isinstance(params['dict_struct'], unicode):
+        if isinstance(params['dict_struct'], str) or isinstance(params['dict_struct'], six.text_type):
             params['dict_struct'] = _json.loads(params['dict_struct'])
     if 'attrs' in args:
         attrs = args.get('attrs')
@@ -543,7 +542,7 @@ def modify_query_and_get_filter_function(query, keyword, value, op):
                 # else:
                 value = type_coerce_value(column_type, value)
     elif op == 'in':
-        value = map(lambda v: type_coerce_value(column_type, v), value)
+        value = [type_coerce_value(column_type, v) for v in value]
 
     if hasattr(model_class, attr_name):
         return (_query, getattr(
@@ -742,12 +741,12 @@ def convert_result_to_response_structure(
             'curr_page_first_item_index': (page - 1) * per_page + 1,
             'curr_page_last_item_index': min(page * per_page, result.total)
         }
-        if isinstance(meta, dict) and len(meta.keys()) > 0:
+        if isinstance(meta, dict) and len(list(meta.keys())) > 0:
             pages_meta = merge(pages_meta, meta)
         return structured(
             serializable_list(result.items, **params_to_be_serialized),
             meta=pages_meta)
-    if isinstance(meta, dict) and len(meta.keys()) > 0:
+    if isinstance(meta, dict) and len(list(meta.keys())) > 0:
         kwargs = merge(params_to_be_serialized, {'meta': meta})
     else:
         kwargs = params_to_be_serialized
@@ -803,7 +802,7 @@ def process_args_and_fetch_rows(
 
     if '_f' in request.args:
         filters = _json.loads(request.args['_f'])
-        if isinstance(filters, str) or isinstance(filters, unicode):
+        if isinstance(filters, str) or isinstance(filters, six.text_type):
             filters = _json.loads(filters)
         q = filter_query_using_filters_list(q, filters)
 
@@ -832,7 +831,7 @@ def process_args_and_render_json_list(q, **kwargs):
 
     if '_f' in request.args:
         filters = _json.loads(request.args['_f'])
-        if isinstance(filters, str) or isinstance(filters, unicode):
+        if isinstance(filters, str) or isinstance(filters, six.text_type):
             filters = _json.loads(filters)
         q = filter_query_using_filters_list(q, filters)
 
