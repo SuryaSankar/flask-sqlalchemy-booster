@@ -676,11 +676,28 @@ def construct_batch_save_view_function(
         tmp_folder_path="/tmp", celery_worker=None,
         result_saving_instance_model=None,
         result_saving_instance_getter=None,
-        run_as_async_task=False):
+        run_as_async_task=False,
+        update_only=False, create_only=False,
+        skip_pre_processors=False, skip_post_processors=False):
 
     def determine_response_for_input_row(
             input_row, existing_instance, raw_input_row,
-            result_saving_instance=None):
+            result_saving_instance=None, update_only=False, create_only=False,
+            skip_pre_processors=False, skip_post_processors=False):
+        if existing_instance and create_only:
+            return {
+                "status": "failure",
+                "code": 401,
+                "error": "Cannot create a new instance as a matching instance is existing",
+                "input": raw_input_row
+            }
+        if not existing_instance and update_only:
+            return {
+                "status": "failure",
+                "code": 404,
+                "error": "No matching instance found",
+                "input": raw_input_row
+            }
         if existing_instance and callable(access_checker):
             allowed, message = access_checker(existing_instance)
             if not allowed:
@@ -690,19 +707,19 @@ def construct_batch_save_view_function(
                     "error": message,
                     "input": raw_input_row
                 }
-
-        pre_processors = pre_processors_for_put if existing_instance else pre_processors_for_post
-        if pre_processors is not None:
-            for pre_processor in pre_processors:
-                if callable(pre_processor):
-                    process_result = pre_processor(
-                        data=input_row, existing_instance=existing_instance,
-                        extra_params={"result_saving_instance_id": fetch_nested_key(result_saving_instance, 'id')})
-                    if process_result and isinstance(process_result, Response):
-                        response = get_result_dict_from_response(
-                            process_result)
-                        if response:
-                            return merge(response, {"input": raw_input_row})
+        if not skip_pre_processors:
+            pre_processors = pre_processors_for_put if existing_instance else pre_processors_for_post
+            if pre_processors is not None:
+                for pre_processor in pre_processors:
+                    if callable(pre_processor):
+                        process_result = pre_processor(
+                            data=input_row, existing_instance=existing_instance,
+                            extra_params={"result_saving_instance_id": fetch_nested_key(result_saving_instance, 'id')})
+                        if process_result and isinstance(process_result, Response):
+                            response = get_result_dict_from_response(
+                                process_result)
+                            if response:
+                                return merge(response, {"input": raw_input_row})
 
         modified_input_row = model_class.pre_validation_adapter(
             input_row, existing_instance)
@@ -735,23 +752,25 @@ def construct_batch_save_view_function(
             dict_struct={"rels": {}}) if existing_instance else None
         obj = existing_instance.update(
             **input_row) if existing_instance else model_class.create(**input_row)
-
-        post_processors = post_processors_for_put if existing_instance else post_processors_for_post
-        if post_processors is not None:
-            for processor in post_processors:
-                if callable(processor):
-                    processed_obj = processor(
-                        obj, input_row,
-                        pre_modification_data=pre_modification_data,
-                        raw_input_data=raw_input_row)
-                    if processed_obj is not None:
-                        obj = processed_obj
+        if not skip_post_processors:
+            post_processors = post_processors_for_put if existing_instance else post_processors_for_post
+            if post_processors is not None:
+                for processor in post_processors:
+                    if callable(processor):
+                        processed_obj = processor(
+                            obj, input_row,
+                            pre_modification_data=pre_modification_data,
+                            raw_input_data=raw_input_row)
+                        if processed_obj is not None:
+                            obj = processed_obj
         return merge(
             as_dict(obj, dict_struct=dict_struct),
             {"input": raw_input_row}
         )
 
-    def process_batch_input_data(input_data, result_saving_instance=None):
+    def process_batch_input_data(
+            input_data, result_saving_instance=None, update_only=False, create_only=False,
+            skip_pre_processors=False, skip_post_processors=False):
 
         raw_input_data = deepcopy(input_data)
 
@@ -771,6 +790,7 @@ def construct_batch_save_view_function(
         obj_ids = [obj.get(primary_key_name) for obj in input_data]
         existing_instances = model_class.get_all(obj_ids)
 
+        # Identifying which instance to update using some other key apart from the primary key
         if unique_identifier_fields:
             for idx, input_row in enumerate(input_data):
                 existing_instance = existing_instances[idx]
@@ -781,6 +801,8 @@ def construct_batch_save_view_function(
                         existing_instances[idx] = model_class.query.filter_by(
                             **filter_kwargs).first()
                         if existing_instances[idx]:
+                            # Setting the primary key value in the dict so that the
+                            # corresponding instance would be updated
                             input_row[primary_key_name] = getattr(
                                 existing_instances[idx], primary_key_name)
 
@@ -800,7 +822,10 @@ def construct_batch_save_view_function(
                 responses.append(
                     determine_response_for_input_row(
                         input_row, existing_instance, raw_input_row,
-                        result_saving_instance=result_saving_instance))
+                        result_saving_instance=result_saving_instance,
+                        update_only=update_only, create_only=create_only,
+                        skip_pre_processors=skip_pre_processors,
+                        skip_post_processors=skip_post_processors))
             except Exception as e:
                 responses.append({
                     "status": "failure",
@@ -816,7 +841,10 @@ def construct_batch_save_view_function(
         }
         return consolidated_result
 
-    def async_process_batch_input_data(input_data, result_saving_instance_id=None):
+    def async_process_batch_input_data(
+            input_data, result_saving_instance_id=None,
+            update_only=False, create_only=False,
+            skip_pre_processors=False, skip_post_processors=False):
         try:
             result_saving_instance = None
             if result_saving_instance_id and result_saving_instance_model:
@@ -826,7 +854,10 @@ def construct_batch_save_view_function(
                 result_saving_instance.mark_as_started()
                 # result_saving_instance.pre_process_input_data(input_data)
             response = process_batch_input_data(
-                input_data, result_saving_instance)
+                input_data, result_saving_instance,
+                update_only=update_only, create_only=create_only,
+                skip_pre_processors=skip_pre_processors,
+                skip_post_processors=skip_post_processors)
             if result_saving_instance:
                 result_saving_instance.save_response_data(response)
         except Exception as e:
@@ -842,6 +873,10 @@ def construct_batch_save_view_function(
 
         data_file_path = None
         saving_model_instance = None
+        _update_only = update_only
+        _create_only = create_only
+        _skip_pre_processors = skip_pre_processors
+        _skip_post_processors = skip_post_processors
         if request.headers['Content-Type'].startswith("multipart/form-data"):
             data_file_path = save_file_from_request(
                 request.files['file'], location=tmp_folder_path)
@@ -852,6 +887,11 @@ def construct_batch_save_view_function(
                     remove_empty_values_in_dict(row),
                     model_class) for row in rows]
                 input_data = rows
+            if request.form:
+                _update_only = request.form.get('update_only') or update_only
+                _create_only = request.form.get('create_only') or update_only
+                _skip_pre_processors = request.form.get('skip_pre_processors') or skip_pre_processors
+                _skip_post_processors = request.form.get('skip_post_processors') or skip_post_processors
         else:
             input_data = get_request_json()
 
@@ -859,7 +899,10 @@ def construct_batch_save_view_function(
             result_saving_instance = result_saving_instance_getter(
                 input_data=input_data, input_file_path=data_file_path) if callable(result_saving_instance_getter) else None
             async_process_batch_input_data.delay(
-                input_data, result_saving_instance_id=result_saving_instance.id)
+                input_data, result_saving_instance_id=result_saving_instance.id,
+                update_only=_update_only, create_only=_create_only,
+                skip_pre_processors=_skip_pre_processors,
+                skip_post_processors=_skip_post_processors)
             if result_saving_instance:
                 return render_json_obj_with_requested_structure(result_saving_instance)
             else:
@@ -875,7 +918,10 @@ def construct_batch_save_view_function(
         #     return success_json()
         else:
             try:
-                consolidated_result = process_batch_input_data(input_data)
+                consolidated_result = process_batch_input_data(
+                    input_data, update_only=_update_only, create_only=_create_only,
+                    skip_pre_processors=_skip_pre_processors,
+                    skip_post_processors=_skip_post_processors)
             except Unauthorized as e:
                 return error_json(401, e.description)
 
