@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from flask import Flask, g, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_sqlalchemy import _QueryProperty
@@ -8,6 +9,7 @@ from .flask_client_booster import FlaskClientBooster
 import bleach
 from werkzeug.datastructures import MultiDict
 from decimal import Decimal
+import six
 
 class QueryPropertyWithModelClass(_QueryProperty):
     """Subclassed to add the cls attribute to a query instance.
@@ -67,7 +69,7 @@ def _sanitize_object(obj):
     for k, v in obj.items():
         if isinstance(v, int) or isinstance(v, Decimal):
             result[k] = v
-        elif not (isinstance(v, str) or isinstance(v, unicode)):
+        elif not (isinstance(v, str) or isinstance(v, six.text_type)):
             result[k] = json.loads(bleach.clean(json.dumps(v)))
         else:
             result[k] = bleach.clean(v)

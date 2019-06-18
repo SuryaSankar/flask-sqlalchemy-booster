@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from sqlalchemy.orm.collections import collection, _SerializableAttrGetter
 from sqlalchemy import util, exc as sa_exc
 

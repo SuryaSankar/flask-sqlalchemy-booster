@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from datetime import datetime
 from decimal import Decimal
 from flask.json import _json
@@ -5,6 +6,8 @@ from toolspy import dict_map
 from .utils import is_list_like, is_dict_like
 from collections import OrderedDict
 from types import FunctionType
+import six
+from past.builtins import long
 
 
 def json_encoder(obj):
@@ -14,7 +17,7 @@ def json_encoder(obj):
         return obj
     elif isinstance(obj, Decimal):
         return float(obj)
-    elif isinstance(obj, unicode):
+    elif isinstance(obj, six.text_type):
         return obj
     elif isinstance(obj, OrderedDict):
         return [[k, json_encoder(v)]
@@ -30,7 +33,7 @@ def json_encoder(obj):
         try:
             return _json.JSONEncoder().default(obj)
         except:
-            return unicode(obj)
+            return six.text_type(obj)
 
 
 class BoosterJSONEncoder(_json.JSONEncoder):

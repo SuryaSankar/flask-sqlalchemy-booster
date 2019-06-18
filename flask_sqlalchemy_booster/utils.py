@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from sqlalchemy.ext.associationproxy import (
     _AssociationDict, _AssociationList, _AssociationSet)
 from sqlalchemy.orm.collections import (
@@ -12,6 +13,7 @@ from sqlalchemy.sql import sqltypes
 from sqlalchemy import func
 import dateutil.parser
 from decimal import Decimal
+import six
 
 
 def is_list_like(rel_instance):
@@ -29,9 +31,9 @@ def is_dict_like(rel_instance):
 
 def all_cols_including_subclasses(model_cls):
     return remove_duplicates(
-        class_mapper(model_cls).columns.items() +
+        list(class_mapper(model_cls).columns.items()) +
         flatten(
-            [class_mapper(subcls).columns.items()
+            [list(class_mapper(subcls).columns.items())
              for subcls in all_subclasses(model_cls)]
         )
     )
@@ -39,9 +41,9 @@ def all_cols_including_subclasses(model_cls):
 
 def all_rels_including_subclasses(model_cls):
     return remove_duplicates(
-        class_mapper(model_cls).relationships.items() +
+        list(class_mapper(model_cls).relationships.items()) +
         flatten(
-            [class_mapper(subcls).relationships.items()
+            [list(class_mapper(subcls).relationships.items())
              for subcls in all_subclasses(model_cls)]
         )
     )
@@ -70,7 +72,7 @@ def save_file_from_request(_file, location=None):
 def type_coerce_value(column_type, value):
     if value is None:
         return None
-    if isinstance(value, unicode) or isinstance(value, str):
+    if isinstance(value, six.text_type) or isinstance(value, str):
         if value.lower() == 'none' or value.lower() == 'null' or value.strip() == '':
             return None
     if column_type is sqltypes.Integer:

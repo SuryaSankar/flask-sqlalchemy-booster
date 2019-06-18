@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from sqlalchemy.types import TypeDecorator, TEXT
 from sqlalchemy.ext.mutable import Mutable
 from flask.json import _json as json

@@ -4,6 +4,7 @@ A wrapper over Flask-SQLAlchemy
 
 """
 
+from __future__ import absolute_import
 from .core import FlaskSQLAlchemyBooster, FlaskBooster
 from .model_booster import ModelBooster
 from .query_booster import QueryBooster
