@@ -2,10 +2,9 @@ from flask_sqlalchemy_booster import FlaskSQLAlchemyBooster
 from sqlalchemy import func
 from flask_sqlalchemy_booster import FlaskBooster
 from flask_sqlalchemy_booster.crud_api_view import register_crud_routes_for_models
+from sqlalchemy.ext.associationproxy import association_proxy
 
 from werkzeug.serving import run_simple
-
-
 
 
 db = FlaskSQLAlchemyBooster()
@@ -17,6 +16,12 @@ class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True, unique=True)
     created_on = db.Column(db.DateTime(), default=func.now())
     title = db.Column(db.String(300))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+
+    user = db.relationship("User")
+    user_email = association_proxy(
+        "user", "email", creator=lambda email: User.first(email=email)
+    )
 
 class User(db.Model):
     _autogenerate_dict_struct_if_none_ = True
@@ -24,7 +29,8 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True, unique=True)
     created_on = db.Column(db.DateTime(), default=func.now())
     name = db.Column(db.String(100))
-    email = db.Column(db.String(100))
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    gender = db.Column(db.Enum('male', 'female', 'transgender'), nullable=False)
 
 
 def create_todolist_app():

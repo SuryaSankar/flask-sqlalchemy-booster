@@ -1,0 +1,10 @@
+dist/
+*.egg-info/
+build/
+*.pyc
+.coverage
+<<<<<<< HEAD
+.vscode/
+=======
+*.bak
+>>>>>>> py3
