@@ -9,11 +9,11 @@ setup(
     packages=['flask_sqlalchemy_booster'],
     include_package_data=True,
     install_requires=[
-        "toolspy>=0.2.30",
+        "toolspy>=0.3.1",
         "Flask>=1.0.2",
         "SQLAlchemy>=1.3.1",
         "Flask-SQLAlchemy>=2.3.2",
-        "Schemalite>=0.1.23",
+        "Schemalite>=0.2.1",
         "bleach"
     ],
     tests_require=[
