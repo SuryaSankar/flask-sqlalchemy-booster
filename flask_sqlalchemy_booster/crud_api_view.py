@@ -5,7 +5,7 @@ from sqlalchemy.sql import sqltypes
 import json
 from toolspy import (
     all_subclasses, fetch_nested_key_from_dict, fetch_nested_key,
-    delete_dict_keys, union, merge)
+    delete_dict_keys, union, merge, difference)
 from copy import deepcopy
 import inspect
 import six.moves.urllib.request, six.moves.urllib.parse, six.moves.urllib.error
@@ -934,9 +934,13 @@ def construct_batch_save_view_function(
 def register_crud_routes_for_models(
         app_or_bp, registration_dict, register_schema_structure=True,
         allow_unknown_fields=False, cache_handler=None, exception_handler=None,
-        tmp_folder_path="/tmp", forbidden_views=None, celery_worker=None,
+        tmp_folder_path="/tmp", permitted_operations=None,
+        forbidden_operations=None, celery_worker=None,
         register_schema_definition=False, register_views_map=False,
         schema_def_url='/schema-def', views_map_url='/views-map'):
+
+    all_operations = ['index', 'get', 'post', 'put', 'patch', 'delete', 'batch_save']
+
     if not hasattr(app_or_bp, "registered_models_and_crud_routes"):
         app_or_bp.registered_models_and_crud_routes = {
             "models_registered_for_views": [],
@@ -983,8 +987,20 @@ def register_crud_routes_for_models(
             _model = _model_key
             _model_name = _model.__name__
         base_url = _model_dict.get('url_slug')
-        disabled_views = _model_dict.get(
-            'forbidden_views') or forbidden_views or []
+
+        if _model_dict.get('permitted_operations'):
+            permitted_actions = _model_dict.get('permitted_operations')
+        elif _model_dict.get('forbidden_operations'):
+            permitted_actions = difference(
+                all_operations, _model_dict.get('forbidden_operations'))
+        elif permitted_operations is not None:
+            permitted_actions = permitted_operations
+        elif forbidden_operations is not None:
+            permitted_actions = difference(
+                all_operations, forbidden_operations)
+        else:
+            permitted_actions = all_operations
+
         default_query_constructor = _model_dict.get('query_constructor')
         default_access_checker = _model_dict.get('access_checker')
         default_dict_post_processors = _model_dict.get('dict_post_processors')
@@ -1019,7 +1035,7 @@ def register_crud_routes_for_models(
             views[_model_name] = {}
 
 
-        if 'index' not in disabled_views:
+        if 'index' in permitted_actions:
             index_dict = view_dict_for_model.get('index', {})
             if 'enable_caching' in index_dict:
                 enable_caching = index_dict.get(
@@ -1051,7 +1067,7 @@ def register_crud_routes_for_models(
                 index_func)
             views[_model_name]['index'] = {'url': index_url}
 
-        if 'get' not in disabled_views:
+        if 'get' in permitted_actions:
             get_dict = view_dict_for_model.get('get', {})
             if 'enable_caching' in get_dict:
                 enable_caching = get_dict.get(
@@ -1078,7 +1094,7 @@ def register_crud_routes_for_models(
                 get_func)
             views[_model_name]['get'] = {'url': get_url}
 
-        if 'post' not in disabled_views:
+        if 'post' in permitted_actions:
             post_dict = view_dict_for_model.get('post', {})
             if callable(post_dict.get('input_schema_modifier')):
                 post_input_schema = post_dict['input_schema_modifier'](
@@ -1109,7 +1125,7 @@ def register_crud_routes_for_models(
                 views[_model_name]['post']['input_schema'] = post_dict['input_schema_modifier'](
                     deepcopy(model_schemas[_model.__name__]['input_schema']))
 
-        if 'put' not in disabled_views:
+        if 'put' in permitted_actions:
             put_dict = view_dict_for_model.get('put', {})
             if callable(put_dict.get('input_schema_modifier')):
                 put_input_schema = put_dict['input_schema_modifier'](
@@ -1144,7 +1160,7 @@ def register_crud_routes_for_models(
                 views[_model_name]['put']['input_schema'] = put_dict['input_schema_modifier'](
                     deepcopy(model_schemas[_model.__name__]['input_schema']))
 
-        # if 'batch_put' not in disabled_views:
+        # if 'batch_put' in permitted_actions:
         #     batch_put_dict = view_dict_for_model.get('batch_put', {})
         #     if callable(batch_put_dict.get('input_schema_modifier')):
         #         batch_put_input_schema = batch_put_dict['input_schema_modifier'](deepcopy(model_default_input_schema))
@@ -1171,7 +1187,7 @@ def register_crud_routes_for_models(
         #         views[_model_name]['batch_put']['input_schema'] = batch_put_dict['input_schema_modifier'](
         #             deepcopy(model_schemas[_model.__name__]['input_schema']))
 
-        if 'patch' not in disabled_views:
+        if 'patch' in permitted_actions:
             patch_dict = view_dict_for_model.get('patch', {})
             if callable(patch_dict.get('input_schema_modifier')):
                 patch_input_schema = patch_dict['input_schema_modifier'](
@@ -1200,7 +1216,7 @@ def register_crud_routes_for_models(
                 views[_model_name]['patch']['input_schema'] = patch_dict['input_schema_modifier'](
                     deepcopy(model_schemas[_model.__name__]['input_schema']))
 
-        if 'delete' not in disabled_views:
+        if 'delete' in permitted_actions:
             delete_dict = view_dict_for_model.get('delete', {})
             delete_func = delete_dict.get('view_func', None) or construct_delete_view_function(
                 _model,
@@ -1218,7 +1234,7 @@ def register_crud_routes_for_models(
                 delete_func)
             views[_model_name]['delete'] = {'url': delete_url}
 
-        if 'batch_save' not in disabled_views:
+        if 'batch_save' in permitted_actions:
             batch_save_dict = view_dict_for_model.get('batch_save', {})
             if callable(batch_save_dict.get('input_schema_modifier')):
                 batch_save_input_schema = batch_save_dict['input_schema_modifier'](
