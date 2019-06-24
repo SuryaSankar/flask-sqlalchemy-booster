@@ -28,9 +28,14 @@ class User(db.Model):
 
     id = db.Column(db.Integer, primary_key=True, unique=True)
     created_on = db.Column(db.DateTime(), default=func.now())
-    name = db.Column(db.String(100))
+    name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(100), unique=True, nullable=False)
     gender = db.Column(db.Enum('male', 'female', 'transgender'), nullable=False)
+    marital_status = db.Column(db.Enum('married', 'single'))
+
+    @property
+    def first_name(self):
+        return self.name.split(" ")[0]
 
 
 def create_todolist_app():
