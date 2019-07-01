@@ -57,14 +57,12 @@ class QueryableMixin(object):
             if r.key == attr)
         return mapped_rel.mapper.class_
 
-    def preprocess_kwargs_before_update(self, kwargs):
-        return kwargs
 
     def update_without_commit(self, **kwargs):
-        kwargs = self._preprocess_params(kwargs)
-        kwargs = self.preprocess_kwargs_before_update(kwargs)
+        cls = type(self)
+        kwargs = cls.pre_save_adapter(kwargs, existing_instance=self)
+        kwargs = self._prepare_data_for_saving(kwargs)
         for key, value in six.iteritems(kwargs):
-            cls = type(self)
             if key not in cls.all_settable_keys():
                 continue
             if not hasattr(cls, key) or isinstance(getattr(cls, key), property):
@@ -135,7 +133,7 @@ class QueryableMixin(object):
         cls.session.rollback()
 
     @classmethod
-    def _preprocess_params(cls, kwargs):
+    def _prepare_data_for_saving(cls, kwargs):
         """Returns a preprocessed dictionary of parameters.
         Use this to filter the kwargs passed to `new`, `create`,
         `build` methods.
@@ -177,8 +175,8 @@ class QueryableMixin(object):
         return kwargs
 
     @classmethod
-    def preprocess_kwargs_before_new(cls, kwargs):
-        return kwargs
+    def pre_save_adapter(cls, data, existing_instance=None):
+        return data
 
     def clone(self, dict_struct=None, commit=True):
         def remove_primary_keys_from_dict_struct(klass, ds):
@@ -215,10 +213,10 @@ class QueryableMixin(object):
             >>> customer.update(email="newemail@x.com", name="new")
 
         """
-        kwargs = self._preprocess_params(kwargs)
-        kwargs = self.preprocess_kwargs_before_update(kwargs)
+        cls = type(self)
+        kwargs = cls.pre_save_adapter(kwargs, existing_instance=self)
+        kwargs = self._prepare_data_for_saving(kwargs)
         for key, value in six.iteritems(kwargs):
-            cls = type(self)
             if not hasattr(cls, key) or isinstance(getattr(cls, key), property):
                 continue
             if key not in self._no_overwrite_:
@@ -375,7 +373,7 @@ class QueryableMixin(object):
         """Returns a new, unsaved instance of the model class.
 
         """
-        kwargs = cls.preprocess_kwargs_before_new(kwargs)
+        kwargs = cls.pre_save_adapter(kwargs)
         if cls.__mapper__.polymorphic_on is not None:
             discriminator_key = cls.__mapper__.polymorphic_on.name
             discriminator_val = kwargs.get(discriminator_key)
@@ -383,10 +381,10 @@ class QueryableMixin(object):
                 actual_cls = cls.__mapper__.polymorphic_map[discriminator_val].class_
                 return actual_cls(
                     **subdict(
-                        actual_cls._preprocess_params(kwargs),
+                        actual_cls._prepare_data_for_saving(kwargs),
                         actual_cls.all_settable_keys())
                 )
-        return cls(**subdict(cls._preprocess_params(kwargs), cls.all_settable_keys()))
+        return cls(**subdict(cls._prepare_data_for_saving(kwargs), cls.all_settable_keys()))
 
     @classmethod
     def add(cls, model, commit=True):
@@ -957,7 +955,7 @@ class QueryableMixin(object):
             **kwargs: update parameters
         """
         model = cls.get(id)
-        for k, v in cls._preprocess_params(kwargs).items():
+        for k, v in cls._prepare_data_for_saving(kwargs).items():
             setattr(model, k, v)
         cls.session.commit()
         return model
@@ -971,7 +969,7 @@ class QueryableMixin(object):
             **kwargs: update parameters
         """
         model = cls.get(id)
-        for k, v in cls._preprocess_params(kwargs).items():
+        for k, v in cls._prepare_data_for_saving(kwargs).items():
             setattr(model, k, v)
         return model
 
