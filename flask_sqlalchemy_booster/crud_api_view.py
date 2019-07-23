@@ -47,6 +47,7 @@ def construct_get_view_function(
     def get(_id):
         try:
             _id = _id.strip()
+            id_attr_name = g.args.get('_id_attr')
             if _id.startswith('[') and _id.endswith(']'):
                 # Handles multiple ids being passed
                 # Eg: /tasks/[1,2,3]
@@ -60,12 +61,12 @@ def construct_get_view_function(
                     resources = [permitted_object_getter()]
                     ids = [_id[1:-1]]
                 else:
-                    ids = [int(i) for i in json.loads(_id)]
+                    ids = json.loads(_id)
                     if get_query_creator:
                         resources = get_query_creator(
-                            model_class.query).get_all(ids)
+                            model_class.query).get_all(ids, key=id_attr_name)
                     else:
-                        resources = model_class.get_all(ids)
+                        resources = model_class.get_all(ids, key=id_attr_name)
                 if callable(access_checker):
                     resources = [r if access_checker(r)[0]
                                  else None for r in resources]
@@ -92,7 +93,6 @@ def construct_get_view_function(
             if permitted_object_getter is not None:
                 obj = permitted_object_getter()
             else:
-                id_attr_name = g.args.get('_id_attr')
                 if get_query_creator:
                     id_attr = getattr(model_class, id_attr_name) if id_attr_name else model_class.primary_key()
                     obj = get_query_creator(model_class.query).filter(id_attr == _id).first()
