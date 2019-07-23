@@ -98,6 +98,10 @@ def convert_to_proper_types(data, model_class):
             data[attr_name] = type_coerce_value(column_type, value)
     return data
 
+def cast_as_column_type(value, col):
+    col_type = type(col.type)
+    return type_coerce_value(col_type, value)
+
 
 def tz_str(mins):
     prefix = "+" if mins >= 0 else "-"
