@@ -92,11 +92,15 @@ def construct_get_view_function(
             if permitted_object_getter is not None:
                 obj = permitted_object_getter()
             else:
+                id_attr_name = g.args.get('_id_attr')
                 if get_query_creator:
-                    obj = get_query_creator(model_class.query).filter(
-                        model_class.primary_key() == _id).first()
+                    id_attr = getattr(model_class, id_attr_name) if id_attr_name else model_class.primary_key()
+                    obj = get_query_creator(model_class.query).filter(id_attr == _id).first()
                 else:
-                    obj = model_class.get(_id)
+                    if id_attr_name:
+                        obj = model_class.get(_id, key=id_attr_name)
+                    else:
+                        obj = model_class.get(_id)
             if obj is None:
                 return error_json(404, 'Resource not found')
 
