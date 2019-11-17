@@ -10,6 +10,7 @@ import bleach
 from werkzeug.datastructures import MultiDict
 from decimal import Decimal
 import six
+from flask.json import _json as json
 
 class QueryPropertyWithModelClass(_QueryProperty):
     """Subclassed to add the cls attribute to a query instance.

@@ -13,3 +13,4 @@ from .json_columns import JSONEncodedStruct, MutableDict, MutableList
 from .schema_generators import generate_input_data_schema
 from . import crud_api_view, responses
 from .crud_api_view import register_crud_routes_for_models
+from .interactive_shell import run_interactive_shell

@@ -524,7 +524,6 @@ class QueryableMixin(object):
             user35@i.com, user5@i.com
 
         """
-        print("in get_all method with key ", key)
         if len(keyvals) == 0:
             return []
         if key is None:
