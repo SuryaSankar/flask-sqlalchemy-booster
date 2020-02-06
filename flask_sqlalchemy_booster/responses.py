@@ -459,10 +459,10 @@ def as_list(func):
 #     return value
 
 def return_joined_query_model_class_and_attr_name(query, keyword):
-    print("in return_joined_query_model_class_and_attr_name")
-    print(query, keyword)
-    print("query.model_class ", query.model_class)
-    print("query.criterion ", query._criterion)
+    # print("in return_joined_query_model_class_and_attr_name")
+    # print(query, keyword)
+    # print("query.model_class ", query.model_class)
+    # print("query.criterion ", query._criterion)
     if '.' in keyword:
         kw_split_arr = keyword.split('.')
         prefix_names = kw_split_arr[:-1]
@@ -487,8 +487,8 @@ def return_joined_query_model_class_and_attr_name(query, keyword):
                         if r.key == rel_or_proxy_name)
                     model_class = mapped_rel.mapper.class_
                     if model_class not in [entity.class_ for entity in _query._join_entities]:
-                        print("About to join model_class ", model_class)
-                        print("rel_or_proxy_name is ", rel_or_proxy_name)
+                        # print("About to join model_class ", model_class)
+                        # print("rel_or_proxy_name is ", rel_or_proxy_name)
                         # try:
                         #     _query = _query.join(model_class)
                         # except:
@@ -507,14 +507,14 @@ def return_joined_query_model_class_and_attr_name(query, keyword):
                     if model_class not in [entity.class_ for entity in _query._join_entities]:
                         _query = _query.join(model_class)
     else:
-        print(". not in attr_name")
+        # print(". not in attr_name")
         model_class = query.model_class
         attr_name = keyword
         _query = query
         counter = 0  # to prevent infinite loop by some mistake
 
         while attr_name in model_class.association_proxy_keys() and counter < 10:
-            print("attr_name in assoc proxy keys ", attr_name)
+            # print("attr_name in assoc proxy keys ", attr_name)
             counter += 1
             assoc_proxy = getattr(model_class, attr_name)
             assoc_rel = next(
@@ -523,9 +523,9 @@ def return_joined_query_model_class_and_attr_name(query, keyword):
             prev_model_class = model_class
             model_class = assoc_rel.mapper.class_
             attr_name = assoc_proxy.value_attr
-            print("prev_model_class ", prev_model_class)
-            print("model_class ", model_class)
-            print("attr_name ", attr_name)
+            # print("prev_model_class ", prev_model_class)
+            # print("model_class ", model_class)
+            # print("attr_name ", attr_name)
             if model_class not in [entity.class_ for entity in _query._join_entities]:
                 # _query = _query.join(model_class)
                 # Commenting this out because it is not possibel to directly
@@ -537,11 +537,11 @@ def return_joined_query_model_class_and_attr_name(query, keyword):
 
 
 def modify_query_and_get_filter_function(query, keyword, value, op):
-    print("in modify_query_and_get_filter_function")
+    # print("in modify_query_and_get_filter_function")
     _query, model_class, attr_name = return_joined_query_model_class_and_attr_name(query, keyword)
-    print("in modify query, model_class ", model_class)
-    print("in modify query, attr_name ", attr_name)
-    print("in modify query, count ", _query.count())
+    # print("in modify query, model_class ", model_class)
+    # print("in modify query, attr_name ", attr_name)
+    # print("in modify query, count ", _query.count())
 
     columns = getattr(
         getattr(model_class, '__mapper__'),
@@ -562,7 +562,7 @@ def modify_query_and_get_filter_function(query, keyword, value, op):
     elif op == 'in':
         value = [type_coerce_value(column_type, v) for v in value]
 
-    print("in modify_query, value ", value)
+    # print("in modify_query, value ", value)
 
     if hasattr(model_class, attr_name):
         return (_query, getattr(
@@ -596,22 +596,22 @@ def filter_query_with_key(query, keyword, value, op):
 
 
 def convert_filters_to_sqlalchemy_filter(query, filters, connector):
-    print("in convert_filters_to_sqlalchemy_filter")
+    # print("in convert_filters_to_sqlalchemy_filter")
     sqfilters = []
     for f in filters:
-        print("checking filter ", f)
+        # print("checking filter ", f)
         if "c" in f:
-            print("found a connector c in filter")
+            # print("found a connector c in filter")
             sub_sq_filter = convert_filters_to_sqlalchemy_filter(
                 query, f['f'], f['c'])
             if sub_sq_filter is not None:
                 sqfilters.append(sub_sq_filter)
         else:
-            print("calling modify_query")
+            # print("calling modify_query")
             query, sqfilter = modify_query_and_get_filter_function(
                 query, f["k"], f["v"], f["op"])
             sqfilters.append(sqfilter)
-    print("found sqfilters list as ", sqfilters)
+    # print("found sqfilters list as ", sqfilters)
     if len(sqfilters) > 0:
         if connector == 'AND':
             return and_(*sqfilters)
@@ -664,7 +664,7 @@ def filter_query_using_filters_list(result, filters_dict):
     sqfilter = convert_filters_to_sqlalchemy_filter(result, filters, connector)
     if sqfilter is not None:
         result = result.filter(sqfilter)
-    print("sqlalchemy filters ", result)
+    # print("sqlalchemy filters ", result)
     return result
     # for f in filters:
     #     if "c" in f:
@@ -830,10 +830,10 @@ def process_args_and_fetch_rows(
         filters = _json.loads(request.args['_f'])
         if isinstance(filters, str) or isinstance(filters, six.text_type):
             filters = _json.loads(filters)
-        print("filters are ", filters)
+        # print("filters are ", filters)
         q = filter_query_using_filters_list(q, filters)
-        print("after applying filters")
-        print(str(q))
+        # print("after applying filters")
+        # print(str(q))
 
     filtered_query = filter_query_using_args(q)
 
