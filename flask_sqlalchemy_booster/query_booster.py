@@ -1,5 +1,5 @@
 from __future__ import absolute_import
-from flask_sqlalchemy import BaseQuery
+from flask_sqlalchemy import BaseQuery, Pagination
 from six.moves import range
 
 
@@ -73,8 +73,8 @@ class QueryBooster(BaseQuery):
 
     def paginate(self, *args, **kwargs):
         pagination = super(QueryBooster, self).paginate(*args, **kwargs)
-        if pagination.page == 1:
-            pagination.total = self.order_by(None).count()
-        return pagination
-
-
+        distinct_total = self.order_by(None).distinct().count()
+        return Pagination(
+            self, pagination.page, pagination.per_page,
+            distinct_total, pagination.items
+        )
