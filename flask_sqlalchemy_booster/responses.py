@@ -537,7 +537,9 @@ def return_joined_query_model_class_and_attr_name(query, keyword):
 
 
 def modify_query_and_get_filter_function(query, keyword, value, op):
-    print("in modify_query_and_get_filter_function")
+    print(
+        "in modify_query_and_get_filter_function ",
+        query, keyword, value, op)
     _query, model_class, attr_name = return_joined_query_model_class_and_attr_name(query, keyword)
     print("in modify query, model_class ", model_class)
     print("in modify query, attr_name ", attr_name)
@@ -596,13 +598,15 @@ def filter_query_with_key(query, keyword, value, op):
 
 
 def convert_filters_to_sqlalchemy_filter(query, filters, connector):
-    print("in convert_filters_to_sqlalchemy_filter")
+    print(
+        "in convert_filters_to_sqlalchemy_filter ", 
+        query, filters, connector)
     sqfilters = []
     for f in filters:
         print("checking filter ", f)
         if "c" in f:
             print("found a connector c in filter")
-            sub_sq_filter = convert_filters_to_sqlalchemy_filter(
+            query, sub_sq_filter = convert_filters_to_sqlalchemy_filter(
                 query, f['f'], f['c'])
             if sub_sq_filter is not None:
                 sqfilters.append(sub_sq_filter)
@@ -610,14 +614,15 @@ def convert_filters_to_sqlalchemy_filter(query, filters, connector):
             print("calling modify_query")
             query, sqfilter = modify_query_and_get_filter_function(
                 query, f["k"], f["v"], f["op"])
+
             sqfilters.append(sqfilter)
     print("found sqfilters list as ", sqfilters)
     if len(sqfilters) > 0:
         if connector == 'AND':
-            return and_(*sqfilters)
+            return (query, and_(*sqfilters))
         if connector == 'OR':
-            return or_(*sqfilters)
-    return None
+            return (query, or_(*sqfilters))
+    return (query, None)
 
 
 def filter_query_using_filters_list(result, filters_dict):
@@ -661,7 +666,8 @@ def filter_query_using_filters_list(result, filters_dict):
             result = result.query
     filters = filters_dict['f']
     connector = filters_dict.get('c') or 'AND'
-    sqfilter = convert_filters_to_sqlalchemy_filter(result, filters, connector)
+    result, sqfilter = convert_filters_to_sqlalchemy_filter(
+        result, filters, connector)
     if sqfilter is not None:
         result = result.filter(sqfilter)
     print("sqlalchemy filters ", result)
