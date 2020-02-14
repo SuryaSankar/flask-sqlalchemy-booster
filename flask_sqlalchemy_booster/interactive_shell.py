@@ -56,12 +56,6 @@ def run_interactive_shell(app, db):
     def jget(url, **kwargs):
         return load_json(get(url, **kwargs))
 
-    def su():
-        client.post(
-            '/login', data={'email': 'admin@inkmonk.com', 'password': 'password'})
-
-    def logout_su():
-        client.get('/logout', follow_redirects=True)
 
     # Use this in your code as `with login() as c:` and you can use
     # all the methods defined on `app.test_client`

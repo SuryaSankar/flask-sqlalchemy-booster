@@ -74,7 +74,11 @@ class QueryBooster(BaseQuery):
     def paginate(self, *args, **kwargs):
         pagination = super(QueryBooster, self).paginate(*args, **kwargs)
         distinct_total = self.order_by(None).distinct().count()
+        items = self.distinct().limit(
+            pagination.per_page).offset(
+            (pagination.page - 1) * pagination.per_page
+            ).all()
         return Pagination(
             self, pagination.page, pagination.per_page,
-            distinct_total, pagination.items
+            distinct_total, items
         )
