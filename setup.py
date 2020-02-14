@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name='Flask-SQLAlchemy-Booster',
-    version='0.6.7',
+    version='0.6.8',
     description='A booster package for Flask and SQLAlchemy',
     long_description='Allows querying on Model classes, supports several common query operations, allows JSONification of models and relations and provides a simple query language for dynamically fetching data',
     packages=['flask_sqlalchemy_booster'],
