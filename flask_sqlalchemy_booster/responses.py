@@ -176,7 +176,9 @@ def serialized_list(olist, **kwargs):
     return [serialized_obj(o, **kwargs) for o in olist]
 
 
-def structured(struct, wrap=True, meta=None, struct_key='result', pre_render_callback=None):
+def structured(struct, wrap=True, meta=None, struct_key=None, pre_render_callback=None):
+    if struct_key is None:
+        struct_key = "result"
     output = struct
     if wrap:
         output = {'status': 'success', struct_key: struct}
@@ -187,7 +189,7 @@ def structured(struct, wrap=True, meta=None, struct_key='result', pre_render_cal
     return output
 
 
-def jsoned(struct, wrap=True, meta=None, struct_key='result', pre_render_callback=None):
+def jsoned(struct, wrap=True, meta=None, struct_key=None, pre_render_callback=None):
     """ Provides a json dump of the struct
 
     Args:
@@ -233,11 +235,14 @@ def jsoned_list(olist, **kwargs):
         serializable_list(olist, **kwargs))
 
 
-def as_json(struct, status=200, wrap=True, meta=None, pre_render_callback=None):
+def as_json(
+        struct, status=200, wrap=True, meta=None, 
+        pre_render_callback=None, struct_key=None):
     return Response(
         jsoned(
             struct, wrap=wrap, meta=meta,
-            pre_render_callback=pre_render_callback),
+            pre_render_callback=pre_render_callback,
+            struct_key=struct_key),
         status, mimetype='application/json')
 
 def as_dict(o, attrs_to_serialize=None,
