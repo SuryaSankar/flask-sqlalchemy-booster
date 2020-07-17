@@ -902,6 +902,8 @@ def register_crud_routes_for_models(
 
         default_query_constructor = _model_dict.get('query_constructor')
         default_access_checker = _model_dict.get('access_checker')
+        default_exception_handler = _model_dict.get(
+            'exception_handler') or exception_handler
         default_dict_post_processors = _model_dict.get('dict_post_processors')
         view_dict_for_model = _model_dict.get('views', {})
         dict_struct_for_model = _model_dict.get('dict_struct')
@@ -933,7 +935,6 @@ def register_crud_routes_for_models(
         if _model_name not in views:
             views[_model_name] = {}
 
-
         if 'index' in permitted_actions:
             index_dict = view_dict_for_model.get('index', {})
             if 'enable_caching' in index_dict:
@@ -950,8 +951,11 @@ def register_crud_routes_for_models(
                 custom_response_creator=index_dict.get(
                     'custom_response_creator'),
                 enable_caching=enable_caching,
-                cache_handler=cache_handler, cache_key_determiner=cache_key_determiner,
-                cache_timeout=cache_timeout, exception_handler=exception_handler,
+                cache_handler=cache_handler,
+                cache_key_determiner=cache_key_determiner,
+                cache_timeout=cache_timeout,
+                exception_handler=index_dict.get(
+                    'exception_handler') or default_exception_handler,
                 access_checker=index_dict.get(
                     'access_checker') or default_access_checker,
                 default_limit=index_dict.get('default_limit'),
@@ -983,7 +987,9 @@ def register_crud_routes_for_models(
                     'dict_struct') or dict_struct_for_model,
                 enable_caching=enable_caching,
                 cache_handler=cache_handler, cache_key_determiner=cache_key_determiner,
-                cache_timeout=cache_timeout, exception_handler=exception_handler,
+                cache_timeout=cache_timeout,
+                exception_handler=get_dict.get(
+                    'exception_handler') or default_exception_handler,
                 access_checker=get_dict.get(
                     'access_checker') or default_access_checker,
                 dict_post_processors=get_dict.get('dict_post_processors') or default_dict_post_processors)
@@ -1009,7 +1015,8 @@ def register_crud_routes_for_models(
                 allow_unknown_fields=allow_unknown_fields,
                 dict_struct=post_dict.get(
                     'dict_struct') or dict_struct_for_model,
-                exception_handler=exception_handler,
+                exception_handler=post_dict.get(
+                    'exception_handler') or default_exception_handler,
                 access_checker=post_dict.get(
                     'access_checker') or default_access_checker,
                 fields_forbidden_from_being_set=union([
@@ -1044,7 +1051,8 @@ def register_crud_routes_for_models(
                 query_constructor=put_dict.get(
                     'query_constructor') or default_query_constructor,
                 schemas_registry=schemas_registry,
-                exception_handler=exception_handler,
+                exception_handler=put_dict.get(
+                    'exception_handler') or default_exception_handler,
                 access_checker=put_dict.get(
                     'access_checker') or default_access_checker,
                 fields_forbidden_from_being_set=union([
@@ -1075,7 +1083,9 @@ def register_crud_routes_for_models(
                     'query_constructor') or default_query_constructor,
                 permitted_object_getter=patch_dict.get(
                     'permitted_object_getter') or _model_dict.get('permitted_object_getter'),
-                schemas_registry=schemas_registry, exception_handler=exception_handler,
+                schemas_registry=schemas_registry,
+                exception_handler=patch_dict.get(
+                    'exception_handler') or default_exception_handler,
                 access_checker=patch_dict.get(
                     'access_checker') or default_access_checker,
                 dict_struct=patch_dict.get('dict_struct') or dict_struct_for_model)
@@ -1098,7 +1108,9 @@ def register_crud_routes_for_models(
                 registration_dict=registration_dict,
                 permitted_object_getter=delete_dict.get(
                     'permitted_object_getter') or _model_dict.get('permitted_object_getter'),
-                post_processors=delete_dict.get('post_processors'), exception_handler=exception_handler,
+                post_processors=delete_dict.get('post_processors'),
+                exception_handler=delete_dict.get(
+                    'exception_handler') or default_exception_handler,
                 access_checker=delete_dict.get('access_checker') or default_access_checker)
             delete_url = delete_dict.get('url', None) or "/%s/<_id>" % base_url
             app_or_bp.route(
@@ -1137,7 +1149,8 @@ def register_crud_routes_for_models(
                 query_constructor=batch_save_dict.get(
                     'query_constructor') or default_query_constructor,
                 schemas_registry=schemas_registry,
-                exception_handler=exception_handler,
+                exception_handler=batch_save_dict.get(
+                    'exception_handler') or default_exception_handler,
                 tmp_folder_path=tmp_folder_path,
                 fields_forbidden_from_being_set=union([
                     fields_forbidden_from_being_set_for_all_views,
@@ -1157,7 +1170,6 @@ def register_crud_routes_for_models(
             if 'input_schema_modifier' in batch_save_dict:
                 views[_model_name]['batch_save']['input_schema'] = batch_save_dict['input_schema_modifier'](
                     deepcopy(model_schemas[_model.__name__]['input_schema']))
-
 
     if register_schema_definition:
         def schema_def():

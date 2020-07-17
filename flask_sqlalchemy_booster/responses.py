@@ -336,6 +336,20 @@ def success_json():
                     200, mimetype='application/json')
 
 
+def convert_error_to_json_response(e):
+    response = e.get_response()
+    response.data = _json.dumps({
+        "status": "failure",
+        "error": {
+            "code": e.code,
+            "name": e.name,
+            "description": e.description
+        }
+    })
+    response.content_type = "application/json"
+    return response
+
+
 def error_json(status_code, error=None):
     return Response(_json.dumps({
         'status': 'failure',

@@ -120,3 +120,4 @@ class FlaskBooster(Flask):
         self.before_request_funcs.setdefault(None, []).append(json_sanitizer)
         self.before_request_funcs.setdefault(None, []).append(args_sanitizer)
         self.before_request_funcs.setdefault(None, []).append(form_sanitizer)
+
