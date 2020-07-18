@@ -4,6 +4,7 @@ from toolspy import subdict, remove_and_mark_duplicate_dicts, merge
 from sqlalchemy.ext.associationproxy import AssociationProxyInstance
 from sqlalchemy.ext.orderinglist import OrderingList
 from sqlalchemy.orm import class_mapper
+from sqlalchemy.sql.schema import UniqueConstraint
 import six
 from six.moves import range
 from ..utils import cast_as_column_type
@@ -31,6 +32,37 @@ class QueryableMixin(object):
     @classmethod
     def is_a_to_one_rel(cls, attr):
         return attr in cls.__mapper__.relationships and not cls.__mapper__.relationships[attr].uselist
+
+    @classmethod
+    def columns(cls):
+        return [c for c in class_mapper(cls).columns]
+
+    @classmethod
+    def unique_columns(cls):
+        return [c for c in cls.columns() if c.unique]
+
+    @classmethod
+    def unique_column_names(cls):
+        return [c.key for c in cls.unique_columns()]
+
+    @classmethod
+    def table(cls):
+        return cls.__table__
+
+    @classmethod
+    def constraints(cls):
+        return cls.table().constraints
+
+    @classmethod
+    def unique_constraints(cls):
+        return [
+            c for c in cls.constraints() 
+            if isinstance(c, UniqueConstraint)]
+
+    @classmethod
+    def unique_constraint_col_name_tuples(cls):
+        return [c.columns.keys() for c in cls.unique_constraints()]
+
 
     @classmethod
     def primary_key_name(cls):
@@ -162,17 +194,16 @@ class QueryableMixin(object):
                         if all(isinstance(v, dict) for v in val):
                             rel_cls = cls.mapped_rel_class(attr)
                             kwargs[attr] = rel_cls.update_or_new_all(
-                                list_of_kwargs=val, keys=[rel_cls.primary_key_name()])
+                                list_of_kwargs=val)
                     elif isinstance(val, dict):
                         rel_cls = cls.mapped_rel_class(attr)
                         mapping_col = rel.collection_class().keyfunc.name
                         list_of_kwargs = [merge(v, {mapping_col: k}) for k, v in val.items()]
                         kwargs[attr] = {getattr(obj, mapping_col): obj for obj in rel_cls.update_or_new_all(
-                            list_of_kwargs=list_of_kwargs, keys=[rel_cls.primary_key_name()])}
+                            list_of_kwargs=list_of_kwargs)}
                 elif isinstance(val, dict):
                     rel_cls = cls.mapped_rel_class(attr)
-                    kwargs[attr] = rel_cls.update_or_new(
-                        **merge(val, {'keys': [rel_cls.primary_key_name()]}))
+                    kwargs[attr] = rel_cls.update_or_new(**val)
         return kwargs
 
     @classmethod
@@ -630,13 +661,53 @@ class QueryableMixin(object):
         return obj
 
     @classmethod
+    def get_matching_obj_using_unique_keys(cls, kwargs):
+        primary_key_name = cls.primary_key_name()
+        if primary_key_name in kwargs:
+            obj = cls.first(**subdict(kwargs, primary_key_name))
+            if obj:
+                return obj
+        for k in cls.unique_column_names():
+            if k in kwargs and k!=primary_key_name:
+                obj = cls.first(**subdict(kwargs, k))
+                if obj:
+                    return obj
+        for col_name_tuple in cls.unique_constraint_col_name_tuples():
+            if all(c in kwargs for c in col_name_tuple):
+                obj = cls.first(**subdict(kwargs, col_name_tuple))
+                if obj:
+                    return obj
+        return None
+
+    @classmethod
+    def update_matching_obj_or_generate_new_obj(cls, kwargs):
+        obj = cls.get_matching_obj_using_unique_keys(kwargs)
+        if obj is not None:
+            update_kwargs = {
+                k: v for k, v in six.iteritems(kwargs)
+                if k not in cls._no_overwrite_}
+            obj.update_without_commit(**update_kwargs)
+        else:
+            obj = cls.new(**kwargs)
+        return obj
+
+    @classmethod
     def update_or_new(cls, **kwargs):
         keys = kwargs.pop('keys') if 'keys' in kwargs else []
+        if keys is None or len(keys)==0:
+            return cls.update_matching_obj_or_generate_new_obj(kwargs)
         return cls.get_updated_or_new_obj(kwargs, keys)
 
     @classmethod
-    def update_or_new_all(cls, list_of_kwargs, keys=[]):
+    def update_or_new_all(cls, list_of_kwargs, keys=None):
         objs = []
+        if keys is None:
+            keys = []
+        if keys is None or len(keys) == 0:
+            return [
+                cls.update_matching_obj_or_generate_new_obj(kwargs)
+                for kwargs in list_of_kwargs
+            ]
         for kwargs in list_of_kwargs:
             objs.append(cls.get_updated_or_new_obj(kwargs, keys))
         return objs

@@ -211,8 +211,11 @@ def construct_post_view_function(
                 for processor in pre_processors:
                     if callable(processor):
                         process_result = processor(data=input_data)
-                        if process_result and isinstance(process_result, Response):
-                            return process_result
+                        if process_result:
+                            if isinstance(process_result, Response):
+                                return process_result
+                            if isinstance(process_result, dict):
+                                input_data = process_result
 
             fields_to_be_removed = union([
                 fields_forbidden_from_being_set or [],
@@ -359,10 +362,12 @@ def construct_put_view_function(
                 for processor in pre_processors:
                     if callable(processor):
                         process_result = processor(data=input_data, existing_instance=obj)
-                        if process_result and isinstance(process_result, Response):
-                            return process_result
+                        if process_result:
+                            if isinstance(process_result, Response):
+                                return process_result
+                            if isinstance(process_result, dict):
+                                input_data = process_result
 
-                        
             fields_to_be_removed = union([
                 fields_forbidden_from_being_set or [],
                 model_class._fields_forbidden_from_being_set_ or []])
