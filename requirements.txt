@@ -3,3 +3,5 @@ sqlalchemy
 flask_sqlalchemy
 toolspy
 schemalite
+future
+bleach

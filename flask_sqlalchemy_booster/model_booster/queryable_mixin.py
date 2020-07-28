@@ -56,13 +56,12 @@ class QueryableMixin(object):
     @classmethod
     def unique_constraints(cls):
         return [
-            c for c in cls.constraints() 
+            c for c in cls.constraints()
             if isinstance(c, UniqueConstraint)]
 
     @classmethod
     def unique_constraint_col_name_tuples(cls):
         return [c.columns.keys() for c in cls.unique_constraints()]
-
 
     @classmethod
     def primary_key_name(cls):
@@ -89,7 +88,6 @@ class QueryableMixin(object):
             r for r in cls.__mapper__.relationships
             if r.key == attr)
         return mapped_rel.mapper.class_
-
 
     def update_without_commit(self, **kwargs):
         cls = type(self)
@@ -198,7 +196,8 @@ class QueryableMixin(object):
                     elif isinstance(val, dict):
                         rel_cls = cls.mapped_rel_class(attr)
                         mapping_col = rel.collection_class().keyfunc.name
-                        list_of_kwargs = [merge(v, {mapping_col: k}) for k, v in val.items()]
+                        list_of_kwargs = [
+                            merge(v, {mapping_col: k}) for k, v in val.items()]
                         kwargs[attr] = {getattr(obj, mapping_col): obj for obj in rel_cls.update_or_new_all(
                             list_of_kwargs=list_of_kwargs)}
                 elif isinstance(val, dict):
@@ -567,9 +566,9 @@ class QueryableMixin(object):
 
         # We need the results in the same order as the input keyvals
         # So order by field in SQL
-        key_result_mapping = {getattr(result, key): result for result in resultset.all()}
+        key_result_mapping = {
+            getattr(result, key): result for result in resultset.all()}
         return [key_result_mapping.get(kv) for kv in original_keyvals]
-
 
     @classmethod
     def get_or_404(cls, id):
@@ -638,6 +637,7 @@ class QueryableMixin(object):
 
     @classmethod
     def get_updated_or_new_obj(cls, kwargs=None, filter_keys=None):
+        print("in get_updated_or_new_obj")
         if filter_keys is None:
             filter_keys = []
         if kwargs is None:
@@ -664,16 +664,21 @@ class QueryableMixin(object):
     def get_matching_obj_using_unique_keys(cls, kwargs):
         primary_key_name = cls.primary_key_name()
         if primary_key_name in kwargs:
-            obj = cls.first(**subdict(kwargs, primary_key_name))
+            print("primary key name in kwargs ", primary_key_name)
+            matching_data = subdict(kwargs, primary_key_name)
+            print("matching data ", matching_data)
+            obj = cls.first(**matching_data)
             if obj:
                 return obj
         for k in cls.unique_column_names():
-            if k in kwargs and k!=primary_key_name:
+            if k in kwargs and k != primary_key_name:
+                print("unique key name in kwargs ", k)
                 obj = cls.first(**subdict(kwargs, k))
                 if obj:
                     return obj
         for col_name_tuple in cls.unique_constraint_col_name_tuples():
             if all(c in kwargs for c in col_name_tuple):
+                print("col_name_tuple in kwargs ", col_name_tuple)
                 obj = cls.first(**subdict(kwargs, col_name_tuple))
                 if obj:
                     return obj
@@ -681,20 +686,23 @@ class QueryableMixin(object):
 
     @classmethod
     def update_matching_obj_or_generate_new_obj(cls, kwargs):
+        print("calling update matching_obj_or_generate_new_obj")
         obj = cls.get_matching_obj_using_unique_keys(kwargs)
         if obj is not None:
+            print("got obj as ", obj.id)
             update_kwargs = {
                 k: v for k, v in six.iteritems(kwargs)
                 if k not in cls._no_overwrite_}
             obj.update_without_commit(**update_kwargs)
         else:
+            print("obj is None")
             obj = cls.new(**kwargs)
         return obj
 
     @classmethod
     def update_or_new(cls, **kwargs):
         keys = kwargs.pop('keys') if 'keys' in kwargs else []
-        if keys is None or len(keys)==0:
+        if keys is None or len(keys) == 0:
             return cls.update_matching_obj_or_generate_new_obj(kwargs)
         return cls.get_updated_or_new_obj(kwargs, keys)
 
@@ -1036,4 +1044,4 @@ class QueryableMixin(object):
 
     @classmethod
     def buckets(cls, bucket_size=None):
-    	return cls.query.buckets(bucket_size=bucket_size)
+        return cls.query.buckets(bucket_size=bucket_size)
