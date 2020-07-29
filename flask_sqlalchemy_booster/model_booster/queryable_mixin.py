@@ -664,22 +664,20 @@ class QueryableMixin(object):
     def get_matching_obj_using_unique_keys(cls, kwargs):
         primary_key_name = cls.primary_key_name()
         if primary_key_name in kwargs:
-            print("primary key name in kwargs ", primary_key_name)
-            matching_data = subdict(kwargs, primary_key_name)
-            print("matching data ", matching_data)
-            obj = cls.first(**matching_data)
+            matching_data = subdict(kwargs, [primary_key_name])
+            obj = cls.first(**matching_data) if matching_data else None
             if obj:
                 return obj
         for k in cls.unique_column_names():
             if k in kwargs and k != primary_key_name:
-                print("unique key name in kwargs ", k)
-                obj = cls.first(**subdict(kwargs, k))
+                matching_data = subdict(kwargs, [k])
+                obj = cls.first(**matching_data) if matching_data else None
                 if obj:
                     return obj
         for col_name_tuple in cls.unique_constraint_col_name_tuples():
             if all(c in kwargs for c in col_name_tuple):
-                print("col_name_tuple in kwargs ", col_name_tuple)
-                obj = cls.first(**subdict(kwargs, col_name_tuple))
+                matching_data = subdict(kwargs, col_name_tuple)
+                obj = cls.first(**matching_data) if matching_data else None
                 if obj:
                     return obj
         return None
@@ -695,8 +693,9 @@ class QueryableMixin(object):
                 if k not in cls._no_overwrite_}
             obj.update_without_commit(**update_kwargs)
         else:
-            print("obj is None")
+            print("obj is None, so creating new with kwargs ", kwargs)
             obj = cls.new(**kwargs)
+        print("new obj is ", obj.todict())
         return obj
 
     @classmethod
