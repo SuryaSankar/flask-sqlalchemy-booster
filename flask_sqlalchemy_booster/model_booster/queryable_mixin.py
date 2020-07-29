@@ -637,7 +637,6 @@ class QueryableMixin(object):
 
     @classmethod
     def get_updated_or_new_obj(cls, kwargs=None, filter_keys=None):
-        print("in get_updated_or_new_obj")
         if filter_keys is None:
             filter_keys = []
         if kwargs is None:
@@ -684,18 +683,14 @@ class QueryableMixin(object):
 
     @classmethod
     def update_matching_obj_or_generate_new_obj(cls, kwargs):
-        print("calling update matching_obj_or_generate_new_obj")
         obj = cls.get_matching_obj_using_unique_keys(kwargs)
         if obj is not None:
-            print("got obj as ", obj.id)
             update_kwargs = {
                 k: v for k, v in six.iteritems(kwargs)
                 if k not in cls._no_overwrite_}
             obj.update_without_commit(**update_kwargs)
         else:
-            print("obj is None, so creating new with kwargs ", kwargs)
             obj = cls.new(**kwargs)
-        print("new obj is ", obj.todict())
         return obj
 
     @classmethod
