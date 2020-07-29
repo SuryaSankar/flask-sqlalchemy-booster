@@ -78,11 +78,12 @@ class TeamMembership(db.Model):
     team = db.relationship("Team", backref=db.backref("memberships"))
 
 
-def create_todolist_app():
+def create_todolist_app(testing=False):
     app = FlaskBooster(__name__)
 
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite://'
     app.config['DEBUG'] = True
+    app.testing = testing
 
     db.init_app(app)
 

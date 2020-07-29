@@ -4,11 +4,12 @@ from .todo_list_api.app import db, create_todolist_app, User, Task
 
 @pytest.fixture(scope="session")
 def todolist_app():
-    return create_todolist_app()
+    return create_todolist_app(testing=True)
+
 
 @pytest.fixture(scope="session")
 def todolist_with_users_tasks(todolist_app):
-    with  todolist_app.test_request_context():
+    with todolist_app.test_request_context():
         users = [{
             "name": "Donald Duck",
             "email": "duck@disney.com",
