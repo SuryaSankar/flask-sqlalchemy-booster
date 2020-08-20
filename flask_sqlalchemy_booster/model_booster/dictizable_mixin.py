@@ -49,6 +49,7 @@ def _set_fields_for_col(col_name, col, schema, forbidden, required):
                 sqltypes.Text: (six.text_type, str),
                 sqltypes.Boolean: (bool,),
                 sqltypes.Enum: (six.text_type, str),
+                sqltypes.JSON: (dict, ),
                 MEDIUMTEXT: (six.text_type, str)
             }
             schema["fields"][col_name]["type"] = type_mapping[type(col.type)] + (type(None), )

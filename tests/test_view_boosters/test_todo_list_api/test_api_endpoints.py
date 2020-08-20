@@ -92,3 +92,13 @@ def test_task_filtering(todolist_app):
 		assert resp['status'] == 'success'
 		assert resp['result'][0]['title'] == "Solve a mystery"
 
+def test_that_user_get_fails_with_id(todolist_app):
+	with todolist_app.test_client() as client:
+		resp = client.jget("/users/1")
+		assert resp['status'] == 'failure'
+
+def test_user_get_succeeds_with_email(todolist_app):
+	with todolist_app.test_client() as client:
+		resp = client.jget("/users/popeye@acme.com")
+		assert resp['status'] == 'success'	
+

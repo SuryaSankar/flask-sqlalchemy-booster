@@ -97,7 +97,8 @@ def create_todolist_app(testing=False):
             'url_slug': 'tasks'
         },
         User: {
-            'url_slug': 'users'
+            'url_slug': 'users',
+            'id_attr': 'email'
         },
         Project: {
             'url_slug': 'projects'

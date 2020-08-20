@@ -42,12 +42,15 @@ def construct_get_view_function(
         dict_struct=None, schemas_registry=None, get_query_creator=None,
         enable_caching=False, cache_handler=None, cache_key_determiner=None,
         cache_timeout=None, exception_handler=None, access_checker=None,
-        dict_post_processors=None):
+        dict_post_processors=None, id_attr_name=None):
 
     def get(_id):
         try:
             _id = _id.strip()
-            id_attr_name = g.args.get('_id_attr')
+            if id_attr_name:
+                id_col_name = id_attr_name
+            else:
+                id_col_name = g.args.get('_id_attr')
             if _id.startswith('[') and _id.endswith(']'):
                 # Handles multiple ids being passed
                 # Eg: /tasks/[1,2,3]
@@ -64,9 +67,9 @@ def construct_get_view_function(
                     ids = json.loads(_id)
                     if get_query_creator:
                         resources = get_query_creator(
-                            model_class.query).get_all(ids, key=id_attr_name)
+                            model_class.query).get_all(ids, key=id_col_name)
                     else:
-                        resources = model_class.get_all(ids, key=id_attr_name)
+                        resources = model_class.get_all(ids, key=id_col_name)
                 if callable(access_checker):
                     resources = [r if access_checker(r)[0]
                                  else None for r in resources]
@@ -94,11 +97,11 @@ def construct_get_view_function(
                 obj = permitted_object_getter()
             else:
                 if get_query_creator:
-                    id_attr = getattr(model_class, id_attr_name) if id_attr_name else model_class.primary_key()
+                    id_attr = getattr(model_class, id_col_name) if id_col_name else model_class.primary_key()
                     obj = get_query_creator(model_class.query).filter(id_attr == _id).first()
                 else:
-                    if id_attr_name:
-                        obj = model_class.get(_id, key=id_attr_name)
+                    if id_col_name:
+                        obj = model_class.get(_id, key=id_col_name)
                     else:
                         obj = model_class.get(_id)
             if obj is None:
@@ -910,6 +913,7 @@ def register_crud_routes_for_models(
         default_exception_handler = _model_dict.get(
             'exception_handler') or exception_handler
         default_dict_post_processors = _model_dict.get('dict_post_processors')
+        default_id_attr = _model_dict.get('id_attr')
         view_dict_for_model = _model_dict.get('views', {})
         dict_struct_for_model = _model_dict.get('dict_struct')
         fields_forbidden_from_being_set_for_all_views = _model_dict.get(
@@ -997,6 +1001,7 @@ def register_crud_routes_for_models(
                     'exception_handler') or default_exception_handler,
                 access_checker=get_dict.get(
                     'access_checker') or default_access_checker,
+                id_attr_name=get_dict.get('id_attr') or default_id_attr,
                 dict_post_processors=get_dict.get('dict_post_processors') or default_dict_post_processors)
             get_url = get_dict.get('url', None) or '/%s/<_id>' % base_url
             app_or_bp.route(

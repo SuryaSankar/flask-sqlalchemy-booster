@@ -174,9 +174,11 @@ class QueryableMixin(object):
             **kwargs: a dictionary of parameters
         """
         # kwargs.pop('csrf_token', None)
+        attrs_to_delete = []
         for attr, val in kwargs.items():
             if cls.is_the_primary_key(attr) and cls._prevent_primary_key_initialization_:
-                del kwargs[attr]
+                attrs_to_delete.append(attr)
+                # del kwargs[attr]
                 continue
             if val == "":
                 # Making an assumption that there is no good usecase
@@ -203,6 +205,8 @@ class QueryableMixin(object):
                 elif isinstance(val, dict):
                     rel_cls = cls.mapped_rel_class(attr)
                     kwargs[attr] = rel_cls.update_or_new(**val)
+        for attr in attrs_to_delete:
+            del kwargs[attr]
         return kwargs
 
     @classmethod
