@@ -100,5 +100,5 @@ def test_that_user_get_fails_with_id(todolist_app):
 def test_user_get_succeeds_with_email(todolist_app):
 	with todolist_app.test_client() as client:
 		resp = client.jget("/users/popeye@acme.com")
-		assert resp['status'] == 'success'	
+		assert resp['status'] == 'success'
 

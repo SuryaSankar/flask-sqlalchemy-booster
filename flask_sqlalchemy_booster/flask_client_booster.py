@@ -16,21 +16,21 @@ class FlaskClientBooster(FlaskClient):
         jdata = json.dumps(data, default=json_encoder)
         parse_json_response = kwargs.pop('parse_json_response', True)
         resp = self.post(url, data=jdata, **kwargs)
-        return json.loads(resp.data) if parse_json_response else resp
+        return self.jread(resp) if parse_json_response else resp
 
     def jput(self, url, data, **kwargs):
         kwargs['content_type'] = "application/json"
         jdata = json.dumps(data, default=json_encoder)
         parse_json_response = kwargs.pop('parse_json_response', True)
         resp = self.put(url, data=jdata, **kwargs)
-        return json.loads(resp.data) if parse_json_response else resp
+        return self.jread(resp) if parse_json_response else resp
 
     def jpatch(self, url, data, **kwargs):
         kwargs['content_type'] = "application/json"
         jdata = json.dumps(data, default=json_encoder)
         parse_json_response = kwargs.pop('parse_json_response', True)
         resp = self.patch(url, data=jdata, **kwargs)
-        return json.loads(resp.data) if parse_json_response else resp
+        return self.jread(resp) if parse_json_response else resp
 
 
     def jget(self, *args, **kwargs):
