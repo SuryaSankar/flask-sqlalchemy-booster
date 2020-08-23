@@ -24,6 +24,7 @@ class QueryableMixin(object):
     _prevent_primary_key_initialization_ = True
     _prevent_primary_key_updation_ = True
     _fields_forbidden_from_being_set_ = None
+    allow_updation_based_on_unique_keys = False
 
     @classmethod
     def is_a_to_many_rel(cls, attr):
@@ -164,7 +165,7 @@ class QueryableMixin(object):
         cls.session.rollback()
 
     @classmethod
-    def _prepare_data_for_saving(cls, kwargs, allow_unique_keys_instead_of_primary_keys=False):
+    def _prepare_data_for_saving(cls, kwargs):
         """Returns a preprocessed dictionary of parameters.
         Use this to filter the kwargs passed to `new`, `create`,
         `build` methods.
@@ -195,7 +196,7 @@ class QueryableMixin(object):
                             rel_cls = cls.mapped_rel_class(attr)
                             kwargs[attr] = rel_cls.update_or_new_all(
                                 list_of_kwargs=val,
-                                keys=None if allow_unique_keys_instead_of_primary_keys else [
+                                keys=None if rel_cls.allow_updation_based_on_unique_keys else [
                                     rel_cls.primary_key_name()]
                             )
                     elif isinstance(val, dict):
@@ -207,13 +208,13 @@ class QueryableMixin(object):
                             getattr(obj, mapping_col): obj 
                             for obj in rel_cls.update_or_new_all(
                             list_of_kwargs=list_of_kwargs,
-                            keys=None if allow_unique_keys_instead_of_primary_keys else [
+                            keys=None if rel_cls.allow_updation_based_on_unique_keys else [
                                 rel_cls.primary_key_name()]
-                        )}
+                            )}
                 elif isinstance(val, dict):
                     rel_cls = cls.mapped_rel_class(attr)
-                    val['keys'] = None if allow_unique_keys_instead_of_primary_keys else [
-                        rel_cls.primary_key_name()]
+                    if not rel_cls.allow_updation_based_on_unique_keys:
+                        val['keys'] = [rel_cls.primary_key_name()]
                     kwargs[attr] = rel_cls.update_or_new(**val)
         for attr in attrs_to_delete:
             del kwargs[attr]
@@ -259,12 +260,8 @@ class QueryableMixin(object):
 
         """
         cls = type(self)
-        allow_unique_keys_instead_of_primary_keys = kwargs.pop(
-            'allow_unique_keys_instead_of_primary_keys', False)
         kwargs = cls.pre_save_adapter(kwargs, existing_instance=self)
-        kwargs = self._prepare_data_for_saving(
-            kwargs, 
-            allow_unique_keys_instead_of_primary_keys=allow_unique_keys_instead_of_primary_keys)
+        kwargs = self._prepare_data_for_saving(kwargs)
         for key, value in six.iteritems(kwargs):
             if not hasattr(cls, key) or isinstance(getattr(cls, key), property):
                 continue
@@ -422,8 +419,6 @@ class QueryableMixin(object):
         """Returns a new, unsaved instance of the model class.
 
         """
-        allow_unique_keys_instead_of_primary_keys = kwargs.pop(
-            'allow_unique_keys_instead_of_primary_keys', False)
         kwargs = cls.pre_save_adapter(kwargs)
         if cls.__mapper__.polymorphic_on is not None:
             discriminator_key = cls.__mapper__.polymorphic_on.name
@@ -432,17 +427,10 @@ class QueryableMixin(object):
                 actual_cls = cls.__mapper__.polymorphic_map[discriminator_val].class_
                 return actual_cls(
                     **subdict(
-                        actual_cls._prepare_data_for_saving(
-                            kwargs,
-                            allow_unique_keys_instead_of_primary_keys=allow_unique_keys_instead_of_primary_keys),
+                        actual_cls._prepare_data_for_saving(kwargs),
                         actual_cls.all_settable_keys())
                 )
-        return cls(
-            **subdict(
-                cls._prepare_data_for_saving(
-                    kwargs,
-                    allow_unique_keys_instead_of_primary_keys=allow_unique_keys_instead_of_primary_keys),
-                    cls.all_settable_keys()))
+        return cls(**subdict(cls._prepare_data_for_saving(kwargs), cls.all_settable_keys()))
 
     @classmethod
     def add(cls, model, commit=True):
@@ -1044,12 +1032,8 @@ class QueryableMixin(object):
             model: the model to update
             **kwargs: update parameters
         """
-        allow_unique_keys_instead_of_primary_keys = kwargs.pop(
-            'allow_unique_keys_instead_of_primary_keys', False)
         model = cls.get(id)
-        for k, v in cls._prepare_data_for_saving(
-            kwargs,
-            allow_unique_keys_instead_of_primary_keys=allow_unique_keys_instead_of_primary_keys).items():
+        for k, v in cls._prepare_data_for_saving(kwargs).items():
             setattr(model, k, v)
         cls.session.commit()
         return model
@@ -1062,12 +1046,8 @@ class QueryableMixin(object):
             model: the model to update
             **kwargs: update parameters
         """
-        allow_unique_keys_instead_of_primary_keys = kwargs.pop(
-            'allow_unique_keys_instead_of_primary_keys', False)
         model = cls.get(id)
-        for k, v in cls._prepare_data_for_saving(
-            kwargs,
-            allow_unique_keys_instead_of_primary_keys=allow_unique_keys_instead_of_primary_keys).items():
+        for k, v in cls._prepare_data_for_saving(kwargs).items():
             setattr(model, k, v)
         return model
 

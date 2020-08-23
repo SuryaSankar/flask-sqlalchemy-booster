@@ -12,10 +12,17 @@ db = FlaskSQLAlchemyBooster()
 
 class Project(db.Model):
 
+    allow_updation_based_on_unique_keys = True
+
     id = db.Column(db.Integer, primary_key=True, unique=True)
     created_on = db.Column(db.DateTime(), default=func.now())
-    name = db.Column(db.String(300))
+    name = db.Column(db.String(300), unique=True)
+    owning_user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    owning_team_id = db.Column(db.Integer, db.ForeignKey('team.id'))
     description = db.Column(db.Text)
+
+    owning_user = db.relationship("User", backref=db.backref("projects"))
+    owning_team = db.relationship("Team", backref=db.backref("projects"))
 
 
 class Team(db.Model):
@@ -98,7 +105,13 @@ def create_todolist_app(testing=False):
         },
         User: {
             'url_slug': 'users',
-            'id_attr': 'email'
+            'id_attr': 'email',
+            'dict_struct': {
+                'rels': {
+                    'tasks': {},
+                    'projects': {}
+                }
+            }
         },
         Project: {
             'url_slug': 'projects'
