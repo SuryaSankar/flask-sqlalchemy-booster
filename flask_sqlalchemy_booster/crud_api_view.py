@@ -222,12 +222,14 @@ def construct_post_view_function(
 
             fields_to_be_removed = union([
                 fields_forbidden_from_being_set or [],
-                model_class._fields_forbidden_from_being_set_ or []])
+                model_class._fields_forbidden_from_being_set_ or [],
+                model_class.property_keys() or []])
             if isinstance(input_data, list):
                 if fields_allowed_to_be_set and len(fields_to_be_removed) > 0:
                     for dict_item in input_data:
                         permit_only_allowed_fields(
-                            dict_item, fields_allowed_to_be_set=fields_allowed_to_be_set, fields_forbidden_from_being_set=fields_to_be_removed)
+                            dict_item, fields_allowed_to_be_set=fields_allowed_to_be_set, 
+                            fields_forbidden_from_being_set=fields_to_be_removed)
                 # if fields_allowed_to_be_set:
                 #     for dict_item in input_data:
                 #         for k in dict_item.keys():
@@ -373,7 +375,8 @@ def construct_put_view_function(
 
             fields_to_be_removed = union([
                 fields_forbidden_from_being_set or [],
-                model_class._fields_forbidden_from_being_set_ or []])
+                model_class._fields_forbidden_from_being_set_ or [],
+                model_class.property_keys() or []])
             if len(fields_to_be_removed) > 0:
                 delete_dict_keys(input_data, fields_to_be_removed)
             input_data = model_class.pre_validation_adapter(input_data, existing_instance=obj)
@@ -683,7 +686,8 @@ def construct_batch_save_view_function(
 
         fields_to_be_removed = union([
             fields_forbidden_from_being_set or [],
-            model_class._fields_forbidden_from_being_set_ or []])
+            model_class._fields_forbidden_from_being_set_ or [],
+            model_class.property_keys() or []])
         if len(fields_to_be_removed) > 0:
             for dict_item in input_data:
                 delete_dict_keys(dict_item, fields_to_be_removed)

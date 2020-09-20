@@ -105,11 +105,15 @@ def create_todolist_app(testing=False):
         },
         User: {
             'url_slug': 'users',
-            'id_attr': 'email',
             'dict_struct': {
                 'rels': {
                     'tasks': {},
                     'projects': {}
+                }
+            },
+            'views': {
+                'get': {
+                    'id_attr': 'email'
                 }
             }
         },
