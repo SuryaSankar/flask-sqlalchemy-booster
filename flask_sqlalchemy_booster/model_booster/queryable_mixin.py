@@ -100,7 +100,11 @@ class QueryableMixin(object):
             if not hasattr(cls, key) or isinstance(getattr(cls, key), property):
                 continue
             if key not in self._no_overwrite_:
-                setattr(self, key, value)
+                try:
+                    setattr(self, key, value)
+                except Exception as e:
+                    print(key, value, e.message)
+                    raise
             if isinstance(getattr(self, key), OrderingList):
                 getattr(self, key).reorder()
             elif isinstance(getattr(cls, key), AssociationProxyInstance):
@@ -266,7 +270,11 @@ class QueryableMixin(object):
             if not hasattr(cls, key) or isinstance(getattr(cls, key), property):
                 continue
             if key not in self._no_overwrite_:
-                setattr(self, key, value)
+                try:
+                    setattr(self, key, value)
+                except Exception as e:
+                    print(key, value, e.message)
+                    raise
             if isinstance(getattr(self, key), OrderingList):
                 getattr(self, key).reorder()
             elif isinstance(getattr(cls, key), AssociationProxyInstance):
