@@ -201,6 +201,7 @@ def construct_post_view_function(
         fields_forbidden_from_being_set=None, exception_handler=None,
         prevent_relationship_updates=False,
         prevent_association_proxy_updates=False,
+        remove_property_keys_before_validation=False,
         access_checker=None):
 
     def post():
@@ -226,6 +227,10 @@ def construct_post_view_function(
                 fields_forbidden_from_being_set or [],
                 model_class._fields_forbidden_from_being_set_ or []
             ])
+            if remove_property_keys_before_validation:
+                fields_to_be_removed = union([
+                    fields_to_be_removed, model_class.property_keys() or []
+                ])
             if prevent_relationship_updates:
                 fields_to_be_removed = union(
                     [fields_to_be_removed, model_class.relationship_keys() or []])
@@ -352,6 +357,7 @@ def construct_put_view_function(
         fields_allowed_to_be_set=None,
         fields_forbidden_from_being_set=None, prevent_relationship_updates=False,
         prevent_association_proxy_updates=False,
+        remove_property_keys_before_validation=False,
         exception_handler=None):
     def put(_id):
         try:
@@ -387,6 +393,10 @@ def construct_put_view_function(
                 fields_forbidden_from_being_set or [],
                 model_class._fields_forbidden_from_being_set_ or []
             ])
+            if remove_property_keys_before_validation:
+                fields_to_be_removed = union([
+                    fields_to_be_removed, model_class.property_keys() or []
+                ])
             if prevent_relationship_updates:
                 fields_to_be_removed = union(
                     [fields_to_be_removed, model_class.relationship_keys() or []])
@@ -942,6 +952,8 @@ def register_crud_routes_for_models(
             'fields_allowed_to_be_set', [])
         prevent_relationship_updates = _model_dict.get('prevent_relationship_updates', False)
         prevent_association_proxy_updates = _model_dict.get('prevent_association_proxy_updates', False)
+        remove_property_keys_before_validation = _model_dict.get(
+            'remove_property_keys_before_validation', False)
         enable_caching = _model_dict.get(
             'enable_caching', False) and cache_handler is not None
         cache_timeout = _model_dict.get('cache_timeout')
@@ -1053,6 +1065,9 @@ def register_crud_routes_for_models(
                     'exception_handler') or default_exception_handler,
                 access_checker=post_dict.get(
                     'access_checker') or default_access_checker,
+                remove_property_keys_before_validation=post_dict.get(
+                    'remove_property_keys_before_validation') if post_dict.get(
+                    'remove_property_keys_before_validation') is not None else remove_property_keys_before_validation,
                 prevent_relationship_updates=post_dict.get(
                     'prevent_relationship_updates') if post_dict.get(
                     'prevent_relationship_updates') is not None else prevent_relationship_updates,
@@ -1097,6 +1112,9 @@ def register_crud_routes_for_models(
                     'exception_handler') or default_exception_handler,
                 access_checker=put_dict.get(
                     'access_checker') or default_access_checker,
+                remove_property_keys_before_validation=post_dict.get(
+                    'remove_property_keys_before_validation') if post_dict.get(
+                    'remove_property_keys_before_validation') is not None else remove_property_keys_before_validation,
                 prevent_relationship_updates=put_dict.get(
                     'prevent_relationship_updates') if put_dict.get(
                     'prevent_relationship_updates') is not None else prevent_relationship_updates,
