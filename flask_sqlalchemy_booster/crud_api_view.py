@@ -224,8 +224,8 @@ def construct_post_view_function(
 
             fields_to_be_removed = union([
                 fields_forbidden_from_being_set or [],
-                model_class._fields_forbidden_from_being_set_ or [],
-                model_class.property_keys() or []])
+                model_class._fields_forbidden_from_being_set_ or []
+            ])
             if prevent_relationship_updates:
                 fields_to_be_removed = union(
                     [fields_to_be_removed, model_class.relationship_keys() or []])
@@ -385,8 +385,8 @@ def construct_put_view_function(
 
             fields_to_be_removed = union([
                 fields_forbidden_from_being_set or [],
-                model_class._fields_forbidden_from_being_set_ or [],
-                model_class.property_keys() or []])
+                model_class._fields_forbidden_from_being_set_ or []
+            ])
             if prevent_relationship_updates:
                 fields_to_be_removed = union(
                     [fields_to_be_removed, model_class.relationship_keys() or []])
@@ -702,8 +702,8 @@ def construct_batch_save_view_function(
 
         fields_to_be_removed = union([
             fields_forbidden_from_being_set or [],
-            model_class._fields_forbidden_from_being_set_ or [],
-            model_class.property_keys() or []])
+            model_class._fields_forbidden_from_being_set_ or []
+        ])
         if len(fields_to_be_removed) > 0:
             for dict_item in input_data:
                 delete_dict_keys(dict_item, fields_to_be_removed)
