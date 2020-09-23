@@ -1112,8 +1112,8 @@ def register_crud_routes_for_models(
                     'exception_handler') or default_exception_handler,
                 access_checker=put_dict.get(
                     'access_checker') or default_access_checker,
-                remove_property_keys_before_validation=post_dict.get(
-                    'remove_property_keys_before_validation') if post_dict.get(
+                remove_property_keys_before_validation=put_dict.get(
+                    'remove_property_keys_before_validation') if put_dict.get(
                     'remove_property_keys_before_validation') is not None else remove_property_keys_before_validation,
                 remove_relationship_keys_before_validation=put_dict.get(
                     'remove_relationship_keys_before_validation') if put_dict.get(
