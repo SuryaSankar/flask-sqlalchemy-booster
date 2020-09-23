@@ -105,6 +105,7 @@ def create_todolist_app(testing=False):
         },
         User: {
             'url_slug': 'users',
+            'remove_property_keys_before_validation': True,
             'dict_struct': {
                 'rels': {
                     'tasks': {},
