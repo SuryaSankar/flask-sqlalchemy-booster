@@ -199,8 +199,8 @@ def construct_post_view_function(
         dict_struct=None, schemas_registry=None,
         fields_allowed_to_be_set=None,
         fields_forbidden_from_being_set=None, exception_handler=None,
-        prevent_relationship_updates=False,
-        prevent_association_proxy_updates=False,
+        remove_relationship_keys_before_validation=False,
+        remove_assoc_proxy_keys_before_validation=False,
         remove_property_keys_before_validation=False,
         access_checker=None):
 
@@ -231,10 +231,10 @@ def construct_post_view_function(
                 fields_to_be_removed = union([
                     fields_to_be_removed, model_class.property_keys() or []
                 ])
-            if prevent_relationship_updates:
+            if remove_relationship_keys_before_validation:
                 fields_to_be_removed = union(
                     [fields_to_be_removed, model_class.relationship_keys() or []])
-            if prevent_association_proxy_updates:
+            if remove_assoc_proxy_keys_before_validation:
                 fields_to_be_removed = union(
                     [fields_to_be_removed, model_class.association_proxy_keys() or []])
             if isinstance(input_data, list):
@@ -355,8 +355,8 @@ def construct_put_view_function(
         allow_unknown_fields=False,
         access_checker=None,
         fields_allowed_to_be_set=None,
-        fields_forbidden_from_being_set=None, prevent_relationship_updates=False,
-        prevent_association_proxy_updates=False,
+        fields_forbidden_from_being_set=None, remove_relationship_keys_before_validation=False,
+        remove_assoc_proxy_keys_before_validation=False,
         remove_property_keys_before_validation=False,
         exception_handler=None):
     def put(_id):
@@ -397,10 +397,10 @@ def construct_put_view_function(
                 fields_to_be_removed = union([
                     fields_to_be_removed, model_class.property_keys() or []
                 ])
-            if prevent_relationship_updates:
+            if remove_relationship_keys_before_validation:
                 fields_to_be_removed = union(
                     [fields_to_be_removed, model_class.relationship_keys() or []])
-            if prevent_association_proxy_updates:
+            if remove_assoc_proxy_keys_before_validation:
                 fields_to_be_removed = union(
                     [fields_to_be_removed, model_class.association_proxy_keys() or []])
             if len(fields_to_be_removed) > 0:
@@ -950,8 +950,8 @@ def register_crud_routes_for_models(
             'fields_forbidden_from_being_set', [])
         fields_allowed_to_be_set_for_all_views = _model_dict.get(
             'fields_allowed_to_be_set', [])
-        prevent_relationship_updates = _model_dict.get('prevent_relationship_updates', False)
-        prevent_association_proxy_updates = _model_dict.get('prevent_association_proxy_updates', False)
+        remove_relationship_keys_before_validation = _model_dict.get('remove_relationship_keys_before_validation', False)
+        remove_assoc_proxy_keys_before_validation = _model_dict.get('remove_assoc_proxy_keys_before_validation', False)
         remove_property_keys_before_validation = _model_dict.get(
             'remove_property_keys_before_validation', False)
         enable_caching = _model_dict.get(
@@ -1068,12 +1068,12 @@ def register_crud_routes_for_models(
                 remove_property_keys_before_validation=post_dict.get(
                     'remove_property_keys_before_validation') if post_dict.get(
                     'remove_property_keys_before_validation') is not None else remove_property_keys_before_validation,
-                prevent_relationship_updates=post_dict.get(
-                    'prevent_relationship_updates') if post_dict.get(
-                    'prevent_relationship_updates') is not None else prevent_relationship_updates,
-                prevent_association_proxy_updates=post_dict.get(
-                    'prevent_association_proxy_updates') if post_dict.get(
-                    'prevent_association_proxy_updates') is not None else prevent_association_proxy_updates,
+                remove_relationship_keys_before_validation=post_dict.get(
+                    'remove_relationship_keys_before_validation') if post_dict.get(
+                    'remove_relationship_keys_before_validation') is not None else remove_relationship_keys_before_validation,
+                remove_assoc_proxy_keys_before_validation=post_dict.get(
+                    'remove_assoc_proxy_keys_before_validation') if post_dict.get(
+                    'remove_assoc_proxy_keys_before_validation') is not None else remove_assoc_proxy_keys_before_validation,
                 fields_allowed_to_be_set=post_dict.get(
                     'fields_allowed_to_be_set') or fields_allowed_to_be_set_for_all_views,
                 fields_forbidden_from_being_set=union([
@@ -1115,12 +1115,12 @@ def register_crud_routes_for_models(
                 remove_property_keys_before_validation=post_dict.get(
                     'remove_property_keys_before_validation') if post_dict.get(
                     'remove_property_keys_before_validation') is not None else remove_property_keys_before_validation,
-                prevent_relationship_updates=put_dict.get(
-                    'prevent_relationship_updates') if put_dict.get(
-                    'prevent_relationship_updates') is not None else prevent_relationship_updates,
-                prevent_association_proxy_updates=put_dict.get(
-                    'prevent_association_proxy_updates') if put_dict.get(
-                    'prevent_association_proxy_updates') is not None else prevent_association_proxy_updates,
+                remove_relationship_keys_before_validation=put_dict.get(
+                    'remove_relationship_keys_before_validation') if put_dict.get(
+                    'remove_relationship_keys_before_validation') is not None else remove_relationship_keys_before_validation,
+                remove_assoc_proxy_keys_before_validation=put_dict.get(
+                    'remove_assoc_proxy_keys_before_validation') if put_dict.get(
+                    'remove_assoc_proxy_keys_before_validation') is not None else remove_assoc_proxy_keys_before_validation,
                 fields_allowed_to_be_set=put_dict.get(
                     'fields_allowed_to_be_set') or fields_allowed_to_be_set_for_all_views,
                 fields_forbidden_from_being_set=union([
