@@ -16,7 +16,7 @@ from schemalite.core import validate_dict
 from schemalite.validators import is_a_type_of, is_a_list_of_types_of
 from sqlalchemy.orm import class_mapper
 from sqlalchemy.orm.query import Query
-from sqlalchemy import or_, and_
+from sqlalchemy import or_, and_, not_
 
 from .json_encoder import json_encoder
 from .query_booster import QueryBooster
@@ -553,10 +553,9 @@ def return_joined_query_model_class_and_attr_name(query, keyword):
     return (_query, model_class, attr_name)
 
 
-def modify_query_and_get_filter_function(query, keyword, value, op):
+def modify_query_and_get_filter_function(query, keyword, value, op, negate=False):
     # print(
-    #     "in modify_query_and_get_filter_function ",
-    #     query, keyword, value, op)
+    #     "in modify_query_and_get_filter_functions ", keyword, value, op, negate)
     _query, model_class, attr_name = return_joined_query_model_class_and_attr_name(query, keyword)
     # print("in modify query, model_class ", model_class)
     # print("in modify query, attr_name ", attr_name)
@@ -584,8 +583,11 @@ def modify_query_and_get_filter_function(query, keyword, value, op):
     # print("in modify_query, value ", value)
 
     if hasattr(model_class, attr_name):
-        return (_query, getattr(
-            getattr(model_class, attr_name), OPERATOR_FUNC[op])(value))
+        fltr = getattr(
+            getattr(model_class, attr_name), OPERATOR_FUNC[op])(value)
+        if negate:
+            fltr = not_(fltr)
+        return (_query, fltr)
     else:
         subcls_filters = []
         for subcls in all_subclasses(model_class):
@@ -593,12 +595,13 @@ def modify_query_and_get_filter_function(query, keyword, value, op):
                 if '.' in keyword:
                     if not _query.is_joined_with(subcls):
                         _query = _query.join(subcls)
-                subcls_filters.append(
-                    getattr(
-                        getattr(subcls, attr_name),
-                        OPERATOR_FUNC[op]
-                    )(value)
-                )
+                fltr = getattr(
+                    getattr(subcls, attr_name),
+                    OPERATOR_FUNC[op]
+                )(value)
+                if negate:
+                    fltr = not_(fltr)
+                subcls_filters.append(fltr)
             # print "adding filter to subcls filters ", subcls, attr_name, value
         if len(subcls_filters) > 0:
             return (_query, or_(*subcls_filters))
@@ -606,9 +609,9 @@ def modify_query_and_get_filter_function(query, keyword, value, op):
         return (query, None)
 
 
-def filter_query_with_key(query, keyword, value, op):
+def filter_query_with_key(query, keyword, value, op, negate=False):
     _query, filter_func = modify_query_and_get_filter_function(
-        query, keyword, value, op)
+        query, keyword, value, op, negate=negate)
     if filter_func is not None:
         return _query.filter(filter_func)
     return query
@@ -630,7 +633,7 @@ def convert_filters_to_sqlalchemy_filter(query, filters, connector):
         else:
             # print("calling modify_query")
             query, sqfilter = modify_query_and_get_filter_function(
-                query, f["k"], f["v"], f["op"])
+                query, f["k"], f["v"], f["op"], negate=f.get("neg"))
 
             sqfilters.append(sqfilter)
     # print("found sqfilters list as ", sqfilters)
@@ -699,13 +702,16 @@ def filter_query_using_filters_list(result, filters_dict):
     # return result
 
 
-def filter_query_using_args(result, args_to_skip=[]):
+def filter_query_using_args(result, args_to_skip=None):
     if not (isinstance(result, Query) or isinstance(result, QueryBooster)):
         if isinstance(result, DefaultMeta) and class_mapper(
                 result).polymorphic_on is not None:
             result = result.query.with_polymorphic('*')
         else:
             result = result.query
+    if args_to_skip is None:
+        args_to_skip = []
+    args_to_skip.append('_f')
     for kw in request.args:
         if kw not in args_to_skip:
             for op in OPERATORS:
@@ -818,7 +824,7 @@ def convert_result_to_response(result, **kwargs):
 
 
 def convert_query_to_response_object(
-        query, args_to_skip=[], meta={}, attrs_to_serialize=None, rels_to_expand=None,
+        query, args_to_skip=None, meta={}, attrs_to_serialize=None, rels_to_expand=None,
         rels_to_serialize=None, group_listrels_by=None, dict_struct=None,
         preserve_order=None, groupby=None):
     return convert_result_to_response_structure(
