@@ -59,8 +59,12 @@ class ModelBooster(Model, QueryableMixin, DictizableMixin):
         return None
 
     @classmethod
+    def internal_keys(cls):
+        return ['query']
+
+    @classmethod
     def property_keys(cls):
-        return [k for k in cls.all_keys() if isinstance(
+        return [k for k in cls.all_keys() if k not in cls.internal_keys() and isinstance(
             getattr(cls, k), property)]
 
     @classmethod
