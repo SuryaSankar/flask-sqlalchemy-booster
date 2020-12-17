@@ -12,6 +12,7 @@ import six.moves.urllib.request, six.moves.urllib.parse, six.moves.urllib.error
 import functools
 import csv
 import traceback
+from . import entity_definition_keys as edk
 
 from .responses import (
     as_dict, get_request_json, get_request_args,
@@ -334,7 +335,7 @@ def construct_post_view_function(
                     if final_obj_cls in registration_dict:
                         final_obj_dict_struct = (fetch_nested_key_from_dict(
                             registration_dict[final_obj_cls], 'views.get.dict_struct') or
-                            registration_dict[final_obj_cls].get('dict_struct'))
+                            registration_dict[final_obj_cls].get(edk.RESPONSE_DICT_STRUCT))
                     return render_json_obj_with_requested_structure(final_obj, dict_struct=final_obj_dict_struct)
                 return render_json_obj_with_requested_structure(obj, dict_struct=dict_struct)
         except Exception as e:
@@ -442,7 +443,7 @@ def construct_put_view_function(
                 if final_obj_cls in registration_dict:
                     final_obj_dict_struct = (fetch_nested_key_from_dict(
                         registration_dict[final_obj_cls], 'views.get.dict_struct') or
-                        registration_dict[final_obj_cls].get('dict_struct'))
+                        registration_dict[final_obj_cls].get(edk.RESPONSE_DICT_STRUCT))
                 return render_json_obj_with_requested_structure(final_obj, dict_struct=final_obj_dict_struct)
             return render_json_obj_with_requested_structure(
                 updated_obj,
@@ -576,7 +577,7 @@ def construct_delete_view_function(
                 if cls_of_rel_obj_requested_in_return in registration_dict:
                     rel_obj_dict_struct = (fetch_nested_key_from_dict(
                         registration_dict[cls_of_rel_obj_requested_in_return], 'views.get.dict_struct') or
-                        registration_dict[cls_of_rel_obj_requested_in_return].get('dict_struct'))
+                        registration_dict[cls_of_rel_obj_requested_in_return].get(edk.RESPONSE_DICT_STRUCT))
                 return render_json_obj_with_requested_structure(
                     refetched_rel_obj, dict_struct=rel_obj_dict_struct)
 
@@ -865,8 +866,7 @@ def construct_batch_save_view_function(
             return as_json(consolidated_result, wrap=False)
 
     return batch_save
-
-
+    
 
 def register_crud_routes_for_models(
         app_or_bp, registration_dict, register_schema_structure=True,
@@ -876,7 +876,7 @@ def register_crud_routes_for_models(
         register_schema_definition=False, register_views_map=False,
         schema_def_url='/schema-def', views_map_url='/views-map'):
 
-    all_operations = ['index', 'get', 'post', 'put', 'patch', 'delete', 'batch_save']
+    all_operations = [edk.INDEX, edk.GET, edk.POST, edk.PUT, edk.PATCH, edk.DELETE, edk.BATCH_SAVE]
 
     if not hasattr(app_or_bp, "registered_models_and_crud_routes"):
         app_or_bp.registered_models_and_crud_routes = {
@@ -884,7 +884,7 @@ def register_crud_routes_for_models(
             "model_schemas": {
 
             },
-            "views": {
+            edk.OPERATION_MODIFIERS: {
 
             }
         }
@@ -898,8 +898,8 @@ def register_crud_routes_for_models(
             input_schema = deepcopy(modelcls._input_data_schema_)
         else:
             input_schema = modelcls.generate_input_data_schema()
-        if modelcls in registration_dict and callable(registration_dict[modelcls].get('input_schema_modifier')):
-            input_schema = registration_dict[modelcls]['input_schema_modifier'](
+        if modelcls in registration_dict and callable(registration_dict[modelcls].get(edk.INPUT_SCHEMA_MODIFIER)):
+            input_schema = registration_dict[modelcls][edk.INPUT_SCHEMA_MODIFIER](
                 input_schema)
         model_schemas[modelcls_key] = {
             "input_schema": input_schema,
@@ -918,18 +918,18 @@ def register_crud_routes_for_models(
 
     for _model_key, _model_dict in registration_dict.items():
         if isinstance(_model_key, str):
-            _model = _model_dict['model_class']
+            _model = _model_dict[edk.MODEL_CLASS]
             _model_name = _model_key
         else:
             _model = _model_key
             _model_name = _model.__name__
-        base_url = _model_dict.get('url_slug')
+        base_url = _model_dict.get(edk.URL_SLUG)
 
-        if _model_dict.get('permitted_operations'):
-            permitted_actions = _model_dict.get('permitted_operations')
-        elif _model_dict.get('forbidden_operations'):
+        if _model_dict.get(edk.PERMITTED_OPERATIONS):
+            permitted_actions = _model_dict.get(edk.PERMITTED_OPERATIONS)
+        elif _model_dict.get(edk.FORBIDDEN_OPERATIONS):
             permitted_actions = difference(
-                all_operations, _model_dict.get('forbidden_operations'))
+                all_operations, _model_dict.get(edk.FORBIDDEN_OPERATIONS))
         elif permitted_operations is not None:
             permitted_actions = permitted_operations
         elif forbidden_operations is not None:
@@ -938,25 +938,25 @@ def register_crud_routes_for_models(
         else:
             permitted_actions = all_operations
 
-        default_query_constructor = _model_dict.get('query_constructor')
-        default_access_checker = _model_dict.get('access_checker')
+        default_query_constructor = _model_dict.get(edk.QUERY_MODIFIER)
+        default_access_checker = _model_dict.get(edk.ACCESS_CHECKER)
         default_exception_handler = _model_dict.get(
-            'exception_handler') or exception_handler
-        default_dict_post_processors = _model_dict.get('dict_post_processors')
-        default_id_attr = _model_dict.get('id_attr')
-        view_dict_for_model = _model_dict.get('views', {})
-        dict_struct_for_model = _model_dict.get('dict_struct')
+            edk.EXCEPTION_HANDLER) or exception_handler
+        default_dict_post_processors = _model_dict.get(edk.RESPONSE_DICT_MODIFIERS)
+        default_id_attr = _model_dict.get(edk.ID_ATTR)
+        view_dict_for_model = _model_dict.get(edk.OPERATION_MODIFIERS, {})
+        dict_struct_for_model = _model_dict.get(edk.RESPONSE_DICT_STRUCT)
         fields_forbidden_from_being_set_for_all_views = _model_dict.get(
-            'fields_forbidden_from_being_set', [])
+            edk.NON_SETTABLE_FIELDS, [])
         fields_allowed_to_be_set_for_all_views = _model_dict.get(
-            'fields_allowed_to_be_set', [])
+            edk.SETTABLE_FIELDS, [])
         remove_relationship_keys_before_validation = _model_dict.get('remove_relationship_keys_before_validation', False)
         remove_assoc_proxy_keys_before_validation = _model_dict.get('remove_assoc_proxy_keys_before_validation', False)
         remove_property_keys_before_validation = _model_dict.get(
             'remove_property_keys_before_validation', False)
         enable_caching = _model_dict.get(
-            'enable_caching', False) and cache_handler is not None
-        cache_timeout = _model_dict.get('cache_timeout')
+            edk.ENABLE_CACHING, False) and cache_handler is not None
+        cache_timeout = _model_dict.get(edk.CACHE_TIMEOUT)
         resource_name = _model_dict.get(
             'resource_name') or _model.__tablename__
 
@@ -970,101 +970,101 @@ def register_crud_routes_for_models(
             model_default_input_schema = deepcopy(_model._input_data_schema_)
         else:
             model_default_input_schema = _model.generate_input_data_schema()
-        if callable(registration_dict[_model].get('input_schema_modifier')):
-            model_default_input_schema = registration_dict[_model]['input_schema_modifier'](
+        if callable(registration_dict[_model].get(edk.INPUT_SCHEMA_MODIFIER)):
+            model_default_input_schema = registration_dict[_model][edk.INPUT_SCHEMA_MODIFIER](
                 model_default_input_schema)
 
-        views = app_or_bp.registered_models_and_crud_routes["views"]
+        views = app_or_bp.registered_models_and_crud_routes[edk.OPERATION_MODIFIERS]
         schemas_registry = {k: v.get('input_schema')
                             for k, v in list(model_schemas.items())}
         if _model_name not in views:
             views[_model_name] = {}
 
-        if 'index' in permitted_actions:
-            index_dict = view_dict_for_model.get('index', {})
-            if 'enable_caching' in index_dict:
+        if edk.INDEX in permitted_actions:
+            index_dict = view_dict_for_model.get(edk.INDEX, {})
+            if edk.ENABLE_CACHING in index_dict:
                 enable_caching = index_dict.get(
-                    'enable_caching') and cache_handler is not None
-            cache_key_determiner = index_dict.get('cache_key_determiner')
-            cache_timeout = index_dict.get('cache_timeout') or cache_timeout
-            index_func = index_dict.get('view_func', None) or construct_index_view_function(
+                    edk.ENABLE_CACHING) and cache_handler is not None
+            cache_key_determiner = index_dict.get(edk.CACHE_KEY_DETERMINER)
+            cache_timeout = index_dict.get(edk.CACHE_TIMEOUT) or cache_timeout
+            index_func = index_dict.get(edk.VIEW_FUNC, None) or construct_index_view_function(
                 _model,
                 index_query_creator=index_dict.get(
-                    'query_constructor') or default_query_constructor,
+                    edk.QUERY_MODIFIER) or default_query_constructor,
                 dict_struct=index_dict.get(
-                    'dict_struct') or dict_struct_for_model,
+                    edk.RESPONSE_DICT_STRUCT) or dict_struct_for_model,
                 custom_response_creator=index_dict.get(
-                    'custom_response_creator'),
+                    edk.CUSTOM_RESPONSE_CREATOR),
                 enable_caching=enable_caching,
                 cache_handler=cache_handler,
                 cache_key_determiner=cache_key_determiner,
                 cache_timeout=cache_timeout,
                 exception_handler=index_dict.get(
-                    'exception_handler') or default_exception_handler,
+                    edk.EXCEPTION_HANDLER) or default_exception_handler,
                 access_checker=index_dict.get(
-                    'access_checker') or default_access_checker,
+                    edk.ACCESS_CHECKER) or default_access_checker,
                 default_limit=index_dict.get('default_limit'),
                 default_sort=index_dict.get('default_sort'),
                 default_orderby=index_dict.get('default_orderby'),
                 default_offset=index_dict.get('default_offset'),
                 default_page=index_dict.get('default_page'),
                 default_per_page=index_dict.get('default_per_page'))
-            index_url = index_dict.get('url', None) or "/%s" % base_url
+            index_url = index_dict.get(edk.URL, None) or "/%s" % base_url
             app_or_bp.route(
                 index_url, methods=['GET'], endpoint='index_%s' % resource_name)(
                 index_func)
-            views[_model_name]['index'] = {'url': index_url}
+            views[_model_name][edk.INDEX] = {edk.URL: index_url}
 
         if 'get' in permitted_actions:
             get_dict = view_dict_for_model.get('get', {})
-            if 'enable_caching' in get_dict:
+            if edk.ENABLE_CACHING in get_dict:
                 enable_caching = get_dict.get(
-                    'enable_caching') and cache_handler is not None
-            cache_key_determiner = get_dict.get('cache_key_determiner')
-            cache_timeout = get_dict.get('cache_timeout') or cache_timeout
-            get_func = get_dict.get('view_func', None) or construct_get_view_function(
+                    edk.ENABLE_CACHING) and cache_handler is not None
+            cache_key_determiner = get_dict.get(edk.CACHE_KEY_DETERMINER)
+            cache_timeout = get_dict.get(edk.CACHE_TIMEOUT) or cache_timeout
+            get_func = get_dict.get(edk.VIEW_FUNC, None) or construct_get_view_function(
                 _model, registration_dict,
                 permitted_object_getter=get_dict.get(
-                    'permitted_object_getter') or _model_dict.get('permitted_object_getter'),
+                    edk.PERMITTED_OBJECT_GETTER) or _model_dict.get(edk.PERMITTED_OBJECT_GETTER),
                 get_query_creator=get_dict.get(
-                    'query_constructor') or default_query_constructor,
+                    edk.QUERY_MODIFIER) or default_query_constructor,
                 dict_struct=get_dict.get(
-                    'dict_struct') or dict_struct_for_model,
+                    edk.RESPONSE_DICT_STRUCT) or dict_struct_for_model,
                 enable_caching=enable_caching,
                 cache_handler=cache_handler, cache_key_determiner=cache_key_determiner,
                 cache_timeout=cache_timeout,
                 exception_handler=get_dict.get(
-                    'exception_handler') or default_exception_handler,
+                    edk.EXCEPTION_HANDLER) or default_exception_handler,
                 access_checker=get_dict.get(
-                    'access_checker') or default_access_checker,
-                id_attr_name=get_dict.get('id_attr') or default_id_attr,
-                dict_post_processors=get_dict.get('dict_post_processors') or default_dict_post_processors)
-            get_url = get_dict.get('url', None) or '/%s/<_id>' % base_url
+                    edk.ACCESS_CHECKER) or default_access_checker,
+                id_attr_name=get_dict.get(edk.ID_ATTR) or default_id_attr,
+                dict_post_processors=get_dict.get(edk.RESPONSE_DICT_MODIFIERS) or default_dict_post_processors)
+            get_url = get_dict.get(edk.URL, None) or '/%s/<_id>' % base_url
             app_or_bp.route(
                 get_url, methods=['GET'], endpoint='get_%s' % resource_name)(
                 get_func)
-            views[_model_name]['get'] = {'url': get_url}
+            views[_model_name]['get'] = {edk.URL: get_url}
 
         if 'post' in permitted_actions:
             post_dict = view_dict_for_model.get('post', {})
-            if callable(post_dict.get('input_schema_modifier')):
-                post_input_schema = post_dict['input_schema_modifier'](
+            if callable(post_dict.get(edk.INPUT_SCHEMA_MODIFIER)):
+                post_input_schema = post_dict[edk.INPUT_SCHEMA_MODIFIER](
                     deepcopy(model_default_input_schema))
             else:
                 post_input_schema = model_default_input_schema
-            post_func = post_dict.get('view_func', None) or construct_post_view_function(
+            post_func = post_dict.get(edk.VIEW_FUNC, None) or construct_post_view_function(
                 _model, post_input_schema,
                 registration_dict=registration_dict,
-                pre_processors=post_dict.get('pre_processors'),
-                post_processors=post_dict.get('post_processors'),
+                pre_processors=post_dict.get(edk.BEFORE_SAVE_HANDLERS),
+                post_processors=post_dict.get(edk.AFTER_SAVE_HANDLERS),
                 schemas_registry=schemas_registry,
                 allow_unknown_fields=allow_unknown_fields,
                 dict_struct=post_dict.get(
-                    'dict_struct') or dict_struct_for_model,
+                    edk.RESPONSE_DICT_STRUCT) or dict_struct_for_model,
                 exception_handler=post_dict.get(
-                    'exception_handler') or default_exception_handler,
+                    edk.EXCEPTION_HANDLER) or default_exception_handler,
                 access_checker=post_dict.get(
-                    'access_checker') or default_access_checker,
+                    edk.ACCESS_CHECKER) or default_access_checker,
                 remove_property_keys_before_validation=post_dict.get(
                     'remove_property_keys_before_validation') if post_dict.get(
                     'remove_property_keys_before_validation') is not None else remove_property_keys_before_validation,
@@ -1075,43 +1075,43 @@ def register_crud_routes_for_models(
                     'remove_assoc_proxy_keys_before_validation') if post_dict.get(
                     'remove_assoc_proxy_keys_before_validation') is not None else remove_assoc_proxy_keys_before_validation,
                 fields_allowed_to_be_set=post_dict.get(
-                    'fields_allowed_to_be_set') or fields_allowed_to_be_set_for_all_views,
+                    edk.SETTABLE_FIELDS) or fields_allowed_to_be_set_for_all_views,
                 fields_forbidden_from_being_set=union([
                     fields_forbidden_from_being_set_for_all_views,
-                    post_dict.get('fields_forbidden_from_being_set', [])]))
-            post_url = post_dict.get('url', None) or "/%s" % base_url
+                    post_dict.get(edk.NON_SETTABLE_FIELDS, [])]))
+            post_url = post_dict.get(edk.URL, None) or "/%s" % base_url
             app_or_bp.route(
                 post_url, methods=['POST'], endpoint='post_%s' % resource_name)(
                 post_func)
-            views[_model_name]['post'] = {'url': post_url}
-            if 'input_schema_modifier' in post_dict:
-                views[_model_name]['post']['input_schema'] = post_dict['input_schema_modifier'](
+            views[_model_name]['post'] = {edk.URL: post_url}
+            if edk.INPUT_SCHEMA_MODIFIER in post_dict:
+                views[_model_name]['post']['input_schema'] = post_dict[edk.INPUT_SCHEMA_MODIFIER](
                     deepcopy(model_schemas[_model.__name__]['input_schema']))
 
         if 'put' in permitted_actions:
             put_dict = view_dict_for_model.get('put', {})
-            if callable(put_dict.get('input_schema_modifier')):
-                put_input_schema = put_dict['input_schema_modifier'](
+            if callable(put_dict.get(edk.INPUT_SCHEMA_MODIFIER)):
+                put_input_schema = put_dict[edk.INPUT_SCHEMA_MODIFIER](
                     deepcopy(model_default_input_schema))
             else:
                 put_input_schema = model_default_input_schema
-            put_func = put_dict.get('view_func', None) or construct_put_view_function(
+            put_func = put_dict.get(edk.VIEW_FUNC, None) or construct_put_view_function(
                 _model, put_input_schema,
                 registration_dict=registration_dict,
                 permitted_object_getter=put_dict.get(
-                    'permitted_object_getter') or _model_dict.get('permitted_object_getter'),
-                pre_processors=put_dict.get('pre_processors'),
-                post_processors=put_dict.get('post_processors'),
+                    edk.PERMITTED_OBJECT_GETTER) or _model_dict.get(edk.PERMITTED_OBJECT_GETTER),
+                pre_processors=put_dict.get(edk.BEFORE_SAVE_HANDLERS),
+                post_processors=put_dict.get(edk.AFTER_SAVE_HANDLERS),
                 dict_struct=put_dict.get(
-                    'dict_struct') or dict_struct_for_model,
+                    edk.RESPONSE_DICT_STRUCT) or dict_struct_for_model,
                 allow_unknown_fields=allow_unknown_fields,
                 query_constructor=put_dict.get(
-                    'query_constructor') or default_query_constructor,
+                    edk.QUERY_MODIFIER) or default_query_constructor,
                 schemas_registry=schemas_registry,
                 exception_handler=put_dict.get(
-                    'exception_handler') or default_exception_handler,
+                    edk.EXCEPTION_HANDLER) or default_exception_handler,
                 access_checker=put_dict.get(
-                    'access_checker') or default_access_checker,
+                    edk.ACCESS_CHECKER) or default_access_checker,
                 remove_property_keys_before_validation=put_dict.get(
                     'remove_property_keys_before_validation') if put_dict.get(
                     'remove_property_keys_before_validation') is not None else remove_property_keys_before_validation,
@@ -1122,78 +1122,78 @@ def register_crud_routes_for_models(
                     'remove_assoc_proxy_keys_before_validation') if put_dict.get(
                     'remove_assoc_proxy_keys_before_validation') is not None else remove_assoc_proxy_keys_before_validation,
                 fields_allowed_to_be_set=put_dict.get(
-                    'fields_allowed_to_be_set') or fields_allowed_to_be_set_for_all_views,
+                    edk.SETTABLE_FIELDS) or fields_allowed_to_be_set_for_all_views,
                 fields_forbidden_from_being_set=union([
                     fields_forbidden_from_being_set_for_all_views,
-                    put_dict.get('fields_forbidden_from_being_set', [])]))
-            put_url = put_dict.get('url', None) or "/%s/<_id>" % base_url
+                    put_dict.get(edk.NON_SETTABLE_FIELDS, [])]))
+            put_url = put_dict.get(edk.URL, None) or "/%s/<_id>" % base_url
             app_or_bp.route(
                 put_url, methods=['PUT'], endpoint='put_%s' % resource_name)(
                 put_func)
-            views[_model_name]['put'] = {'url': put_url}
-            if 'input_schema_modifier' in put_dict:
-                views[_model_name]['put']['input_schema'] = put_dict['input_schema_modifier'](
+            views[_model_name]['put'] = {edk.URL: put_url}
+            if edk.INPUT_SCHEMA_MODIFIER in put_dict:
+                views[_model_name]['put']['input_schema'] = put_dict[edk.INPUT_SCHEMA_MODIFIER](
                     deepcopy(model_schemas[_model.__name__]['input_schema']))
 
         if 'patch' in permitted_actions:
             patch_dict = view_dict_for_model.get('patch', {})
-            if callable(patch_dict.get('input_schema_modifier')):
-                patch_input_schema = patch_dict['input_schema_modifier'](
+            if callable(patch_dict.get(edk.INPUT_SCHEMA_MODIFIER)):
+                patch_input_schema = patch_dict[edk.INPUT_SCHEMA_MODIFIER](
                     deepcopy(model_default_input_schema))
             else:
                 patch_input_schema = model_default_input_schema
-            patch_func = patch_dict.get('view_func', None) or construct_patch_view_function(
+            patch_func = patch_dict.get(edk.VIEW_FUNC, None) or construct_patch_view_function(
                 _model, patch_input_schema,
-                pre_processors=patch_dict.get('pre_processors'),
+                pre_processors=patch_dict.get(edk.BEFORE_SAVE_HANDLERS),
                 processors=patch_dict.get('processors'),
-                post_processors=patch_dict.get('post_processors'),
+                post_processors=patch_dict.get(edk.AFTER_SAVE_HANDLERS),
                 query_constructor=patch_dict.get(
-                    'query_constructor') or default_query_constructor,
+                    edk.QUERY_MODIFIER) or default_query_constructor,
                 permitted_object_getter=patch_dict.get(
-                    'permitted_object_getter') or _model_dict.get('permitted_object_getter'),
+                    edk.PERMITTED_OBJECT_GETTER) or _model_dict.get(edk.PERMITTED_OBJECT_GETTER),
                 schemas_registry=schemas_registry,
                 exception_handler=patch_dict.get(
-                    'exception_handler') or default_exception_handler,
+                    edk.EXCEPTION_HANDLER) or default_exception_handler,
                 access_checker=patch_dict.get(
-                    'access_checker') or default_access_checker,
-                dict_struct=patch_dict.get('dict_struct') or dict_struct_for_model)
-            patch_url = patch_dict.get('url', None) or "/%s/<_id>" % base_url
+                    edk.ACCESS_CHECKER) or default_access_checker,
+                dict_struct=patch_dict.get(edk.RESPONSE_DICT_STRUCT) or dict_struct_for_model)
+            patch_url = patch_dict.get(edk.URL, None) or "/%s/<_id>" % base_url
             app_or_bp.route(
                 patch_url, methods=['PATCH'], endpoint='patch_%s' % resource_name)(
                 patch_func)
-            views[_model_name]['patch'] = {'url': patch_url}
-            if 'input_schema_modifier' in patch_dict:
-                views[_model_name]['patch']['input_schema'] = patch_dict['input_schema_modifier'](
+            views[_model_name]['patch'] = {edk.URL: patch_url}
+            if edk.INPUT_SCHEMA_MODIFIER in patch_dict:
+                views[_model_name]['patch']['input_schema'] = patch_dict[edk.INPUT_SCHEMA_MODIFIER](
                     deepcopy(model_schemas[_model.__name__]['input_schema']))
 
         if 'delete' in permitted_actions:
             delete_dict = view_dict_for_model.get('delete', {})
-            delete_func = delete_dict.get('view_func', None) or construct_delete_view_function(
+            delete_func = delete_dict.get(edk.VIEW_FUNC, None) or construct_delete_view_function(
                 _model,
                 query_constructor=delete_dict.get(
-                    'query_constructor') or default_query_constructor,
-                pre_processors=delete_dict.get('pre_processors'),
+                    edk.QUERY_MODIFIER) or default_query_constructor,
+                pre_processors=delete_dict.get(edk.BEFORE_SAVE_HANDLERS),
                 registration_dict=registration_dict,
                 permitted_object_getter=delete_dict.get(
-                    'permitted_object_getter') or _model_dict.get('permitted_object_getter'),
-                post_processors=delete_dict.get('post_processors'),
+                    edk.PERMITTED_OBJECT_GETTER) or _model_dict.get(edk.PERMITTED_OBJECT_GETTER),
+                post_processors=delete_dict.get(edk.AFTER_SAVE_HANDLERS),
                 exception_handler=delete_dict.get(
-                    'exception_handler') or default_exception_handler,
-                access_checker=delete_dict.get('access_checker') or default_access_checker)
-            delete_url = delete_dict.get('url', None) or "/%s/<_id>" % base_url
+                    edk.EXCEPTION_HANDLER) or default_exception_handler,
+                access_checker=delete_dict.get(edk.ACCESS_CHECKER) or default_access_checker)
+            delete_url = delete_dict.get(edk.URL, None) or "/%s/<_id>" % base_url
             app_or_bp.route(
                 delete_url, methods=['DELETE'], endpoint='delete_%s' % resource_name)(
                 delete_func)
-            views[_model_name]['delete'] = {'url': delete_url}
+            views[_model_name]['delete'] = {edk.URL: delete_url}
 
         if 'batch_save' in permitted_actions:
             batch_save_dict = view_dict_for_model.get('batch_save', {})
-            if callable(batch_save_dict.get('input_schema_modifier')):
-                batch_save_input_schema = batch_save_dict['input_schema_modifier'](
+            if callable(batch_save_dict.get(edk.INPUT_SCHEMA_MODIFIER)):
+                batch_save_input_schema = batch_save_dict[edk.INPUT_SCHEMA_MODIFIER](
                     deepcopy(model_default_input_schema))
             else:
                 batch_save_input_schema = model_default_input_schema
-            batch_save_func = batch_save_dict.get('view_func', None) or construct_batch_save_view_function(
+            batch_save_func = batch_save_dict.get(edk.VIEW_FUNC, None) or construct_batch_save_view_function(
                 _model, batch_save_input_schema,
                 app_or_bp=app_or_bp,
                 registration_dict=registration_dict,
@@ -1212,17 +1212,17 @@ def register_crud_routes_for_models(
                 unique_identifier_fields=batch_save_dict.get(
                     'unique_identifier_fields'),
                 dict_struct=batch_save_dict.get(
-                    'dict_struct') or dict_struct_for_model,
+                    edk.RESPONSE_DICT_STRUCT) or dict_struct_for_model,
                 allow_unknown_fields=allow_unknown_fields,
                 query_constructor=batch_save_dict.get(
-                    'query_constructor') or default_query_constructor,
+                    edk.QUERY_MODIFIER) or default_query_constructor,
                 schemas_registry=schemas_registry,
                 exception_handler=batch_save_dict.get(
-                    'exception_handler') or default_exception_handler,
+                    edk.EXCEPTION_HANDLER) or default_exception_handler,
                 tmp_folder_path=tmp_folder_path,
                 fields_forbidden_from_being_set=union([
                     fields_forbidden_from_being_set_for_all_views,
-                    batch_save_dict.get('fields_forbidden_from_being_set', [])]),
+                    batch_save_dict.get(edk.NON_SETTABLE_FIELDS, [])]),
                 celery_worker=celery_worker,
                 result_saving_instance_model=batch_save_dict.get(
                     'result_saving_instance_model'),
@@ -1230,13 +1230,13 @@ def register_crud_routes_for_models(
                     'result_saving_instance_getter'),
                 run_as_async_task=batch_save_dict.get('run_as_async_task', False))
             batch_save_url = batch_save_dict.get(
-                'url', None) or "/batch-save/%s" % base_url
+                edk.URL, None) or "/batch-save/%s" % base_url
             app_or_bp.route(
                 batch_save_url, methods=['POST'], endpoint='batch_save_%s' % resource_name)(
                 batch_save_func)
-            views[_model_name]['batch_save'] = {'url': batch_save_url}
-            if 'input_schema_modifier' in batch_save_dict:
-                views[_model_name]['batch_save']['input_schema'] = batch_save_dict['input_schema_modifier'](
+            views[_model_name]['batch_save'] = {edk.URL: batch_save_url}
+            if edk.INPUT_SCHEMA_MODIFIER in batch_save_dict:
+                views[_model_name]['batch_save']['input_schema'] = batch_save_dict[edk.INPUT_SCHEMA_MODIFIER](
                     deepcopy(model_schemas[_model.__name__]['input_schema']))
 
     if register_schema_definition:
@@ -1254,7 +1254,7 @@ def register_crud_routes_for_models(
         def views_map():
             return Response(
                 json.dumps(
-                    app_or_bp.registered_models_and_crud_routes['views'],
+                    app_or_bp.registered_models_and_crud_routes[edk.OPERATION_MODIFIERS],
                     default=json_encoder, sort_keys=True),
                 200, mimetype='application/json')
         if cache_handler:
