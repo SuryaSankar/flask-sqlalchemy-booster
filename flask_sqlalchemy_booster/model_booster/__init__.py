@@ -2,7 +2,7 @@ from __future__ import absolute_import
 from flask_sqlalchemy import Model
 from sqlalchemy.ext.associationproxy import AssociationProxy, AssociationProxyInstance
 from sqlalchemy.orm import class_mapper
-from toolspy import all_subclasses
+from toolspy import all_subclasses, union
 from ..query_booster import QueryBooster
 from .queryable_mixin import QueryableMixin
 from .dictizable_mixin import DictizableMixin
@@ -66,6 +66,12 @@ class ModelBooster(Model, QueryableMixin, DictizableMixin):
     def property_keys(cls):
         return [k for k in cls.all_keys() if k not in cls.internal_keys() and isinstance(
             getattr(cls, k), property)]
+
+    @classmethod
+    def props_rels_and_assoc_proxies(cls):
+        return union([
+            cls.property_keys(), cls.relationship_keys(), cls.association_proxy_keys()
+        ])
 
     @classmethod
     def association_proxy_keys(cls, include_parent_classes=True):
