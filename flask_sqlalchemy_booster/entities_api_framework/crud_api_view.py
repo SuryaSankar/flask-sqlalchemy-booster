@@ -14,7 +14,7 @@ import csv
 import traceback
 from . import entity_definition_keys as edk
 
-from .responses import (
+from ..responses import (
     as_dict, get_request_json, get_request_args,
     process_args_and_render_json_list, success_json, error_json,
     render_json_obj_with_requested_structure,
@@ -23,7 +23,7 @@ from .responses import (
     _serializable_params, serializable_obj, as_json,
     process_args_and_fetch_rows, convert_result_to_response)
 
-from .utils import remove_empty_values_in_dict, save_file_from_request, convert_to_proper_types
+from ..utils import remove_empty_values_in_dict, save_file_from_request, convert_to_proper_types
 
 from werkzeug.exceptions import Unauthorized
 from six.moves import zip
@@ -957,8 +957,8 @@ def register_crud_routes_for_models(
         enable_caching = _model_dict.get(
             edk.ENABLE_CACHING, False) and cache_handler is not None
         cache_timeout = _model_dict.get(edk.CACHE_TIMEOUT)
-        resource_name = _model_dict.get(
-            'resource_name') or _model.__tablename__
+        endpoint_slug = _model_dict.get(
+            edk.ENDPOINT_SLUG) or _model.__tablename__
 
         if _model_name not in app_or_bp.registered_models_and_crud_routes["models_registered_for_views"]:
             app_or_bp.registered_models_and_crud_routes["models_registered_for_views"].append(
@@ -1011,7 +1011,7 @@ def register_crud_routes_for_models(
                 default_per_page=index_dict.get('default_per_page'))
             index_url = index_dict.get(edk.URL, None) or "/%s" % base_url
             app_or_bp.route(
-                index_url, methods=['GET'], endpoint='index_%s' % resource_name)(
+                index_url, methods=['GET'], endpoint='index_%s' % endpoint_slug)(
                 index_func)
             views[_model_name][edk.INDEX] = {edk.URL: index_url}
 
@@ -1041,7 +1041,7 @@ def register_crud_routes_for_models(
                 dict_post_processors=get_dict.get(edk.RESPONSE_DICT_MODIFIERS) or default_dict_post_processors)
             get_url = get_dict.get(edk.URL, None) or '/%s/<_id>' % base_url
             app_or_bp.route(
-                get_url, methods=['GET'], endpoint='get_%s' % resource_name)(
+                get_url, methods=['GET'], endpoint='get_%s' % endpoint_slug)(
                 get_func)
             views[_model_name]['get'] = {edk.URL: get_url}
 
@@ -1081,7 +1081,7 @@ def register_crud_routes_for_models(
                     post_dict.get(edk.NON_SETTABLE_FIELDS, [])]))
             post_url = post_dict.get(edk.URL, None) or "/%s" % base_url
             app_or_bp.route(
-                post_url, methods=['POST'], endpoint='post_%s' % resource_name)(
+                post_url, methods=['POST'], endpoint='post_%s' % endpoint_slug)(
                 post_func)
             views[_model_name]['post'] = {edk.URL: post_url}
             if edk.INPUT_SCHEMA_MODIFIER in post_dict:
@@ -1128,7 +1128,7 @@ def register_crud_routes_for_models(
                     put_dict.get(edk.NON_SETTABLE_FIELDS, [])]))
             put_url = put_dict.get(edk.URL, None) or "/%s/<_id>" % base_url
             app_or_bp.route(
-                put_url, methods=['PUT'], endpoint='put_%s' % resource_name)(
+                put_url, methods=['PUT'], endpoint='put_%s' % endpoint_slug)(
                 put_func)
             views[_model_name]['put'] = {edk.URL: put_url}
             if edk.INPUT_SCHEMA_MODIFIER in put_dict:
@@ -1159,7 +1159,7 @@ def register_crud_routes_for_models(
                 dict_struct=patch_dict.get(edk.RESPONSE_DICT_STRUCT) or dict_struct_for_model)
             patch_url = patch_dict.get(edk.URL, None) or "/%s/<_id>" % base_url
             app_or_bp.route(
-                patch_url, methods=['PATCH'], endpoint='patch_%s' % resource_name)(
+                patch_url, methods=['PATCH'], endpoint='patch_%s' % endpoint_slug)(
                 patch_func)
             views[_model_name]['patch'] = {edk.URL: patch_url}
             if edk.INPUT_SCHEMA_MODIFIER in patch_dict:
@@ -1182,7 +1182,7 @@ def register_crud_routes_for_models(
                 access_checker=delete_dict.get(edk.ACCESS_CHECKER) or default_access_checker)
             delete_url = delete_dict.get(edk.URL, None) or "/%s/<_id>" % base_url
             app_or_bp.route(
-                delete_url, methods=['DELETE'], endpoint='delete_%s' % resource_name)(
+                delete_url, methods=['DELETE'], endpoint='delete_%s' % endpoint_slug)(
                 delete_func)
             views[_model_name]['delete'] = {edk.URL: delete_url}
 
@@ -1232,7 +1232,7 @@ def register_crud_routes_for_models(
             batch_save_url = batch_save_dict.get(
                 edk.URL, None) or "/batch-save/%s" % base_url
             app_or_bp.route(
-                batch_save_url, methods=['POST'], endpoint='batch_save_%s' % resource_name)(
+                batch_save_url, methods=['POST'], endpoint='batch_save_%s' % endpoint_slug)(
                 batch_save_func)
             views[_model_name]['batch_save'] = {edk.URL: batch_save_url}
             if edk.INPUT_SCHEMA_MODIFIER in batch_save_dict:
