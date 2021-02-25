@@ -311,7 +311,7 @@ class BatchSave(EntityOperation):
 
 class Entity(object):
     def __init__(
-            self, url_slug=None, model_class=None, name=None, entity_set=None, permitted_operations=None, 
+            self, url_slug=None, model_class=None, name=None, entities_group=None, permitted_operations=None, 
             forbidden_operations=None, endpoint_slug=None,
             query_modifier=None, access_checker=None, exception_handler=None, response_dict_modifiers=None,
             id_attr=None, response_dict_struct=None, non_settable_fields=None, settable_fields=None,
@@ -319,7 +319,11 @@ class Entity(object):
             remove_property_keys_before_validation=False, enable_caching=False, cache_timeout=None):
         self.model_class = model_class
         self.name = name or self.model_class.__name__
-        self.entity_set = entity_set
+        self.entities_group = entities_group
+        if self.entities_group:
+            if self not in self.entities_group.entities:
+                self.entities_group.entities.append(self)
+                self.entities_map[self.name] = self
         self.url_slug = url_slug
         self.permitted_operations = permitted_operations
         self.forbidden_operations = forbidden_operations
@@ -364,7 +368,6 @@ class Entity(object):
 
 
 class EntitiesGroup(object):
-    all_operations = ['index', 'get', 'post', 'put', 'patch', 'delete', 'batch_save']
 
     def __init__(self,
         app_or_bp=None, allow_unknown_fields=False, 
@@ -385,6 +388,10 @@ class EntitiesGroup(object):
             }
         }
         self.entities = entities
+        self.entities_map = {}
+        for entity in self.entities:
+            entity.entity_group = self
+            self.entities_map[entity.name] = entity
         self.allow_unknown_fields = allow_unknown_fields
         self.cache_handler = cache_handler
         self.exception_handler = exception_handler
@@ -396,9 +403,32 @@ class EntitiesGroup(object):
         self.register_views_map = register_views_map
         self.schema_def_url = schema_def_url
         self.views_map_url = views_map_url
+        self.registry = {}
         if app_or_bp:
             self.initialize(app_or_bp, register_routes=register_routes)
 
+    def add_entity(self, entity):
+        if entity not in self.entities:
+            self.entities.append(entity)
+        entity.entity_group = self
+        self.entities_map[entity.name] = entity
+
+    def get_entity(self, entity_name):
+        return self.entities_map.get(entity_name)
+
+    def get_registry_entry(self, app_or_bp, url_prefix):
+        return self.registry.get((app_or_bp, url_prefix))
+
+    def initialize_registry_entry(self, app_or_bp, url_prefix):
+            self.registry[(app_or_bp, url_prefix)] = {
+                "models_registered_for_views": [],
+                "model_schemas": {
+
+                },
+                edk.OPERATION_MODIFIERS: {
+
+                }
+            }
     def initialize(self, app_or_bp, register_routes=True):
         self.app_or_bp = app_or_bp
         if register_routes:
@@ -425,7 +455,7 @@ class EntitiesGroup(object):
 
 
     def register_crud_routes(
-            self, app_or_bp, registration_dict, register_schema_structure=True,
+            self, app_or_bp, url_prefix=None,
             allow_unknown_fields=False, cache_handler=None, exception_handler=None,
             tmp_folder_path="/tmp", permitted_operations=None,
             forbidden_operations=None, celery_worker=None,
@@ -434,17 +464,11 @@ class EntitiesGroup(object):
 
         all_operations = [Index, Get, Post, Put, Patch, Delete, BatchSave]
 
-        if not hasattr(app_or_bp, "registered_models_and_crud_routes"):
-            app_or_bp.registered_models_and_crud_routes = {
-                "models_registered_for_views": [],
-                "model_schemas": {
+        if self.get_registry_entry(app_or_bp, url_prefix) is None:
+            self.initialize_registry_entry(app_or_bp, url_prefix)
+        registry = self.get_registry_entry(app_or_bp, url_prefix)
 
-                },
-                edk.OPERATION_MODIFIERS: {
-
-                }
-            }
-        model_schemas = app_or_bp.registered_models_and_crud_routes["model_schemas"]
+        model_schemas = registry["model_schemas"]
 
         def populate_model_schema(entity):
             if entity.model_class._input_data_schema_:
@@ -503,8 +527,8 @@ class EntitiesGroup(object):
             cache_timeout = entity.cache_timeout
             endpoint_slug = entity.endpoint_slug or _model.__tablename__
 
-            if _model_name not in app_or_bp.registered_models_and_crud_routes["models_registered_for_views"]:
-                app_or_bp.registered_models_and_crud_routes["models_registered_for_views"].append(
+            if _model_name not in registry["models_registered_for_views"]:
+                registry["models_registered_for_views"].append(
                     _model_name)
             if _model_name not in model_schemas:
                 populate_model_schema(entity)
@@ -513,11 +537,11 @@ class EntitiesGroup(object):
                 model_default_input_schema = deepcopy(_model._input_data_schema_)
             else:
                 model_default_input_schema = _model.generate_input_data_schema()
-            if callable(registration_dict[_model].get(edk.INPUT_SCHEMA_MODIFIER)):
-                model_default_input_schema = registration_dict[_model][edk.INPUT_SCHEMA_MODIFIER](
+            if callable(entity.input_schema_modifier):
+                model_default_input_schema = entity.input_schema_modifier(
                     model_default_input_schema)
 
-            views = app_or_bp.registered_models_and_crud_routes[edk.OPERATION_MODIFIERS]
+            views = registry[edk.OPERATION_MODIFIERS]
             schemas_registry = {k: v.get('input_schema')
                                 for k, v in list(model_schemas.items())}
             if _model_name not in views:
@@ -560,7 +584,7 @@ class EntitiesGroup(object):
                 cache_key_determiner = get_op.cache_handler
                 cache_timeout = get_op.cache_timeout or cache_timeout
                 get_func = get_op.view_func or construct_get_view_function(
-                    _model, registration_dict,
+                    _model,
                     permitted_object_getter=get_op.permitted_object_getter or entity.permitted_object_getter,
                     get_query_creator=get_op.query_modifier or default_query_constructor,
                     dict_struct=get_op.response_dict_struct or dict_struct_for_model,
@@ -586,7 +610,7 @@ class EntitiesGroup(object):
                     post_input_schema = model_default_input_schema
                 post_func = post_op.view_func or construct_post_view_function(
                     _model, post_input_schema,
-                    registration_dict=registration_dict,
+                    entities_group=self,
                     pre_processors=post_op.before_save_handlers,
                     post_processors=post_op.after_save_handlers,
                     schemas_registry=schemas_registry,
@@ -626,7 +650,7 @@ class EntitiesGroup(object):
                     put_input_schema = model_default_input_schema
                 put_func = put_op.view_func or construct_put_view_function(
                     _model, put_input_schema,
-                    registration_dict=registration_dict,
+                    entities_group=self,
                     permitted_object_getter=put_op.permitted_object_getter or entity.permitted_object_getter,
                     pre_processors=put_op.before_save_handlers,
                     post_processors=post_op.after_save_handlers,
@@ -692,7 +716,6 @@ class EntitiesGroup(object):
                     _model,
                     query_constructor=delete_op.query_modifier or default_query_constructor,
                     pre_processors=delete_op.before_save_handlers,
-                    registration_dict=registration_dict,
                     permitted_object_getter=delete_op.permitted_object_getter or entity.permitted_object_getter,
                     post_processors=delete_op.after_save_handlers,
                     exception_handler=delete_op.exception_handler or default_exception_handler,
@@ -713,7 +736,6 @@ class EntitiesGroup(object):
                 batch_save_func = batch_save_op.view_func or construct_batch_save_view_function(
                     _model, batch_save_input_schema,
                     app_or_bp=app_or_bp,
-                    registration_dict=registration_dict,
                     pre_processors_for_post=fetch_nested_key(entity, 'post.before_save_handlers'),
                     pre_processors_for_put=fetch_nested_key(entity, 'put.before_save_handlers'),
                     post_processors_for_post=fetch_nested_key(entity, 'post.after_save_handlers'),
@@ -749,7 +771,7 @@ class EntitiesGroup(object):
             def schema_def():
                 return Response(
                     json.dumps(
-                        app_or_bp.registered_models_and_crud_routes,
+                        registry,
                         default=json_encoder, sort_keys=True),
                     200, mimetype='application/json')
             if cache_handler:
@@ -760,7 +782,7 @@ class EntitiesGroup(object):
             def views_map():
                 return Response(
                     json.dumps(
-                        app_or_bp.registered_models_and_crud_routes[edk.OPERATION_MODIFIERS],
+                        registry[edk.OPERATION_MODIFIERS],
                         default=json_encoder, sort_keys=True),
                     200, mimetype='application/json')
             if cache_handler:
