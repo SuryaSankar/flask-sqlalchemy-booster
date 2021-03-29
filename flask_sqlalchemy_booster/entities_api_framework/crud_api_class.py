@@ -17,8 +17,11 @@ from copy import deepcopy
 
 class EntityOperation(object):
     def __init__(self, entity):
+        self.init_entity(entity)
+
+    def init_entity(self, entity):
         self.entity = entity
-        self.entity_group = entity.entity_group
+        self.entity_group = entity.entity_group       
 
     def to_dict(self):
         raise NotImplementedError
@@ -28,11 +31,11 @@ class Get(EntityOperation):
     method = 'get'
 
     def __init__(
-            self, entity, url=None, enable_caching=False, cache_key_determiner=None,
+            self, entity=None, url=None, enable_caching=False, cache_key_determiner=None,
             cache_timeout=None, view_function=None, query_modifier=None,
             permitted_object_getter=None, id_attr=None, response_dict_struct=None,
             response_dict_modifiers=None, exception_handler=None, access_checker=None):
-        super(Get, self).__init__(entity)
+        super(Get, self).__init__(entity=entity)
         self.url = url
         self.enable_caching = enable_caching
         self.cache_key_determiner = cache_key_determiner
@@ -67,13 +70,13 @@ class Index(EntityOperation):
     method = 'index'
 
     def __init__(
-            self, entity, url=None, view_function=None, enable_caching=None,
+            self, entity=None, url=None, view_function=None, enable_caching=None,
             cache_key_determiner=None, cache_timeout=None, query_modifier=None,
             response_dict_struct=None, custom_response_creator=None,
             exception_handler=None, access_checker=None,
             default_limit=None, default_sort=None, default_orderby=None,
             default_offset=None, default_page=None, default_per_page=None):
-        super(Index, self).__init__(entity)
+        super(Index, self).__init__(entity=entity)
         self.url = url
         self.view_function = view_function
         self.enable_caching = enable_caching
@@ -117,12 +120,12 @@ class Post(EntityOperation):
     method = 'post'
 
     def __init__(
-            self, entity, url=None, view_function=None, before_save=None, after_save=None,
+            self, entity=None, url=None, view_function=None, before_save=None, after_save=None,
             response_dict_struct=None, exception_handler=None, access_checker=None,
             settable_fields=None, non_settable_fields=None,
             remove_property_keys_before_validation=False, remove_relationship_keys_before_validation=False,
             remove_assoc_proxy_keys_before_validation=False, input_schema_modifier=None):
-        super(Post, self).__init__(entity)
+        super(Post, self).__init__(entity=entity)
         self.url = url
         self.view_function = view_function
         self.before_save = before_save
@@ -160,14 +163,14 @@ class Put(EntityOperation):
     method = 'put'
 
     def __init__(
-            self, entity, url=None, view_function=None,query_modifier=None,
+            self, entity=None, url=None, view_function=None,query_modifier=None,
             permitted_object_getter=None,
             before_save=None, after_save=None,
             response_dict_struct=None, exception_handler=None, access_checker=None,
             settable_fields=None, non_settable_fields=None,
             remove_property_keys_before_validation=False, remove_relationship_keys_before_validation=False,
             remove_assoc_proxy_keys_before_validation=False, input_schema_modifier=None):
-        super(Put, self).__init__(entity)
+        super(Put, self).__init__(entity=entity)
         self.url = url
         self.view_function = view_function
         self.query_modifier = query_modifier
@@ -210,13 +213,13 @@ class Patch(EntityOperation):
     method = 'patch'
 
     def __init__(
-            self, entity, url=None, view_function=None, query_modifier=None,
+            self, entity=None, url=None, view_function=None, query_modifier=None,
             command_processors=None, before_save=None, after_save=None,
             response_dict_struct=None, exception_handler=None, access_checker=None,
             settable_fields=None, non_settable_fields=None,
             remove_property_keys_before_validation=False, remove_relationship_keys_before_validation=False,
             remove_assoc_proxy_keys_before_validation=False, input_schema_modifier=None):
-        super(Patch, self).__init__(entity)
+        super(Patch, self).__init__(entity=entity)
         self.url = url
         self.view_function = view_function
         self.query_modifier = query_modifier
@@ -257,14 +260,14 @@ class Delete(EntityOperation):
     method = 'delete'
 
     def __init__(
-            self, entity, url=None, view_function=None, query_modifier=None,
+            self, entity=None, url=None, view_function=None, query_modifier=None,
             permitted_object_getter=None,
             before_save=None, after_save=None,
             response_dict_struct=None, exception_handler=None, access_checker=None,
             settable_fields=None, non_settable_fields=None,
             remove_property_keys_before_validation=False, remove_relationship_keys_before_validation=False,
             remove_assoc_proxy_keys_before_validation=False, input_schema_modifier=None):
-        super(Delete, self).__init__(entity)
+        super(Delete, self).__init__(entity=entity)
         self.url = url
         self.view_function = view_function
         self.query_modifier = query_modifier
@@ -305,8 +308,30 @@ class BatchSave(EntityOperation):
 
     method = 'batch_save'
 
-    def __init__(self, entity):
-        super(BatchSave, self).__init__(entity)
+    def __init__(
+            self, entity=None, url=None, view_function=None, query_modifier=None,
+            permitted_object_getter=None,
+            before_save=None, after_save=None,
+            response_dict_struct=None, exception_handler=None, access_checker=None,
+            settable_fields=None, non_settable_fields=None,
+            remove_property_keys_before_validation=False, remove_relationship_keys_before_validation=False,
+            remove_assoc_proxy_keys_before_validation=False, input_schema_modifier=None):
+        super(BatchSave, self).__init__(entity=entity)
+        self.url = url
+        self.view_function = view_function
+        self.query_modifier = query_modifier
+        self.permitted_object_getter = permitted_object_getter
+        self.before_save = before_save
+        self.after_save = after_save
+        self.response_dict_struct = response_dict_struct
+        self.exception_handler = exception_handler
+        self.access_checker = access_checker
+        self.settable_fields = settable_fields
+        self.non_settable_fields = non_settable_fields
+        self.remove_property_keys_before_validation = remove_property_keys_before_validation
+        self.remove_relationship_keys_before_validation = remove_relationship_keys_before_validation
+        self.remove_assoc_proxy_keys_before_validation = remove_assoc_proxy_keys_before_validation
+        self.input_schema_modifier = input_schema_modifier
 
 
 class Entity(object):
@@ -316,7 +341,8 @@ class Entity(object):
             query_modifier=None, access_checker=None, exception_handler=None, response_dict_modifiers=None,
             id_attr=None, response_dict_struct=None, non_settable_fields=None, settable_fields=None,
             remove_relationship_keys_before_validation=False, remove_assoc_proxy_keys_before_validation=False,
-            remove_property_keys_before_validation=False, enable_caching=False, cache_timeout=None):
+            remove_property_keys_before_validation=False, enable_caching=False, cache_timeout=None,
+            get=None, index=None, put=None, post=None, patch=None, delete=None, batch_save=None):
         self.model_class = model_class
         self.name = name or self.model_class.__name__
         self.entities_group = entities_group
@@ -342,7 +368,41 @@ class Entity(object):
         self.remove_assoc_proxy_keys_before_validation = remove_assoc_proxy_keys_before_validation
         self.remove_property_keys_before_validation = remove_property_keys_before_validation
 
+        if get:
+            self.get = get
+            if self.get.entity is None:
+                self.get.init_entity(self)
 
+        if index:
+            self.index = index
+            if self.index.entity is None:
+                self.index.init_entity(self)
+
+        if post:
+            self.post = post
+            if self.post.entity is None:
+                self.post.init_entity(self)
+
+        if put:
+            self.put = put
+            if self.put.entity is None:
+                self.put.init_entity(self)
+
+        if delete:
+            self.delete = delete
+            if self.delete.entity is None:
+                self.delete.init_entity(self)
+
+        if patch:
+            self.patch = patch
+            if self.patch.entity is None:
+                self.patch.init_entity(self)
+
+        if batch_save:
+            self.batch_save = batch_save
+            if self.batch_save.entity is None:
+                self.batch_save.init_entity(self)
+    
 
     def to_dict(self):
         return transform_dict({
@@ -457,12 +517,9 @@ class EntitiesGroup(object):
     def register_crud_routes(
             self, app_or_bp, url_prefix=None,
             allow_unknown_fields=False, cache_handler=None, exception_handler=None,
-            tmp_folder_path="/tmp", permitted_operations=None,
-            forbidden_operations=None, celery_worker=None,
+            tmp_folder_path="/tmp", celery_worker=None,
             register_schema_definition=False, register_views_map=False,
             schema_def_url='/schema-def', views_map_url='/views-map'):
-
-        all_operations = [Index, Get, Post, Put, Patch, Delete, BatchSave]
 
         if self.get_registry_entry(app_or_bp, url_prefix) is None:
             self.initialize_registry_entry(app_or_bp, url_prefix)
@@ -499,19 +556,6 @@ class EntitiesGroup(object):
             base_url = entity.url_slug
             # base_url = _model_dict.get(edk.URL_SLUG)
 
-            if entity.permitted_operations:
-                permitted_actions = entity.permitted_operations
-            elif entity.forbidden_operations:
-                permitted_actions = difference(
-                    all_operations, entity.forbidden_operations)
-            elif permitted_operations is not None:
-                permitted_actions = permitted_operations
-            elif forbidden_operations is not None:
-                permitted_actions = difference(
-                    all_operations, forbidden_operations)
-            else:
-                permitted_actions = all_operations
-
             default_query_constructor = entity.query_modifier
             default_access_checker = entity.access_checker
             default_exception_handler = entity.exception_handler or exception_handler
@@ -547,8 +591,8 @@ class EntitiesGroup(object):
             if _model_name not in views:
                 views[_model_name] = {}
 
-            if Index in permitted_actions:
-                index_op = entity.index or Index(entity=entity)
+            if entity.index:
+                index_op = entity.index
                 if index_op.enable_caching is not None:
                     enable_caching = index_op.enable_caching and cache_handler is not None
                 cache_key_determiner = index_op.cache_key_determiner
@@ -577,8 +621,8 @@ class EntitiesGroup(object):
                     index_func)
                 views[_model_name][edk.INDEX] = {edk.URL: index_url}
 
-            if Get in permitted_actions:
-                get_op = entity.get or Get(entity=entity)
+            if entity.get:
+                get_op = entity.get
                 if get_op.enable_caching is not None:
                     enable_caching = get_op.enable_caching and cache_handler is not None
                 cache_key_determiner = get_op.cache_handler
@@ -601,8 +645,8 @@ class EntitiesGroup(object):
                     get_func)
                 views[_model_name]['get'] = {edk.URL: get_url}
 
-            if Post in permitted_actions:
-                post_op = entity.post or Post(entity=entity)
+            if entity.post:
+                post_op = entity.post
                 if callable(post_op.input_schema_modifier):
                     post_input_schema = post_op.input_schema_modifier(
                         deepcopy(model_default_input_schema))
@@ -641,8 +685,8 @@ class EntitiesGroup(object):
                     views[_model_name]['post']['input_schema'] = post_op.input_schema_modifier(
                         deepcopy(model_schemas[_model.__name__]['input_schema']))
 
-            if Put in permitted_actions:
-                put_op = entity.put or Put(entity=entity)
+            if entity.put:
+                put_op = entity.put
                 if callable(put_op.input_schema_modifier):
                     put_input_schema = put_op.input_schema_modifier(
                         deepcopy(model_default_input_schema))
@@ -683,8 +727,8 @@ class EntitiesGroup(object):
                     views[_model_name]['put']['input_schema'] = put_op.input_schema_modifier(
                         deepcopy(model_schemas[_model.__name__]['input_schema']))
 
-            if Patch in permitted_actions:
-                patch_op = entity.patch or Patch(entity=entity)
+            if entity.patch:
+                patch_op = entity.patch
                 if callable(patch_op.input_schema_modifier):
                     patch_input_schema = patch_op.input_schema_modifier(
                         deepcopy(model_default_input_schema))
@@ -710,8 +754,8 @@ class EntitiesGroup(object):
                     views[_model_name]['patch']['input_schema'] = patch_op.input_schema_modifier(
                         deepcopy(model_schemas[_model.__name__]['input_schema']))
 
-            if Delete in permitted_actions:
-                delete_op = entity.delete or Delete(entity=entity)
+            if entity.delete:
+                delete_op = entity.delete
                 delete_func = delete_op.view_func or construct_delete_view_function(
                     _model,
                     query_constructor=delete_op.query_modifier or default_query_constructor,
@@ -726,8 +770,8 @@ class EntitiesGroup(object):
                     delete_func)
                 views[_model_name]['delete'] = {edk.URL: delete_url}
 
-            if BatchSave in permitted_actions:
-                batch_save_op = entity.batch_save or BatchSave(entity=entity)
+            if entity.batch_save:
+                batch_save_op = entity.batch_save
                 if callable(batch_save_op.input_schema_modifier):
                     batch_save_input_schema = batch_save_op.input_schema_modifier(
                         deepcopy(model_default_input_schema))
