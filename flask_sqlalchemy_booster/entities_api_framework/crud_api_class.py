@@ -4,7 +4,7 @@ from schemalite.core import json_encoder
 
 
 from .crud_api_view import (
-    register_crud_routes_for_models, construct_get_view_function,
+    construct_get_view_function,
     construct_index_view_function, construct_post_view_function,
     construct_put_view_function, construct_delete_view_function,
     construct_patch_view_function, construct_batch_save_view_function)
