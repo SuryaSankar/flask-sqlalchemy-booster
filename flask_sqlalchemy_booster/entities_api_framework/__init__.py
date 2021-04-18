@@ -1,1 +1,1 @@
-from .crud_api_class import EntitiesGroup, Entity, Get, Index, Post, Put, Patch, Delete, BatchSave
+from .crud_api_class import EntitiesRouter, Entity, Get, Index, Post, Put, Patch, Delete, BatchSave

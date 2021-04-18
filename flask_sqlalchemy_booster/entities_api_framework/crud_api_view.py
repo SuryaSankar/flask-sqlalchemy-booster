@@ -459,7 +459,7 @@ def construct_put_view_function(
 def construct_patch_view_function(model_class, schema, pre_processors=None,
                                   query_constructor=None, schemas_registry=None,
                                   exception_handler=None, permitted_object_getter=None,
-                                  processors=None, post_processors=None, access_checker=None,
+                                  commands=None, post_processors=None, access_checker=None,
                                   dict_struct=None):
     def patch(_id):
         try:
@@ -482,29 +482,36 @@ def construct_patch_view_function(model_class, schema, pre_processors=None,
                 for processor in pre_processors:
                     if callable(processor):
                         processor(obj)
-            if processors:
-                updated_obj = obj
-                for processor in processors:
-                    if callable(processor):
-                        updated_obj = processor(updated_obj, request_json)
-                        if isinstance(updated_obj, Response):
-                            return updated_obj
+            cmd = request_json.get('cmd')
+            if cmd in commands and callable(commands[cmd]):
+                updated_obj = commands[cmd](obj, request_json)
+                if isinstance(updated_obj, Response):
+                    return updated_obj
+            # if processors:
+            #     updated_obj = obj
+            #     for processor in processors:
+            #         if callable(processor):
+            #             updated_obj = processor(updated_obj, request_json)
+            #             if isinstance(updated_obj, Response):
+            #                 return updated_obj
 
-            else:
-                polymorphic_field = schema.get('polymorphic_on')
-                if polymorphic_field:
-                    if polymorphic_field not in request_json:
-                        # Why is this being done only on patch? If polymorphic objects can be handled by put, why cant they be handled in patch without setting the discriminator?
-                        request_json[polymorphic_field] = getattr(
-                            obj, polymorphic_field)
-                is_valid, errors = validate_dict(
-                    request_json, schema, allow_required_fields_to_be_skipped=True,
-                    context={"existing_instance": obj,
-                             "model_class": model_class},
-                    schemas_registry=schemas_registry)
-                if not is_valid:
-                    return error_json(400, errors)
-                updated_obj = obj.update(**request_json)
+            # else:
+            #     polymorphic_field = schema.get('polymorphic_on')
+            #     if polymorphic_field:
+            #         if polymorphic_field not in request_json:
+            #             # Why is this being done only on patch? 
+            #             # If polymorphic objects can be handled by put, 
+            #             # why cant they be handled in patch without setting the discriminator?
+            #             request_json[polymorphic_field] = getattr(
+            #                 obj, polymorphic_field)
+            #     is_valid, errors = validate_dict(
+            #         request_json, schema, allow_required_fields_to_be_skipped=True,
+            #         context={"existing_instance": obj,
+            #                  "model_class": model_class},
+            #         schemas_registry=schemas_registry)
+            #     if not is_valid:
+            #         return error_json(400, errors)
+            #     updated_obj = obj.update(**request_json)
 
             if post_processors is not None:
                 for processor in post_processors:

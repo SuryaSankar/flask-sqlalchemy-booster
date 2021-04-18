@@ -16,12 +16,11 @@ from copy import deepcopy
 
 
 class EntityOperation(object):
-    def __init__(self, entity):
+    def __init__(self, entity=None):
         self.init_entity(entity)
 
-    def init_entity(self, entity):
+    def init_entity(self, entity=None):
         self.entity = entity
-        self.entity_group = entity.entity_group       
 
     def to_dict(self):
         raise NotImplementedError
@@ -163,7 +162,8 @@ class Put(EntityOperation):
     method = 'put'
 
     def __init__(
-            self, entity=None, url=None, view_function=None,query_modifier=None,
+            self, entity=None, url=None, view_function=None,
+            query_modifier=None,
             permitted_object_getter=None,
             before_save=None, after_save=None,
             response_dict_struct=None, exception_handler=None, access_checker=None,
@@ -214,7 +214,8 @@ class Patch(EntityOperation):
 
     def __init__(
             self, entity=None, url=None, view_function=None, query_modifier=None,
-            command_processors=None, before_save=None, after_save=None,
+            commands=None, permitted_object_getter=None,
+            before_save=None, after_save=None,
             response_dict_struct=None, exception_handler=None, access_checker=None,
             settable_fields=None, non_settable_fields=None,
             remove_property_keys_before_validation=False, remove_relationship_keys_before_validation=False,
@@ -223,7 +224,8 @@ class Patch(EntityOperation):
         self.url = url
         self.view_function = view_function
         self.query_modifier = query_modifier
-        self.command_processors = command_processors
+        self.permitted_object_getter = permitted_object_getter
+        self.commands = commands
         self.before_save = before_save
         self.after_save = after_save
         self.response_dict_struct = response_dict_struct
@@ -310,19 +312,36 @@ class BatchSave(EntityOperation):
 
     def __init__(
             self, entity=None, url=None, view_function=None, query_modifier=None,
-            permitted_object_getter=None,
+            permitted_object_getter=None, unique_identifier_fields=None, 
             before_save=None, after_save=None,
+            extra_actions_before_save=None, extra_actions_after_save=None,
+            result_saving_instance_model=None,
+            result_saving_instance_getter=None,
+            run_as_async_task=False, celery_worker=None,
             response_dict_struct=None, exception_handler=None, access_checker=None,
             settable_fields=None, non_settable_fields=None,
             remove_property_keys_before_validation=False, remove_relationship_keys_before_validation=False,
-            remove_assoc_proxy_keys_before_validation=False, input_schema_modifier=None):
+            remove_assoc_proxy_keys_before_validation=False, input_schema_modifier=None,
+            update_only=False, create_only=False,
+            skip_pre_processors=False, skip_post_processors=False):
         super(BatchSave, self).__init__(entity=entity)
         self.url = url
         self.view_function = view_function
         self.query_modifier = query_modifier
         self.permitted_object_getter = permitted_object_getter
+        self.unique_identifier_fields = unique_identifier_fields
+        self.result_saving_instance_model = result_saving_instance_model
+        self.result_saving_instance_getter = result_saving_instance_getter
+        self.run_as_async_task = run_as_async_task
+        self.celery_worker = celery_worker
+        self.update_only = update_only
+        self.create_only = create_only
+        self.skip_pre_processors = skip_pre_processors
+        self.skip_post_processors = skip_post_processors
         self.before_save = before_save
         self.after_save = after_save
+        self.extra_actions_before_save = extra_actions_before_save
+        self.extra_actions_after_save = extra_actions_after_save
         self.response_dict_struct = response_dict_struct
         self.exception_handler = exception_handler
         self.access_checker = access_checker
@@ -336,8 +355,9 @@ class BatchSave(EntityOperation):
 
 class Entity(object):
     def __init__(
-            self, url_slug=None, model_class=None, name=None, entities_group=None, permitted_operations=None, 
-            forbidden_operations=None, endpoint_slug=None,
+            self, url_slug=None, model_class=None, name=None, router=None,
+            permitted_operations=None, permitted_object_getter=None,
+            forbidden_operations=None, endpoint_slug=None, input_schema_modifier=None,
             query_modifier=None, access_checker=None, exception_handler=None, response_dict_modifiers=None,
             id_attr=None, response_dict_struct=None, non_settable_fields=None, settable_fields=None,
             remove_relationship_keys_before_validation=False, remove_assoc_proxy_keys_before_validation=False,
@@ -345,15 +365,16 @@ class Entity(object):
             get=None, index=None, put=None, post=None, patch=None, delete=None, batch_save=None):
         self.model_class = model_class
         self.name = name or self.model_class.__name__
-        self.entities_group = entities_group
-        if self.entities_group:
-            if self not in self.entities_group.entities:
-                self.entities_group.entities.append(self)
-                self.entities_map[self.name] = self
+        self.router = router
+        if self.router:
+            if self not in self.router.routes:
+                self.router.routes[self.url_slug] = self
         self.url_slug = url_slug
+        self.permitted_object_getter = permitted_object_getter
         self.permitted_operations = permitted_operations
         self.forbidden_operations = forbidden_operations
         self.endpoint_slug = endpoint_slug
+        self.input_schema_modifier = input_schema_modifier
         self.query_modifier = query_modifier
         self.access_checker = access_checker
         self.exception_handler = exception_handler
@@ -368,40 +389,33 @@ class Entity(object):
         self.remove_assoc_proxy_keys_before_validation = remove_assoc_proxy_keys_before_validation
         self.remove_property_keys_before_validation = remove_property_keys_before_validation
 
-        if get:
-            self.get = get
-            if self.get.entity is None:
-                self.get.init_entity(self)
+        self.get = get
+        if self.get and self.get.entity is None:
+            self.get.init_entity(self)
 
-        if index:
-            self.index = index
-            if self.index.entity is None:
-                self.index.init_entity(self)
+        self.index = index
+        if self.index and self.index.entity is None:
+            self.index.init_entity(self)
 
-        if post:
-            self.post = post
-            if self.post.entity is None:
-                self.post.init_entity(self)
+        self.post = post
+        if self.post and self.post.entity is None:
+            self.post.init_entity(self)
 
-        if put:
-            self.put = put
-            if self.put.entity is None:
-                self.put.init_entity(self)
+        self.put = put
+        if self.put and self.put.entity is None:
+            self.put.init_entity(self)
 
-        if delete:
-            self.delete = delete
-            if self.delete.entity is None:
-                self.delete.init_entity(self)
+        self.delete = delete
+        if self.delete and self.delete.entity is None:
+            self.delete.init_entity(self)
 
-        if patch:
-            self.patch = patch
-            if self.patch.entity is None:
-                self.patch.init_entity(self)
+        self.patch = patch
+        if self.patch and self.patch.entity is None:
+            self.patch.init_entity(self)
 
-        if batch_save:
-            self.batch_save = batch_save
-            if self.batch_save.entity is None:
-                self.batch_save.init_entity(self)
+        self.batch_save = batch_save
+        if self.batch_save and self.batch_save.entity is None:
+            self.batch_save.init_entity(self)
     
 
     def to_dict(self):
@@ -427,16 +441,16 @@ class Entity(object):
 
 
 
-class EntitiesGroup(object):
+class EntitiesRouter(object):
 
     def __init__(self,
-        app_or_bp=None, allow_unknown_fields=False, 
+        mount_point=None, routes=None, allow_unknown_fields=False, 
         cache_handler=None, exception_handler=None,
         tmp_folder_path="/tmp", permitted_operations=None,
         forbidden_operations=None, celery_worker=None,
         register_schema_definition=False, register_views_map=False,
         schema_def_url='/schema-def', views_map_url='/views-map',
-        entities=None, register_routes=True
+        entities=None
     ):
         self.schema_definition = {
             "models_registered_for_views": [],
@@ -448,10 +462,12 @@ class EntitiesGroup(object):
             }
         }
         self.entities = entities
-        self.entities_map = {}
-        for entity in self.entities:
-            entity.entity_group = self
-            self.entities_map[entity.name] = entity
+        self.routes = routes or {}
+        for url_slug, entity in self.routes.items():
+            if entity.url_slug is None:
+                entity.url_slug = url_slug
+            if entity.router is None:
+                entity.router = self
         self.allow_unknown_fields = allow_unknown_fields
         self.cache_handler = cache_handler
         self.exception_handler = exception_handler
@@ -463,48 +479,36 @@ class EntitiesGroup(object):
         self.register_views_map = register_views_map
         self.schema_def_url = schema_def_url
         self.views_map_url = views_map_url
-        self.registry = {}
-        if app_or_bp:
-            self.initialize(app_or_bp, register_routes=register_routes)
+        # self.registry = {}
+        self.initialize_registry_entry()
+        if mount_point:
+            self.mount_point = mount_point
+            self.mount_on(self.mount_point)
 
-    def add_entity(self, entity):
-        if entity not in self.entities:
-            self.entities.append(entity)
-        entity.entity_group = self
-        self.entities_map[entity.name] = entity
+    def route(self, url_slug, entity):
+        self.routes[url_slug] = entity
+        if entity.url_slug is None:
+            entity.url_slug = url_slug
+        if entity.router is None:
+            entity.router = self
 
-    def get_entity(self, entity_name):
-        return self.entities_map.get(entity_name)
 
-    def get_registry_entry(self, app_or_bp, url_prefix):
-        return self.registry.get((app_or_bp, url_prefix))
+    def get_registry_entry(self):
+        return self.registry
 
-    def initialize_registry_entry(self, app_or_bp, url_prefix):
-            self.registry[(app_or_bp, url_prefix)] = {
-                "models_registered_for_views": [],
-                "model_schemas": {
+    def initialize_registry_entry(self):
+        self.registry = {
+            "models_registered_for_views": [],
+            "model_schemas": {
 
-                },
-                edk.OPERATION_MODIFIERS: {
+            },
+            edk.OPERATION_MODIFIERS: {
 
-                }
             }
-    def initialize(self, app_or_bp, register_routes=True):
-        self.app_or_bp = app_or_bp
-        if register_routes:
-            # self.register_routes(self.app_or_bp)
-            self.register_crud_routes(self.app_or_bp)
-
-    def register_routes(self, app_or_bp=None):
-        register_crud_routes_for_models(
-            app_or_bp or self.app_or_bp, self.to_dict(),
-            allow_unknown_fields=self.allow_unknown_fields, cache_handler=self.cache_handler, 
-            exception_handler=self.exception_handler, tmp_folder_path=self.tmp_folder_path,
-            permitted_operations=self.permitted_operations, forbidden_operations=self.forbidden_operations, 
-            celery_worker=self.celery_worker, register_schema_definition=self.register_schema_definition,
-            register_views_map=self.register_views_map,
-            schema_def_url=self.schema_def_url, views_map_url=self.views_map_url
-        )
+        }
+    def mount_on(self, app_or_bp):
+        self.mount_point = app_or_bp
+        self.register_crud_routes()
 
 
     def to_dict(self):
@@ -515,45 +519,44 @@ class EntitiesGroup(object):
 
 
     def register_crud_routes(
-            self, app_or_bp, url_prefix=None,
-            allow_unknown_fields=False, cache_handler=None, exception_handler=None,
+            self, allow_unknown_fields=False, cache_handler=None,
+            exception_handler=None,
             tmp_folder_path="/tmp", celery_worker=None,
             register_schema_definition=False, register_views_map=False,
             schema_def_url='/schema-def', views_map_url='/views-map'):
 
-        if self.get_registry_entry(app_or_bp, url_prefix) is None:
-            self.initialize_registry_entry(app_or_bp, url_prefix)
-        registry = self.get_registry_entry(app_or_bp, url_prefix)
-
+        app_or_bp = self.mount_point
+        registry = self.get_registry_entry()
         model_schemas = registry["model_schemas"]
 
-        def populate_model_schema(entity):
-            if entity.model_class._input_data_schema_:
-                input_schema = deepcopy(entity.model_class._input_data_schema_)
+        def populate_model_schema(model_class, entity=None):
+            model_key = fetch_nested_key(entity, 'name') or model_class.__name__
+            if model_class._input_data_schema_:
+                input_schema = deepcopy(model_class._input_data_schema_)
             else:
-                input_schema = entity.model_class.generate_input_data_schema()
-            if callable(entity.model_class.input_schema_modifier):
-                input_schema = entity.model_class.input_schema_modifier(
+                input_schema = model_class.generate_input_data_schema()
+            if entity and callable(entity.input_schema_modifier):
+                input_schema = entity.input_schema_modifier(
                     input_schema)
-            model_schemas[entity.name] = {
+            model_schemas[model_key] = {
                 "input_schema": input_schema,
-                "output_schema": entity.model_class.output_data_schema(),
-                "accepted_data_structure": entity.model_class.max_permissible_dict_structure()
+                "output_schema": model_class.output_data_schema(),
+                "accepted_data_structure": model_class.max_permissible_dict_structure()
             }
-            for subcls in all_subclasses(entity.model_class):
+            for subcls in all_subclasses(model_class):
                 if subcls.__name__ not in model_schemas:
                     model_schemas[subcls.__name__] = {
-                        'is_a_polymorphically_derived_from': entity.model_class.__name__,
+                        'is_a_polymorphically_derived_from': model_class.__name__,
                         'polymorphic_identity': subcls.__mapper_args__['polymorphic_identity']
                     }
-            for rel in entity.model_class.__mapper__.relationships.values():
+            for rel in model_class.__mapper__.relationships.values():
                 if rel.mapper.class_.__name__ not in model_schemas:
                     populate_model_schema(rel.mapper.class_)
 
-        for entity in self.entities:
+        for url_slug, entity in self.routes.items():
             _model = entity.model_class
             _model_name = entity.name
-            base_url = entity.url_slug
+            base_url = url_slug
             # base_url = _model_dict.get(edk.URL_SLUG)
 
             default_query_constructor = entity.query_modifier
@@ -575,7 +578,7 @@ class EntitiesGroup(object):
                 registry["models_registered_for_views"].append(
                     _model_name)
             if _model_name not in model_schemas:
-                populate_model_schema(entity)
+                populate_model_schema(entity.model_class, entity)
 
             if _model._input_data_schema_:
                 model_default_input_schema = deepcopy(_model._input_data_schema_)
@@ -597,7 +600,7 @@ class EntitiesGroup(object):
                     enable_caching = index_op.enable_caching and cache_handler is not None
                 cache_key_determiner = index_op.cache_key_determiner
                 cache_timeout = index_op.cache_timeout or cache_timeout
-                index_func = index_op.view_func or construct_index_view_function(
+                index_func = index_op.view_function or construct_index_view_function(
                     _model,
                     index_query_creator=index_op.query_modifier or default_query_constructor,
                     dict_struct=index_op.response_dict_struct or dict_struct_for_model,
@@ -625,9 +628,9 @@ class EntitiesGroup(object):
                 get_op = entity.get
                 if get_op.enable_caching is not None:
                     enable_caching = get_op.enable_caching and cache_handler is not None
-                cache_key_determiner = get_op.cache_handler
+                cache_key_determiner = get_op.cache_key_determiner
                 cache_timeout = get_op.cache_timeout or cache_timeout
-                get_func = get_op.view_func or construct_get_view_function(
+                get_func = get_op.view_function or construct_get_view_function(
                     _model,
                     permitted_object_getter=get_op.permitted_object_getter or entity.permitted_object_getter,
                     get_query_creator=get_op.query_modifier or default_query_constructor,
@@ -652,11 +655,11 @@ class EntitiesGroup(object):
                         deepcopy(model_default_input_schema))
                 else:
                     post_input_schema = model_default_input_schema
-                post_func = post_op.view_func or construct_post_view_function(
+                post_func = post_op.view_function or construct_post_view_function(
                     _model, post_input_schema,
                     entities_group=self,
-                    pre_processors=post_op.actions_before_save,
-                    post_processors=post_op.actions_after_save,
+                    pre_processors=post_op.before_save,
+                    post_processors=post_op.after_save,
                     schemas_registry=schemas_registry,
                     allow_unknown_fields=allow_unknown_fields,
                     dict_struct=post_op.response_dict_struct or dict_struct_for_model,
@@ -692,12 +695,12 @@ class EntitiesGroup(object):
                         deepcopy(model_default_input_schema))
                 else:
                     put_input_schema = model_default_input_schema
-                put_func = put_op.view_func or construct_put_view_function(
+                put_func = put_op.view_function or construct_put_view_function(
                     _model, put_input_schema,
                     entities_group=self,
                     permitted_object_getter=put_op.permitted_object_getter or entity.permitted_object_getter,
-                    pre_processors=put_op.actions_before_save,
-                    post_processors=post_op.actions_after_save,
+                    pre_processors=put_op.before_save,
+                    post_processors=post_op.after_save,
                     dict_struct=put_op.response_dict_struct or dict_struct_for_model,
                     allow_unknown_fields=allow_unknown_fields,
                     query_constructor=put_op.query_modifier or default_query_constructor,
@@ -734,11 +737,11 @@ class EntitiesGroup(object):
                         deepcopy(model_default_input_schema))
                 else:
                     patch_input_schema = model_default_input_schema
-                patch_func = patch_op.view_func or construct_patch_view_function(
+                patch_func = patch_op.view_function or construct_patch_view_function(
                     _model, patch_input_schema,
-                    pre_processors=patch_op.actions_before_save,
-                    processors=patch_op.processors,
-                    post_processors=patch_op.actions_after_save,
+                    pre_processors=patch_op.before_save,
+                    commands=patch_op.commands,
+                    post_processors=patch_op.after_save,
                     query_constructor=patch_op.query_modifier or default_query_constructor,
                     permitted_object_getter=patch_op.permitted_object_getter or entity.permitted_object_getter,
                     schemas_registry=schemas_registry,
@@ -756,12 +759,12 @@ class EntitiesGroup(object):
 
             if entity.delete:
                 delete_op = entity.delete
-                delete_func = delete_op.view_func or construct_delete_view_function(
+                delete_func = delete_op.view_function or construct_delete_view_function(
                     _model,
                     query_constructor=delete_op.query_modifier or default_query_constructor,
-                    pre_processors=delete_op.actions_before_save,
+                    pre_processors=delete_op.before_save,
                     permitted_object_getter=delete_op.permitted_object_getter or entity.permitted_object_getter,
-                    post_processors=delete_op.actions_after_save,
+                    post_processors=delete_op.after_save,
                     exception_handler=delete_op.exception_handler or default_exception_handler,
                     access_checker=delete_op.access_checker or default_access_checker)
                 delete_url = delete_op.url or "/%s/<_id>" % base_url
@@ -777,13 +780,13 @@ class EntitiesGroup(object):
                         deepcopy(model_default_input_schema))
                 else:
                     batch_save_input_schema = model_default_input_schema
-                batch_save_func = batch_save_op.view_func or construct_batch_save_view_function(
+                batch_save_func = batch_save_op.view_function or construct_batch_save_view_function(
                     _model, batch_save_input_schema,
                     app_or_bp=app_or_bp,
-                    pre_processors_for_post=fetch_nested_key(entity, 'post.actions_before_save'),
-                    pre_processors_for_put=fetch_nested_key(entity, 'put.actions_before_save'),
-                    post_processors_for_post=fetch_nested_key(entity, 'post.actions_after_save'),
-                    post_processors_for_put=fetch_nested_key(entity, 'put.actions_before_save'),
+                    pre_processors_for_post=fetch_nested_key(entity, 'post.before_save'),
+                    pre_processors_for_put=fetch_nested_key(entity, 'put.before_save'),
+                    post_processors_for_post=fetch_nested_key(entity, 'post.after_save'),
+                    post_processors_for_put=fetch_nested_key(entity, 'put.before_save'),
                     extra_pre_processors=batch_save_op.extra_actions_before_save,
                     extra_post_processors=batch_save_op.extra_actions_after_save,
                     unique_identifier_fields=batch_save_op.unique_identifier_fields,
@@ -800,7 +803,10 @@ class EntitiesGroup(object):
                     celery_worker=celery_worker,
                     result_saving_instance_model=batch_save_op.result_saving_instance_model,
                     result_saving_instance_getter=batch_save_op.result_saving_instance_getter,
-                    run_as_async_task=batch_save_op.run_as_async_task
+                    run_as_async_task=batch_save_op.run_as_async_task,
+                    update_only=batch_save_op.update_only, create_only=batch_save_op.create_only,
+                    skip_pre_processors=batch_save_op.skip_pre_processors,
+                    skip_post_processors=batch_save_op.skip_post_processors
                 )
                 batch_save_url = batch_save_op.url or "/batch-save/%s" % base_url
                 app_or_bp.route(
