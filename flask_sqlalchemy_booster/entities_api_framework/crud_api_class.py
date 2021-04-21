@@ -16,6 +16,9 @@ from copy import deepcopy
 
 
 class EntityOperation(object):
+    """
+    Base class which represents a crud operation on the entity
+    """
     def __init__(self, entity=None):
         self.init_entity(entity)
 
@@ -25,15 +28,61 @@ class EntityOperation(object):
     def to_dict(self):
         raise NotImplementedError
 
+    """This class represents a GET operation on an entity.
+    Registers a GET endpoint at /<entity.url_slug>/<id>
+
+    Parameters
+    ------------
+    entity: Entity
+        The entity object on which the Get operation is defined. Should be specified if the get
+        operation is defined separately after the entity is defined. Can be skipped if it is instead
+        defined as a part of the entity definition
+
+    query_modifier: function, Optional
+        A function which can modify the query used to fetch the object to be returned. This
+        should be a function which accepts a query and returns a query
+        For example, if an api is supposed to return only confirmed orders, we can set the
+        query_modifier like this
+            query_modifier = lambda q: q.filter(Order.confirmed==True)
+
+
+    view_function: functype, Optional
+        
+        
+
+    url: str
+        Optional. Provide this if you want to override the default url for the Get
+        operation which is of the format /<entity.url_slug>/<id>. For example if you
+        want to define a special endpoint /accounts/current which will let the client
+        access the currently logged in account without knowing the id, then you would need
+        to set this url parameter
+
+    
+    """
+
 class Get(EntityOperation):
+    """[summary]
+
+    Parameters
+    ----------
+    EntityOperation : [type]
+        [description]
+
+    Returns
+    -------
+    [type]
+        [description]
+    """
+
 
     method = 'get'
 
     def __init__(
-            self, entity=None, url=None, enable_caching=False, cache_key_determiner=None,
-            cache_timeout=None, view_function=None, query_modifier=None,
+            self, entity=None, view_function=None, query_modifier=None,
             permitted_object_getter=None, id_attr=None, response_dict_struct=None,
-            response_dict_modifiers=None, exception_handler=None, access_checker=None):
+            response_dict_modifiers=None, exception_handler=None, access_checker=None,
+            url=None, enable_caching=False, cache_key_determiner=None,
+            cache_timeout=None, ):
         super(Get, self).__init__(entity=entity)
         self.url = url
         self.enable_caching = enable_caching
@@ -354,6 +403,10 @@ class BatchSave(EntityOperation):
 
 
 class Entity(object):
+
+    """[summary]
+    """
+
     def __init__(
             self, url_slug=None, model_class=None, name=None, router=None,
             permitted_operations=None, permitted_object_getter=None,
