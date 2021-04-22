@@ -39,8 +39,10 @@ Contents
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
 
+   install
+   howto
+   api
 
 
 Indices and tables

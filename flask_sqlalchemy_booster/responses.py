@@ -105,25 +105,25 @@ def serializable_list(
     Converts a list of model instances to a list of dictionaries
     using their `todict` method.
 
-    Args:
-        olist (list): The list of instances to convert
-        attrs_to_serialize (list, optional): To be passed as an argument
-            to the `todict` method
-        rels_to_expand (list, optional): To be passed as an argument
-            to the `todict` method
-        group_listrels_by (dict, optional): To be passed as an argument
-            to the `todict` method
-        rels_to_serialize (list, optional): To be passed as an argument
-            to the `todict` method
-        key_modifications (dict, optional): To be passed as an argument
-            to the `todict` method
-
-        groupby (list, optional): An optional list of keys based on which
-            the result list will be hierarchially grouped ( and converted
-                into a dict)
-
-        keyvals_to_merge (list of dicts, optional): A list of parameters
-            to be merged with each dict of the output list
+    Parameters
+    ------------
+    olist : list
+        The list of instances to convert
+    attrs_to_serialize : list, optional
+        To be passed as an argument to the `todict` method
+    rels_to_expand : list, optional
+        To be passed as an argument to the `todict` method
+    group_listrels_by : dict, optional
+        To be passed as an argument to the `todict` method
+    rels_to_serialize : list, optional
+        To be passed as an argument to the `todict` method
+    key_modifications : dict, optional
+        To be passed as an argument to the `todict` method
+    groupby : list, optional
+        An optional list of keys based on which the result list will be hierarchially grouped ( and converted
+            into a dict)
+    keyvals_to_merge : list of dicts, optional
+        A list of parameters to be merged with each dict of the output list
     """
     if groupby:
         if preserve_order:
@@ -192,22 +192,25 @@ def structured(struct, wrap=True, meta=None, struct_key=None, pre_render_callbac
 def jsoned(struct, wrap=True, meta=None, struct_key=None, pre_render_callback=None):
     """ Provides a json dump of the struct
 
-    Args:
-        struct: The data to dump
-        wrap (bool, optional): Specify whether to wrap the
-            struct in an enclosing dict
-        struct_key (str, optional): The string key which will
-            contain the struct in the result dict
-        meta (dict, optional): An optional dictonary to merge
-            with the output dictionary.
+    Parameters
+    -----------
+    struct 
+        The data to dump
+    wrap : bool, optional
+        Specify whether to wrap the struct in an enclosing dict
+    struct_key  : str, optional
+        The string key which will contain the struct in the result dict
+    meta : dict, optional
+        An optional dictonary to merge with the output dictionary.
 
-    Examples:
+    Examples
+    ---------
 
-        >>> jsoned([3,4,5])
-        ... '{"status": "success", "result": [3, 4, 5]}'
+    >>> jsoned([3,4,5])
+    ... '{"status": "success", "result": [3, 4, 5]}'
 
-        >>> jsoned([3,4,5], wrap=False)
-        ... '[3, 4, 5]'
+    >>> jsoned([3,4,5], wrap=False)
+    ... '[3, 4, 5]'
 
     """
     return _json.dumps(

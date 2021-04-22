@@ -27,3 +27,9 @@ Responses
 .. automodule:: flask_sqlalchemy_booster.responses
     :members:
 
+EntitiesRouter
+--------------------------------
+
+.. automodule:: flask_sqlalchemy_booster.entities_router
+    :members:
+
