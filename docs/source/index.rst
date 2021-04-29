@@ -42,6 +42,7 @@ Contents
 
    install
    howto
+   entities-router
    api
 
 
