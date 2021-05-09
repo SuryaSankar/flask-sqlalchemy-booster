@@ -669,8 +669,8 @@ class EntitiesRouter(object):
 
     def to_dict(self):
         entities_map = {}
-        for entity in self.entities:
-            entities_map[entity.model_class or entity.model_name] = entity.to_dict()
+        for url_slug, entity in self.routes.items():
+            entities_map[entity.name or entity.model_class] = entity.to_dict()
         return entities_map
 
 
@@ -678,7 +678,7 @@ class EntitiesRouter(object):
             self, allow_unknown_fields=False, cache_handler=None,
             exception_handler=None,
             tmp_folder_path="/tmp", celery_worker=None,
-            register_schema_definition=False, register_views_map=False,
+            register_schema_definition=True, register_views_map=True,
             schema_def_url='/schema-def', views_map_url='/views-map'):
 
         app_or_bp = self.mount_point
