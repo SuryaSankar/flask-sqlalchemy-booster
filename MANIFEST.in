@@ -1,1 +1,2 @@
 recursive-include flask_sqlalchemy_booster/model_booster/ *.py
+recursive-include flask_sqlalchemy_booster/entities_router/ *.py

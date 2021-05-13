@@ -704,6 +704,10 @@ def construct_batch_save_view_function(
                     if callable(processor):
                         processed_obj = processor(
                             obj, input_row,
+                            extra_params={
+                                "pre_modification_data": pre_modification_data,
+                                "raw_input_data": raw_input_row
+                            },
                             pre_modification_data=pre_modification_data,
                             raw_input_data=raw_input_row)
                         if processed_obj is not None:
