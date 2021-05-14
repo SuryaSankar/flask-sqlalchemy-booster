@@ -662,9 +662,30 @@ class EntitiesRouter(object):
 
             }
         }
-    def mount_on(self, app_or_bp):
+    def mount_on(
+            self, app_or_bp, allow_unknown_fields=False, cache_handler=None,
+            exception_handler=None,
+            tmp_folder_path=None, celery_worker=None,
+            register_schema_definition=None, register_views_map=None,
+            schema_def_url=None, views_map_url=None):
         self.mount_point = app_or_bp
-        self.register_crud_routes()
+        if allow_unknown_fields is None:
+            allow_unknown_fields = self.allow_unknown_fields
+        if register_schema_definition is None:
+            register_schema_definition = self.register_schema_definition
+        if register_views_map is None:
+            register_views_map = self.register_views_map
+        self.register_crud_routes(
+            allow_unknown_fields=allow_unknown_fields,
+            cache_handler=cache_handler or self.cache_handler, 
+            exception_handler=exception_handler or self.exception_handler,
+            tmp_folder_path=tmp_folder_path or self.tmp_folder_path,
+            celery_worker=celery_worker or self.celery_worker,
+            register_schema_definition=register_schema_definition,
+            register_views_map=register_views_map,
+            schema_def_url=schema_def_url or self.schema_def_url,
+            views_map_url=views_map_url or self.views_map_url
+        )
 
 
     def to_dict(self):

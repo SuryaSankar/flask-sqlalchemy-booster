@@ -147,6 +147,7 @@ def construct_index_view_function(
         cache_timeout=None, exception_handler=None, access_checker=None,
         default_limit=None, default_sort=None, default_orderby=None,
         default_offset=None, default_page=None, default_per_page=None):
+
     def index():
         try:
             if callable(access_checker):
