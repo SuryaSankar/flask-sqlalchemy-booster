@@ -604,7 +604,7 @@ class EntitiesRouter(object):
         cache_handler=None, exception_handler=None,
         tmp_folder_path="/tmp", permitted_operations=None,
         forbidden_operations=None, celery_worker=None,
-        register_schema_definition=False, register_views_map=False,
+        register_schema_definition=True, register_views_map=True,
         schema_def_url='/schema-def', views_map_url='/views-map',
         base_url=None
     ):
