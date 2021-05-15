@@ -877,7 +877,7 @@ class EntitiesRouter(object):
                     entities_group=self,
                     permitted_object_getter=put_op.permitted_object_getter or entity.permitted_object_getter,
                     pre_processors=put_op.before_save,
-                    post_processors=post_op.after_save,
+                    post_processors=put_op.after_save,
                     dict_struct=put_op.response_dict_struct or dict_struct_for_model,
                     allow_unknown_fields=allow_unknown_fields,
                     query_constructor=put_op.query_modifier or default_query_constructor,

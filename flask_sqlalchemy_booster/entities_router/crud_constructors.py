@@ -424,6 +424,7 @@ def construct_put_view_function(
                 return error_json(400, errors)
             pre_modification_data = obj.todict(dict_struct={"rels": {}})
             updated_obj = obj.update(**input_data)
+            print("got post processors as ", post_processors)
             if post_processors is not None:
                 for processor in post_processors:
                     if callable(processor):
