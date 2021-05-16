@@ -497,8 +497,7 @@ def return_joined_query_model_class_and_attr_name(query, keyword):
                     return (query, None)
                 model_class = query.model_class._decl_class_registry[
                     class_name]
-                if model_class not in [entity.class_ for entity in _query._join_entities]:
-                    _query = _query.join(model_class)
+                _query = _query.join(model_class)
 
         elif prefix_names[0] in query.model_class.all_keys():
             model_class = query.model_class
@@ -508,11 +507,7 @@ def return_joined_query_model_class_and_attr_name(query, keyword):
                         r for r in model_class.__mapper__.relationships
                         if r.key == rel_or_proxy_name)
                     model_class = mapped_rel.mapper.class_
-                    if model_class not in [entity.class_ for entity in _query._join_entities]:
-                        # print("About to join model_class ", model_class)
-                        # print("rel_or_proxy_name is ", rel_or_proxy_name)
-                        # _query = _query.join(model_class)
-                        _query = _query.join(rel_or_proxy_name)
+                    _query = _query.join(rel_or_proxy_name)
                 elif rel_or_proxy_name in model_class.association_proxy_keys():
                     assoc_proxy = getattr(model_class, rel_or_proxy_name)
                     assoc_rel = next(
@@ -524,8 +519,7 @@ def return_joined_query_model_class_and_attr_name(query, keyword):
                         r for r in assoc_rel_class.__mapper__.relationships
                         if r.key == assoc_proxy.value_attr)
                     model_class = actual_rel_in_assoc_class.mapper.class_
-                    if model_class not in [entity.class_ for entity in _query._join_entities]:
-                        _query = _query.join(model_class)
+                    _query = _query.join(model_class)
     else:
         # print(". not in attr_name")
         model_class = query.model_class
@@ -543,16 +537,7 @@ def return_joined_query_model_class_and_attr_name(query, keyword):
             prev_model_class = model_class
             model_class = assoc_rel.mapper.class_
             attr_name = assoc_proxy.value_attr
-            # print("prev_model_class ", prev_model_class)
-            # print("model_class ", model_class)
-            # print("attr_name ", attr_name)
-            if model_class not in [entity.class_ for entity in _query._join_entities]:
-                # _query = _query.join(model_class)
-                # Commenting this out because it is not possibel to directly
-                # join a class when there are multiple foreign keys to it.
-                # Instead it is preferable to join by mentioning the relationshp
-                # itself.
-                _query = _query.join(getattr(prev_model_class, assoc_rel.key))
+            _query = _query.join(getattr(prev_model_class, assoc_rel.key))
     return (_query, model_class, attr_name)
 
 

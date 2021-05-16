@@ -205,7 +205,6 @@ def construct_post_view_function(
         remove_assoc_proxy_keys_before_validation=False,
         remove_property_keys_before_validation=False,
         access_checker=None):
-
     def post():
         try:
             request_json = get_request_json()
@@ -424,7 +423,6 @@ def construct_put_view_function(
                 return error_json(400, errors)
             pre_modification_data = obj.todict(dict_struct={"rels": {}})
             updated_obj = obj.update(**input_data)
-            print("got post processors as ", post_processors)
             if post_processors is not None:
                 for processor in post_processors:
                     if callable(processor):

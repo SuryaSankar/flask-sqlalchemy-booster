@@ -204,8 +204,8 @@ class Post(EntityOperation):
             self, entity=None, url=None, view_function=None, before_save=None, after_save=None,
             response_dict_struct=None, exception_handler=None, access_checker=None,
             settable_fields=None, non_settable_fields=None,
-            remove_property_keys_before_validation=False, remove_relationship_keys_before_validation=False,
-            remove_assoc_proxy_keys_before_validation=False, input_schema_modifier=None):
+            remove_property_keys_before_validation=None, remove_relationship_keys_before_validation=None,
+            remove_assoc_proxy_keys_before_validation=None, input_schema_modifier=None):
         super(Post, self).__init__(entity=entity)
         self.url = url
         self.view_function = view_function
@@ -250,8 +250,8 @@ class Put(EntityOperation):
             before_save=None, after_save=None,
             response_dict_struct=None, exception_handler=None, access_checker=None,
             settable_fields=None, non_settable_fields=None,
-            remove_property_keys_before_validation=False, remove_relationship_keys_before_validation=False,
-            remove_assoc_proxy_keys_before_validation=False, input_schema_modifier=None):
+            remove_property_keys_before_validation=None, remove_relationship_keys_before_validation=None,
+            remove_assoc_proxy_keys_before_validation=None, input_schema_modifier=None):
         super(Put, self).__init__(entity=entity)
         self.url = url
         self.view_function = view_function
@@ -300,8 +300,8 @@ class Patch(EntityOperation):
             before_save=None, after_save=None,
             response_dict_struct=None, exception_handler=None, access_checker=None,
             settable_fields=None, non_settable_fields=None,
-            remove_property_keys_before_validation=False, remove_relationship_keys_before_validation=False,
-            remove_assoc_proxy_keys_before_validation=False, input_schema_modifier=None):
+            remove_property_keys_before_validation=None, remove_relationship_keys_before_validation=None,
+            remove_assoc_proxy_keys_before_validation=None, input_schema_modifier=None):
         super(Patch, self).__init__(entity=entity)
         self.url = url
         self.view_function = view_function
@@ -349,8 +349,8 @@ class Delete(EntityOperation):
             before_save=None, after_save=None,
             response_dict_struct=None, exception_handler=None, access_checker=None,
             settable_fields=None, non_settable_fields=None,
-            remove_property_keys_before_validation=False, remove_relationship_keys_before_validation=False,
-            remove_assoc_proxy_keys_before_validation=False, input_schema_modifier=None):
+            remove_property_keys_before_validation=None, remove_relationship_keys_before_validation=None,
+            remove_assoc_proxy_keys_before_validation=None, input_schema_modifier=None):
         super(Delete, self).__init__(entity=entity)
         self.url = url
         self.view_function = view_function
@@ -469,8 +469,8 @@ class Entity(object):
             forbidden_operations=None, endpoint_slug=None, input_schema_modifier=None,
             query_modifier=None, access_checker=None, exception_handler=None, response_dict_modifiers=None,
             id_attr=None, response_dict_struct=None, non_settable_fields=None, settable_fields=None,
-            remove_relationship_keys_before_validation=False, remove_assoc_proxy_keys_before_validation=False,
-            remove_property_keys_before_validation=False, enable_caching=False, cache_timeout=None,
+            remove_relationship_keys_before_validation=None, remove_assoc_proxy_keys_before_validation=None,
+            remove_property_keys_before_validation=None, enable_caching=False, cache_timeout=None,
             get=None, index=None, put=None, post=None, patch=None, delete=None, batch_save=None):
         self.model_class = model_class
         self.name = name or self.model_class.__name__

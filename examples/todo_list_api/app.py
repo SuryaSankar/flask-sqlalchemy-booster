@@ -1,8 +1,7 @@
 from flask_sqlalchemy_booster import FlaskSQLAlchemyBooster
 from sqlalchemy import func
 from flask_sqlalchemy_booster import FlaskBooster
-from flask_sqlalchemy_booster.crud_api_view import register_crud_routes_for_models
-from flask_sqlalchemy_booster.crud_api_class import CrudAPI
+from flask_sqlalchemy_booster.entities_router import EntitiesRouter, Entity, Get, Index, Put, Post
 from sqlalchemy.ext.associationproxy import association_proxy
 
 from werkzeug.serving import run_simple
@@ -45,6 +44,7 @@ class Task(db.Model):
     completed_on = db.Column(db.DateTime())
 
     user = db.relationship("User", backref=db.backref("tasks"))
+    project = db.relationship("Project")
     user_email = association_proxy(
         "user", "email", creator=lambda email: User.first(email=email)
     )
@@ -98,120 +98,41 @@ def create_todolist_app(testing=False):
     with app.app_context():
         db.create_all()
 
-    print("about to call register_crud_routes_for_models")
-
-    register_crud_routes_for_models(app, {
-        Task: {
-            'url_slug': 'tasks'
-        },
-        User: {
-            'url_slug': 'users',
-            'remove_property_keys_before_validation': True,
-            'dict_struct': {
-                'rels': {
-                    'tasks': {},
-                    'projects': {}
+    todolist_entities = EntitiesRouter(
+        routes={
+            "tasks": Entity(
+                model_class=Task, get=Get(), index=Index(),
+                post=Post(), put=Put()
+            ),
+            "users": Entity(
+                model_class=User, get=Get(id_attr='email'), index=Index(),
+                post=Post(), put=Put(),
+                remove_property_keys_before_validation=True,
+                response_dict_struct= {
+                    'rels': {
+                        'tasks': {},
+                        'projects': {}
+                    }
                 }
-            },
-            'views': {
-                'get': {
-                    'id_attr': 'email'
-                }
-            }
-        },
-        Project: {
-            'url_slug': 'projects'
-        },
-        Team: {
-            'url_slug': 'teams'
-        }
-    }, register_views_map=True, register_schema_definition=True)
-    return app
-
-
-
-def create_todolist_app_using_constants(testing=False):
-    app = FlaskBooster(__name__)
-
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite://'
-    app.config['DEBUG'] = True
-    app.testing = testing
-
-    db.init_app(app)
-
-    with app.app_context():
-        db.create_all()
-
-    print("about to call register_crud_routes_for_models")
-
-    model_views_dict = {
-        Task: {
-            URL_SLUG: 'tasks'
-        },
-        User: {
-            URL_SLUG: 'users',
-            REMOVE_PROPERTY_KEYS_BEFORE_VALIDATION: True,
-            DICT_STRUCT: {
-                RELS: {
-                    'tasks': {},
-                    'projects': {}
-                }
-            },
-            VIEWS: {
-                GET: {
-                    ID_ATTR: 'email'
-                }
-            }
-        },
-        Project: {
-            URL_SLUG: 'projects'
-        },
-        Team: {
-            URL_SLUG: 'teams'
-        }
-    }
-
-    register_crud_routes_for_models(app, model_views_dict, register_views_map=True, register_schema_definition=True)
-    return app
-
-
-def create_app_with_function_based_crud(testing=False):
-    app = FlaskBooster(__name__)
-
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite://'
-    app.config['DEBUG'] = True
-    app.testing = testing
-
-    db.init_app(app)
-
-    with app.app_context():
-        db.create_all()
-
-    todolist_entities = EntitySet()
-    todolist_entities.define_entity(model_class=Task, url_slug='tasks')
-    todolist_user = todolist_entities.define_entity(
-        model_class=User, url_slug='users',
-        remove_property_keys_before_validation=True,
-        dict_struct= {
-            'rels': {
-                'tasks': {},
-                'projects': {}
-            }
+            ),
+            "teams": Entity(
+                model_class=Team, get=Get(), index=Index(),
+                post=Post(), put=Put()
+            ),
+            "projects": Entity(
+                model_class=Project, get=Get(), index=Index(),
+                post=Post(), put=Put()
+            )
         }
     )
-    todolist_user.define_get(id_attr='email')
-
-    todolist_entities.define_entity(Project, url_slug='projects')
-    todolist_entities.define_entity(Team, url_slug='teams')
-    todolist_entities.register(app, register_views_map=True, register_schema_definition=True)
-
+    todolist_entities.mount_on(app)
     return app
 
 def run_application(app):
     run_simple('0.0.0.0', 5000, app)
 
 
+
 if __name__ == '__main__':
     app = create_todolist_app()
-
     run_application(app)
