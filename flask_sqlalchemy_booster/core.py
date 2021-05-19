@@ -54,10 +54,22 @@ class FlaskSQLAlchemyBooster(SQLAlchemy):
 
     """
 
-    def __init__(self, *args, **kwargs):
-        kwargs["model_class"] = ModelBooster
-        kwargs["query_class"] = QueryBooster
-        super(FlaskSQLAlchemyBooster, self).__init__(*args, **kwargs)
+
+    def __init__(self, app=None, use_native_unicode=True, session_options=None,
+                 metadata=None,
+                 engine_options=None):
+        self.class_registry = {}
+        model_class = declarative_base(
+            cls=ModelBooster,
+            name='Model',
+            metadata=metadata,
+            metaclass=DefaultMeta,
+            class_registry=self.class_registry
+        )
+        super(FlaskSQLAlchemyBooster, self).__init__(
+            app=app, use_native_unicode=use_native_unicode, session_options=session_options,
+            metadata=metadata, query_class=QueryBooster, model_class=model_class,
+            engine_options=engine_options)
         # self.Query = QueryBooster
 
     def make_declarative_base(self, model, metadata=None):
@@ -67,40 +79,41 @@ class FlaskSQLAlchemyBooster(SQLAlchemy):
         base.session = self.session
         return base
 
-    def make_declarative_base(self, model, metadata=None):
-        """Creates the declarative base that all models will inherit from.
+    # def make_declarative_base(self, model, metadata=None, class_registry=None):
+    #     """Creates the declarative base that all models will inherit from.
 
-        :param model: base model class (or a tuple of base classes) to pass
-            to :func:`~sqlalchemy.ext.declarative.declarative_base`. Or a class
-            returned from ``declarative_base``, in which case a new base class
-            is not created.
-        :param metadata: :class:`~sqlalchemy.MetaData` instance to use, or
-            none to use SQLAlchemy's default.
+    #     :param model: base model class (or a tuple of base classes) to pass
+    #         to :func:`~sqlalchemy.ext.declarative.declarative_base`. Or a class
+    #         returned from ``declarative_base``, in which case a new base class
+    #         is not created.
+    #     :param metadata: :class:`~sqlalchemy.MetaData` instance to use, or
+    #         none to use SQLAlchemy's default.
 
-        .. versionchanged 2.3.0::
-            ``model`` can be an existing declarative base in order to support
-            complex customization such as changing the metaclass.
-        """
-        if not isinstance(model, DeclarativeMeta):
-            model = declarative_base(
-                cls=model,
-                name='Model',
-                metadata=metadata,
-                metaclass=DefaultMeta
-            )
+    #     .. versionchanged 2.3.0::
+    #         ``model`` can be an existing declarative base in order to support
+    #         complex customization such as changing the metaclass.
+    #     """
+    #     if not isinstance(model, DeclarativeMeta):
+    #         model = declarative_base(
+    #             cls=model,
+    #             name='Model',
+    #             metadata=metadata,
+    #             metaclass=DefaultMeta,
+    #             class_registry=class_registry
+    #         )
 
-        # if user passed in a declarative base and a metaclass for some reason,
-        # make sure the base uses the metaclass
-        if metadata is not None and model.metadata is not metadata:
-            model.metadata = metadata
+    #     # if user passed in a declarative base and a metaclass for some reason,
+    #     # make sure the base uses the metaclass
+    #     if metadata is not None and model.metadata is not metadata:
+    #         model.metadata = metadata
 
-        if not getattr(model, 'query_class', None):
-            model.query_class = self.Query
+    #     if not getattr(model, 'query_class', None):
+    #         model.query_class = self.Query
 
-        model.query = _QueryProperty(self)
-        model.query = QueryPropertyWithModelClass(self)
-        model.session = self.session
-        return model
+    #     model.query = _QueryProperty(self)
+    #     model.query = QueryPropertyWithModelClass(self)
+    #     model.session = self.session
+    #     return model
 
 def _sanitize_object(obj):
     result = {}
