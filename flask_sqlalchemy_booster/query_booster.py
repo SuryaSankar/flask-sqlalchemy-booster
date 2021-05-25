@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 from flask_sqlalchemy import BaseQuery, Pagination
+from flask_sqlalchemy.model import DefaultMeta
 from six.moves import range
 
 
@@ -7,23 +8,30 @@ class QueryBooster(BaseQuery):
 
     cls = None
 
-    # def __init__(self, *args, **kwargs):
-    #     super(QueryBooster, self).__init__(*args, **kwargs)
-    #     self.model_class = self._primary_entity.mapper.class_
+    def __init__(self, *args, **kwargs):
+        self.primary_entity = None
+        self.model_class = None
+        if len(args) > 0:
+            self.primary_entity = args[0]
+            if isinstance(self.primary_entity, DefaultMeta):
+                self.model_class = self.primary_entity
+
+        super(QueryBooster, self).__init__(*args, **kwargs)
 
     @property
     def mapper_model_class(self):
-        return self._primary_entity.mapper.class_
+        # return self._primary_entity.mapper.class_
+        return self.model_class
 
     def desc(self, attr=None):
         if attr is None:
-            attr = self.mapper_model_class.primary_key_name()
-        return self.order_by(getattr(self.mapper_model_class, attr).desc())
+            attr = self.model_class.primary_key_name()
+        return self.order_by(getattr(self.model_class, attr).desc())
 
     def asc(self, attr=None):
         if attr is None:
-            attr = self.mapper_model_class.primary_key_name()
-        return self.order_by(getattr(self.mapper_model_class, attr))
+            attr = self.model_class.primary_key_name()
+        return self.order_by(getattr(self.model_class, attr))
 
     def last(self, *criterion, **kwargs):
         return self.filter_by(**kwargs).filter(*criterion).desc().first()
@@ -32,10 +40,10 @@ class QueryBooster(BaseQuery):
         if len(keyvals) == 0:
             return []
         if key is None:
-            key = self.mapper_model_class.primary_key_name()
+            key = self.model_class.primary_key_name()
         original_keyvals = keyvals
         keyvals_set = list(set(keyvals))
-        resultset = self.filter(getattr(self.mapper_model_class, key).in_(keyvals_set))
+        resultset = self.filter(getattr(self.model_class, key).in_(keyvals_set))
         key_result_mapping = {getattr(result, key): result for result in resultset.all()}
         return [key_result_mapping.get(kv) for kv in original_keyvals]
 
